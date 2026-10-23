@@ -121,6 +121,13 @@ programs by mistake. Each build writes `SHA256SUMS.txt`: compare it with `Get-Fi
 running a copy you did not build yourself. Installing from source remains the most transparent
 option.
 
+Next to each program there is a small `.exe.config` file with `loadFromRemoteSources` turned on.
+Windows marks every file extracted from a downloaded zip as "from the Internet", and without this
+setting .NET refuses to load the window library shipped inside the folder (version 0.2.0 failed to
+start with `Failed to resolve Python.Runtime.Loader.Initialize`). The setting applies only to
+Guardia's two programs, which load .NET libraries only from their own folder; anyone who can replace
+those files can already replace the program itself.
+
 ---
 
 ## Italiano
@@ -249,3 +256,10 @@ ancora firmati digitalmente**: Windows SmartScreen può mostrare un avviso e alc
 segnalano per errore i programmi fatti con PyInstaller. Ogni build scrive `SHA256SUMS.txt`:
 confrontalo con `Get-FileHash` prima di avviare una copia che non hai costruito tu. Installare dal
 codice sorgente resta la scelta più trasparente.
+
+Accanto a ogni programma c'è un piccolo file `.exe.config` con `loadFromRemoteSources` attivo.
+Windows segna ogni file estratto da uno zip scaricato come «proveniente da Internet», e senza questa
+impostazione .NET si rifiuta di caricare la libreria della finestra che sta dentro la cartella (la
+versione 0.2.0 non partiva, con l'errore `Failed to resolve Python.Runtime.Loader.Initialize`).
+L'impostazione vale solo per i due programmi di Guardia, che caricano librerie .NET soltanto dalla
+loro cartella; chi riesce a sostituire quei file può già sostituire il programma stesso.

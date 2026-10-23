@@ -4,6 +4,8 @@
 
 **by Alexander Puglisi** · [alexanderpuglisiskilly.com](https://alexanderpuglisiskilly.com) · [Download](https://github.com/AlexanderPuglisi/guardia-mcp/releases/latest) · [✓ Claude Academy: Introduction to MCP](https://academy.claude.com/verify/5a6125d6ee0ea408559c3679d0ff2657)
 
+**[Step-by-step guide with screenshots](docs/GUIDE.md)** · **[Guida passo passo con foto](docs/GUIDA.md)**
+
 [How it was tested](TESTING.md) · [Security](SECURITY.md) · [For reviewers](AUDIT.md) · [Guide (EN)](docs/SHIELD.md) · [Guida (IT)](docs/SCUDO.md)
 
 > 🇬🇧 English below · 🇮🇹 Italiano più sotto
@@ -38,7 +40,7 @@ asks you first.
 <sub>The demo runs on a fake PC made of fake servers and skills written for the purpose
 (`scripts/demo.py`): no real data, no real secrets.</sub>
 
-**Status: version 0.2.0 — v1 (static analysis) and v2 (real-time Shield for local stdio servers).**
+**Status: version 0.2.1 — v1 (static analysis) and v2 (real-time Shield for local stdio servers).**
 
 - `guardia inventory` — finds every MCP server and skill on this PC (Claude Desktop, Claude Code,
   Cursor, VS Code, Windsurf, Gemini CLI, Codex, Copilot CLI) and lists them with a risk level.
@@ -117,8 +119,10 @@ Full guide: [docs/SHIELD.md](docs/SHIELD.md).
 
 ### Getting started (no programming needed)
 
-1. **Download** `GuardiaMCP-0.2.0-windows-x64.zip` from the project's [**Releases**](https://github.com/AlexanderPuglisi/guardia-mcp/releases/latest) page on GitHub
-   and check it: in PowerShell, `Get-FileHash .\GuardiaMCP-0.2.0-windows-x64.zip` must print the
+Prefer pictures? Follow the [step-by-step guide with screenshots](docs/GUIDE.md).
+
+1. **Download** `GuardiaMCP-0.2.1-windows-x64.zip` from the project's [**Releases**](https://github.com/AlexanderPuglisi/guardia-mcp/releases/latest) page on GitHub
+   and check it: in PowerShell, `Get-FileHash .\GuardiaMCP-0.2.1-windows-x64.zip` must print the
    same value written in `SHA256SUMS.txt` on the same page.
 2. **Extract** it to a folder that will not move, for example `C:\Users\YOUR-NAME` (the zip
    already contains the `GuardiaMCP` folder, so you get `C:\Users\YOUR-NAME\GuardiaMCP`).
@@ -268,7 +272,7 @@ conferma.
 <sub>La demo gira su un PC finto, fatto di server e skill finti scritti apposta
 (`scripts/demo.py`): nessun dato vero, nessun segreto vero.</sub>
 
-**Stato: versione 0.2.0 — v1 (analisi statica) e v2 (Scudo in tempo reale per i server locali stdio).**
+**Stato: versione 0.2.1 — v1 (analisi statica) e v2 (Scudo in tempo reale per i server locali stdio).**
 
 - `guardia inventario` — trova tutti i server MCP e le skill del PC (Claude Desktop, Claude Code,
   Cursor, VS Code, Windsurf, Gemini CLI, Codex, Copilot CLI) e li elenca con il livello di rischio.
@@ -354,8 +358,10 @@ Vuoi capire MCP da zero? Leggi [docs/IMPARA-MCP.md](docs/IMPARA-MCP.md).
 
 ### Primi passi (non serve saper programmare)
 
-1. **Scarica** `GuardiaMCP-0.2.0-windows-x64.zip` dalla pagina [**Releases**](https://github.com/AlexanderPuglisi/guardia-mcp/releases/latest) del progetto su GitHub
-   e controllalo: in PowerShell, `Get-FileHash .\GuardiaMCP-0.2.0-windows-x64.zip` deve stampare
+Preferisci le foto? Segui la [guida passo passo con le schermate](docs/GUIDA.md).
+
+1. **Scarica** `GuardiaMCP-0.2.1-windows-x64.zip` dalla pagina [**Releases**](https://github.com/AlexanderPuglisi/guardia-mcp/releases/latest) del progetto su GitHub
+   e controllalo: in PowerShell, `Get-FileHash .\GuardiaMCP-0.2.1-windows-x64.zip` deve stampare
    lo stesso valore scritto in `SHA256SUMS.txt` nella stessa pagina.
 2. **Estrailo** in una cartella che non sposterai, per esempio `C:\Users\TUO-NOME` (lo zip
    contiene già la cartella `GuardiaMCP`, quindi ottieni `C:\Users\TUO-NOME\GuardiaMCP`).

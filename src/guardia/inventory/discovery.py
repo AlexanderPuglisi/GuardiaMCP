@@ -58,6 +58,8 @@ class _DiscoveryState:
         text = decode_text(read_bytes(location.path, self.options.max_file_bytes))
         if location.format is ConfigFormat.CODEX_TOML:
             return parse_toml(text)
+        if not text.strip():
+            return ParsedDocument({}, text=text)
         return parse_json(text, jsonc=location.jsonc)
 
     def process(

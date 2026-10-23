@@ -6,7 +6,7 @@ Lo Scudo è la parte di Guardia che lavora **mentre** l'AI usa i server MCP. L'a
 guarda i file e ti dice cosa c'è di rischioso; lo Scudo invece si mette in mezzo ai messaggi e può
 **bloccarli, nasconderli o oscurarli** seguendo regole scritte da te.
 
-> **Stato: versione 0.2.0.** Regole, protezioni di base, finestra di conferma, collegamento
+> **Stato: versione 0.2.1.** Regole, protezioni di base, finestra di conferma, collegamento
 > automatico dei client e vista «Scudo» nell'app. Provato con l'SDK Python ufficiale di MCP
 > (protocolli 2025-11-25 e 2026-07-28).
 

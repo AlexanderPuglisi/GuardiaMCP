@@ -157,7 +157,12 @@ def source_findings(records: Sequence[SourceRecord]) -> tuple[Finding, ...]:
     for record in records:
         if record.status is SourceStatus.ERROR:
             findings.append(
-                _file_finding("G12-006", record, reason=record.error_code or "", detail="")
+                _file_finding(
+                    "G12-006",
+                    record,
+                    reason=record.error_code or "",
+                    detail=record.error_detail,
+                )
             )
         for warning in record.warnings:
             code, _, detail = warning.partition(":")

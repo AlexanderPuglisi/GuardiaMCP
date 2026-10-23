@@ -6,7 +6,7 @@ The Shield is the part of Guardia that works **while** the AI is using MCP serve
 reads files and tells you what is risky; the Shield sits between the messages and can **block,
 hide or redact** them following rules you write.
 
-> **Status: version 0.2.0.** Rules, built-in protections, the confirmation window, automatic
+> **Status: version 0.2.1.** Rules, built-in protections, the confirmation window, automatic
 > client setup and the "Shield" view in the app. Tested with the official MCP Python SDK
 > (protocols 2025-11-25 and 2026-07-28).
 

@@ -7,7 +7,7 @@
 ## English
 
 A security tool is only worth what its tests prove. This page lists what was actually run on
-version 0.2.0, how, and what is **not** covered. Nothing here was run against real malware or
+version 0.2.1, how, and what is **not** covered. Nothing here was run against real malware or
 anyone else's systems: every "attack" is a fake server or fake file written for the purpose.
 
 ### In numbers
@@ -78,6 +78,15 @@ failed first, then a fix, then the same test passing:
 
 The documentation was corrected in the same pass wherever it promised more than the code did.
 
+### Found after release
+
+Version 0.2.0 did not start on a second Windows laptop when downloaded from GitHub: Windows marks
+files extracted from a downloaded zip as "from the Internet", and .NET refused to load the window
+library (`Failed to resolve Python.Runtime.Loader.Initialize`). The problem was reproduced here by
+marking every file of the release zip the same way, fixed in 0.2.1 with a `.exe.config` next to
+each program, and checked again: with the fix both the app and the confirmation window open, without
+it the same error comes back. A test keeps the configuration in the build.
+
 ### Not covered
 
 - **macOS and Linux**: the code paths exist, but they were not tried on real machines.
@@ -100,7 +109,7 @@ uv run mypy
 ## Italiano
 
 Uno strumento di sicurezza vale quanto dimostrano i suoi test. Qui c'è cosa è stato eseguito
-davvero sulla versione 0.2.0, come, e cosa **non** è coperto. Niente è stato provato con malware
+davvero sulla versione 0.2.1, come, e cosa **non** è coperto. Niente è stato provato con malware
 vero o su sistemi di altri: ogni «attacco» è un server finto o un file finto scritto apposta.
 
 ### In numeri
@@ -178,6 +187,16 @@ prima un test che falliva, poi la correzione, poi lo stesso test che passa:
 
 Nello stesso passaggio la documentazione è stata corretta dove prometteva più di quello che il
 codice fa.
+
+### Trovato dopo la pubblicazione
+
+La versione 0.2.0 non partiva su un secondo portatile Windows quando veniva scaricata da GitHub:
+Windows segna i file estratti da uno zip scaricato come «provenienti da Internet», e .NET si
+rifiutava di caricare la libreria della finestra (`Failed to resolve Python.Runtime.Loader.Initialize`).
+Il problema è stato riprodotto qui segnando allo stesso modo ogni file dello zip, corretto nella
+0.2.1 con un file `.exe.config` accanto a ogni programma, e ricontrollato: con la correzione si aprono
+sia l'app sia la finestra di conferma, senza torna lo stesso errore. Un test tiene la
+configurazione nella build.
 
 ### Non coperto
 

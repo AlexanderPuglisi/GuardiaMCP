@@ -34,6 +34,15 @@ def test_spec_builds_both_executables_with_resources() -> None:
     assert "debug=True" not in spec
 
 
+def test_both_programs_ship_a_dotnet_config_for_downloaded_zips() -> None:
+    config = (PACKAGING / "dotnet.exe.config").read_text(encoding="utf-8")
+    assert '<loadFromRemoteSources enabled="true"/>' in config
+    assert config.index("<runtime>") < config.index("loadFromRemoteSources")
+    build = (PROJECT / "scripts" / "build_exe.py").read_text(encoding="utf-8")
+    assert 'PROGRAMS = ("guardia.exe", "GuardiaMCP.exe")' in build
+    assert 'shutil.copy2(DOTNET_CONFIG, FOLDER / f"{program}.config")' in build
+
+
 def test_icon_contains_small_and_large_sizes() -> None:
     data = (PROJECT / "src" / "guardia" / "app" / "guardia.ico").read_bytes()
     reserved, kind, count = struct.unpack_from("<HHH", data)

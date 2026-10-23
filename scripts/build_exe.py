@@ -15,8 +15,26 @@ DIST = PROJECT / "dist"
 WORK = PROJECT / "build"
 FOLDER = DIST / "GuardiaMCP"
 ARCHIVE = DIST / f"GuardiaMCP-{__version__}-windows-x64.zip"
-EXTRA_FILES = ("LICENSE", "NOTICE", "README.md", "SECURITY.md", "AUDIT.md", "TESTING.md")
-GUIDES = ("SCUDO.md", "SHIELD.md", "REGOLE.md", "RULES.md", "IMPARA-MCP.md")
+DOTNET_CONFIG = PROJECT / "packaging" / "dotnet.exe.config"
+PROGRAMS = ("guardia.exe", "GuardiaMCP.exe")
+EXTRA_FILES = (
+    "LICENSE",
+    "NOTICE",
+    "README.md",
+    "SECURITY.md",
+    "AUDIT.md",
+    "TESTING.md",
+    "CHANGELOG.md",
+)
+GUIDES = (
+    "GUIDA.md",
+    "GUIDE.md",
+    "SCUDO.md",
+    "SHIELD.md",
+    "REGOLE.md",
+    "RULES.md",
+    "IMPARA-MCP.md",
+)
 
 
 def sha256(path: Path) -> str:
@@ -30,17 +48,18 @@ def sha256(path: Path) -> str:
 def package() -> None:
     for name in EXTRA_FILES:
         shutil.copy2(PROJECT / name, FOLDER / name)
+    for program in PROGRAMS:
+        shutil.copy2(DOTNET_CONFIG, FOLDER / f"{program}.config")
     (FOLDER / "docs").mkdir(exist_ok=True)
     for name in GUIDES:
         shutil.copy2(PROJECT / "docs" / name, FOLDER / "docs" / name)
+    shutil.copytree(PROJECT / "docs" / "tutorial", FOLDER / "docs" / "tutorial", dirs_exist_ok=True)
     with zipfile.ZipFile(ARCHIVE, "w", zipfile.ZIP_DEFLATED) as archive:
         for path in sorted(FOLDER.rglob("*")):
             if path.is_file():
                 archive.write(path, Path("GuardiaMCP") / path.relative_to(FOLDER))
     lines = [f"{sha256(ARCHIVE)}  {ARCHIVE.name}"]
-    lines += [
-        f"{sha256(FOLDER / name)}  GuardiaMCP/{name}" for name in ("guardia.exe", "GuardiaMCP.exe")
-    ]
+    lines += [f"{sha256(FOLDER / name)}  GuardiaMCP/{name}" for name in PROGRAMS]
     (DIST / "SHA256SUMS.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 

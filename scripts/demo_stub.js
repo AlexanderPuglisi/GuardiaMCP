@@ -57,7 +57,7 @@
       window_close: async () => null,
       window_maximize: async () => null,
       window_restore: async () => null,
-      settings_history: async () => ({ items: [] }),
+      settings_history: async () => ({ items: DEMO.history || [] }),
       window_resize: async () => null,
     },
   };

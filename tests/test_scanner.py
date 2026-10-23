@@ -126,6 +126,19 @@ def test_crashing_check_marks_the_analysis_incomplete(risky: HostEnvironment) ->
     assert "broken@" in report.errors[0]
 
 
+def test_empty_configuration_files_are_not_errors(
+    env: HostEnvironment, write_text: WriteText
+) -> None:
+    write_text(env.app_config / "Code" / "User" / "mcp.json", "")
+    write_text(env.home / ".cursor" / "mcp.json", "  \r\n")
+    write_text(env.home / ".gemini" / "settings.json", "﻿\n")
+    write_text(env.home / ".codeium" / "windsurf" / "mcp_config.json", '{"mcpServers": {"a": ')
+    report = scan_inventory(discover(env))
+    broken = [f for f in report.file_findings if f.rule_id == "G12-006"]
+    assert [f.location.path.name for f in broken] == ["mcp_config.json"]
+    assert "line 1" in broken[0].evidence
+
+
 def test_file_level_findings(
     env: HostEnvironment, write_text: WriteText, write_json: WriteJson
 ) -> None:
