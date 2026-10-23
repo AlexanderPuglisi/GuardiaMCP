@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="300" viewBox="0 0 1280 300" role="img" aria-labelledby="title desc">
+  <title id="title">Guardia MCP</title>
+  <desc id="desc">Free, offline security shield for AI agents that use the Model Context Protocol. By Alexander Puglisi.</desc>
+  <defs>
+    <radialGradient id="glow" cx="0.18" cy="0.5" r="0.55">
+      <stop offset="0" stop-color="#8e1b1b" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#08080a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#c4332b" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#c4332b"/>
+      <stop offset="1" stop-color="#c4332b" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="300" rx="14" fill="#08080a"/>
+  <rect width="1280" height="300" rx="14" fill="url(#glow)"/>
+  <rect x="0" y="298" width="1280" height="2" fill="url(#edge)"/>
+  <g transform="translate(110 60) scale(5.6)">
+    <path d="M16 2.5 4.5 7v8.2c0 7.3 4.8 12.5 11.5 14.3 6.7-1.8 11.5-7 11.5-14.3V7z" fill="#1d1d23" stroke="#c4332b" stroke-width="2.2" stroke-linejoin="round"/>
+    <path d="m11 16 3.6 3.6 6.9-6.9" fill="none" stroke="#ece9e6" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">
+    <text x="330" y="138" font-size="74" font-weight="700" fill="#ece9e6">Guardia <tspan fill="#c4332b">MCP</tspan></text>
+    <text x="333" y="186" font-size="27" fill="#cfcbc6">Free, offline security shield for AI agents that use MCP</text>
+    <text x="333" y="230" font-size="19" fill="#9b98a0" letter-spacing="0.4">Scanner · Real-time Shield · Signed ledger · Italiano / English · Apache 2.0</text>
+    <text x="1236" y="272" font-size="16" fill="#6d6a72" text-anchor="end">by Alexander Puglisi</text>
+  </g>
+</svg>
