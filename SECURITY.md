@@ -74,8 +74,10 @@ system, only by file permissions.
 
 **Version 1 does not block anything.** It reports. It does not stop an agent while it is running.
 
-**The Shield (v2) is a development preview.** In phase 2.0 it validates the protocol but does not
-apply rules to the content yet. It sees only MCP messages: a malicious server is still a program
+**The Shield (v2) is a development preview.** It applies the rules you approve (phase 2.1), but
+rules are patterns: text written to avoid them can succeed, and `ask` blocks until the confirmation
+window exists. The signed rules file stops hidden changes, yet anyone who can run code as your
+Windows user can also use the signing key. The Shield sees only MCP messages: a malicious server is still a program
 on your PC and can read your files directly, without using MCP. On Windows, if a server does not
 stop when asked, the Shield ends the process it started, but programs that process started in turn
 (for example `node` started by `npx`) may keep running. Commands that are `.cmd` or `.bat` files
@@ -182,8 +184,11 @@ Su macOS e Linux la chiave non è protetta dal sistema operativo, solo dai perme
 
 **La versione 1 non blocca nulla.** Segnala. Non ferma un agente mentre lavora.
 
-**Lo Scudo (v2) è un'anteprima di sviluppo.** Nella fase 2.0 controlla il protocollo ma non applica
-ancora regole al contenuto. Vede solo i messaggi MCP: un server malevolo resta un programma sul tuo
+**Lo Scudo (v2) è un'anteprima di sviluppo.** Applica le regole che approvi (fase 2.1), ma le
+regole sono schemi: un testo scritto per aggirarle può riuscirci, e `chiedi` blocca finché non
+esiste la finestra di conferma. Il file delle regole firmato ferma le modifiche di nascosto, ma chi
+riesce a eseguire codice con il tuo utente di Windows può usare anche la chiave di firma. Lo Scudo
+vede solo i messaggi MCP: un server malevolo resta un programma sul tuo
 PC e può leggere i tuoi file direttamente, senza passare da MCP. Su Windows, se un server non si
 ferma quando glielo si chiede, lo Scudo chiude il processo che ha avviato, ma i programmi avviati a
 loro volta da quel processo (per esempio `node` avviato da `npx`) possono restare attivi. I comandi

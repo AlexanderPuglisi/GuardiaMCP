@@ -129,19 +129,19 @@ class LiveShield:
 
 
 class RaisingInspector:
-    def inspect(self, direction: Direction, message: Message) -> Decision:
+    def inspect(self, direction: Direction, message: Message, pending: object) -> Decision:
         if message.method == "tools/call":
             raise RuntimeError("boom")
-        return Passthrough().inspect(direction, message)
+        return Passthrough().inspect(direction, message, None)
 
 
 class NoneInspector:
-    def inspect(self, direction: Direction, message: Message) -> Any:
+    def inspect(self, direction: Direction, message: Message, pending: object) -> Any:
         return None if message.method == "tools/call" else Decision(Verdict.FORWARD)
 
 
 class RejectToolLists:
-    def inspect(self, direction: Direction, message: Message) -> Decision:
+    def inspect(self, direction: Direction, message: Message, pending: object) -> Decision:
         result = message.payload.get("result")
         if direction is Direction.TO_CLIENT and isinstance(result, dict) and "tools" in result:
             return Decision(Verdict.REJECT, reason="test")
@@ -149,7 +149,7 @@ class RejectToolLists:
 
 
 class ReplaceArguments:
-    def inspect(self, direction: Direction, message: Message) -> Decision:
+    def inspect(self, direction: Direction, message: Message, pending: object) -> Decision:
         if message.method != "tools/call":
             return Decision(Verdict.FORWARD)
         payload = json.loads(json.dumps(message.payload))

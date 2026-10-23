@@ -1,0 +1,68 @@
+# Guardia MCP Shield rules.
+# Each [[rule]] says what to do when a message matches its conditions.
+# When several rules match, the strictest wins: block > ask > redact > log > allow.
+# After every change run:  guardia shield rules approve
+# Full guide: docs/SHIELD.md
+
+version = 1
+
+# What to do when no rule matches: allow, log, ask or block.
+default = "allow"
+
+[[rule]]
+name = "Never touch SSH keys, credentials and .env files"
+action = "block"
+phase = "call"
+argument.path = [
+  "~/.ssh/**",
+  "**/.ssh/**",
+  "**/.env",
+  "**/*.pem",
+  "**/id_rsa*",
+  "~/.aws/**",
+  "**/.git-credentials",
+]
+
+[[rule]]
+name = "Do not send data to tunnel or collection services"
+action = "block"
+phase = "call"
+argument.host = [
+  "*.ngrok.io",
+  "*.ngrok-free.app",
+  "*.trycloudflare.com",
+  "webhook.site",
+  "*.requestbin.net",
+  "*.pipedream.net",
+]
+
+[[rule]]
+name = "Redact secrets in results"
+action = "redact"
+phase = "result"
+content.secrets = true
+
+[[rule]]
+name = "Hide tools that give orders to the AI"
+action = "block"
+phase = "list"
+content.contains = [
+  "ignore previous instructions",
+  "ignora le istruzioni precedenti",
+  "do not tell the user",
+  "non dirlo all'utente",
+]
+
+[[rule]]
+name = "At most 30 calls per minute per server"
+action = "block"
+phase = "call"
+method = "tools/call"
+rate = { max = 30, seconds = 60 }
+
+# Example to adapt: remove the # in front of the lines to enable it.
+# [[rule]]
+# name = "GitHub: ask before writing"
+# server = "github"
+# tool = ["create_*", "delete_*", "push_*", "merge_*"]
+# action = "ask"

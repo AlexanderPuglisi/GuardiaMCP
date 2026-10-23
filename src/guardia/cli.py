@@ -22,6 +22,10 @@ from guardia.render.rules_guide import render_rule_detail, render_rules_list, re
 from guardia.render.sarif import build_sarif
 from guardia.render.terminal import render_inventory, render_scan, severity_label
 from guardia.scanner import RULES, ScanReport
+from guardia.shield import commands as shield_commands
+from guardia.shield.inspector import RulesInspector
+from guardia.shield.patterns import home_text
+from guardia.shield.policy import PolicyWatcher
 from guardia.shield.runner import ShieldOptions, run_shield
 
 INVENTORY_COMMANDS = frozenset({"inventory", "inventario"})
@@ -29,6 +33,18 @@ SCAN_COMMANDS = frozenset({"scan", "scansiona"})
 LEDGER_COMMANDS = frozenset({"ledger", "registro"})
 RULES_COMMANDS = frozenset({"rules", "regole"})
 SHIELD_COMMANDS = frozenset({"shield", "scudo"})
+RULE_ACTIONS = {
+    "verifica": "verify",
+    "verify": "verify",
+    "approva": "approve",
+    "approve": "approve",
+    "prova": "test",
+    "test": "test",
+    "esempio": "example",
+    "example": "example",
+    "stato": "status",
+    "status": "status",
+}
 SHIELD_PREFIX = "[Guardia MCP]"
 FORMATS = ("text", "testo", "json", "html", "sarif")
 FORMAT_ALIASES = {"testo": "text"}
@@ -191,6 +207,35 @@ def build_parser(t: Translator) -> argparse.ArgumentParser:
         dest="ledger",
         action="store_false",
         help=t("shield.cli_no_ledger"),
+    )
+    shield_commands_parser = shield.add_subparsers(dest="shield_command")
+    shield_rules = shield_commands_parser.add_parser(
+        "rules", aliases=["regole"], help=t("shield_rules.cli_help"), parents=[language]
+    )
+    shield_rules.add_argument(
+        "action", choices=sorted(RULE_ACTIONS), help=t("shield_rules.cli_action")
+    )
+    shield_rules.add_argument("--file", type=Path, help=t("shield_rules.cli_file"))
+    shield_rules.add_argument(
+        "--server", dest="test_server", default="server", help=t("shield_rules.cli_server")
+    )
+    shield_rules.add_argument(
+        "--fase", "--phase", dest="phase", default="call", help=t("shield_rules.cli_phase")
+    )
+    shield_rules.add_argument(
+        "--metodo", "--method", dest="method", help=t("shield_rules.cli_method")
+    )
+    shield_rules.add_argument(
+        "--strumento", "--tool", dest="tool", default="", help=t("shield_rules.cli_tool")
+    )
+    shield_rules.add_argument(
+        "--argomenti", "--arguments", dest="arguments", help=t("shield_rules.cli_arguments")
+    )
+    shield_rules.add_argument(
+        "--testo", "--text", dest="text", default="", help=t("shield_rules.cli_text")
+    )
+    shield_rules.add_argument(
+        "--salva", "--save", dest="save", action="store_true", help=t("shield_rules.cli_save")
     )
     rules = commands.add_parser(
         "rules", aliases=["regole"], help=t("guide.cli_help"), parents=[language]
@@ -377,14 +422,62 @@ def run_shield_command(
     options = ShieldOptions(
         server=args.server or Path(command[0]).stem or command[0], command=tuple(command)
     )
+    home = home_text(str(env.home))
+    ledger = Ledger(env.data_dir) if args.ledger else None
+    inspector = RulesInspector(
+        server=safe_text(options.server, 80),
+        policy=PolicyWatcher(env.data_dir, home).current,
+        home=home,
+        ledger=ledger,
+        t=t,
+        report=_report_stderr,
+    )
+    _report_stderr(inspector.describe())
     return run_shield(
         options,
         t=t,
         client_in=sys.stdin.buffer,
         client_out=sys.stdout.buffer,
         report=_report_stderr,
-        ledger=Ledger(env.data_dir) if args.ledger else None,
+        ledger=ledger,
+        inspector=inspector,
     )
+
+
+def run_shield_rules(
+    args: argparse.Namespace, t: Translator, env: HostEnvironment, out: TextIO
+) -> int:
+    action = RULE_ACTIONS[args.action]
+    ws = shield_commands.Workspace(t, env.data_dir, home_text(str(env.home)), out)
+    if action == "verify":
+        return shield_commands.verify(ws, args.file)
+    if action == "approve":
+        return shield_commands.approve(ws)
+    if action == "example":
+        return shield_commands.example(ws, args.save)
+    if action == "status":
+        return shield_commands.status(ws)
+    simulation = shield_commands.Simulation(
+        server=args.test_server,
+        phase=args.phase,
+        method=args.method,
+        tool=args.tool,
+        arguments=args.arguments,
+        text=args.text,
+    )
+    return shield_commands.simulate(ws, args.file, simulation)
+
+
+def dispatch_shield(
+    args: argparse.Namespace,
+    t: Translator,
+    command: list[str],
+    env: HostEnvironment,
+    out: TextIO,
+) -> int:
+    if getattr(args, "shield_command", None):
+        return run_shield_rules(args, t, env, out)
+    return run_shield_command(args, t, command, env)
 
 
 def split_command(arguments: list[str]) -> tuple[list[str], list[str]]:
@@ -414,7 +507,7 @@ def main(
     if args.command in RULES_COMMANDS:
         return run_rules(args, t, out)
     if args.command in SHIELD_COMMANDS:
-        return run_shield_command(args, t, command, env or HostEnvironment.from_os())
+        return dispatch_shield(args, t, command, env or HostEnvironment.from_os(), out)
     missing = _missing_paths(args)
     if missing:
         out.write(t("cli.missing_path", path=str(missing[0])) + "\n")

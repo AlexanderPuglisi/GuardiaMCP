@@ -36,6 +36,7 @@ class Decision:
     verdict: Verdict
     replacement: Message | None = None
     reason: str = ""
+    explanation: str = ""
 
 
 FORWARD = Decision(Verdict.FORWARD)
@@ -43,11 +44,13 @@ INTERNAL_FAILURE = Decision(Verdict.REJECT, reason="internal")
 
 
 class Inspector(Protocol):
-    def inspect(self, direction: Direction, message: Message) -> Decision: ...
+    def inspect(
+        self, direction: Direction, message: Message, pending: Pending | None
+    ) -> Decision: ...
 
 
 class Passthrough:
-    def inspect(self, direction: Direction, message: Message) -> Decision:
+    def inspect(self, direction: Direction, message: Message, pending: Pending | None) -> Decision:
         return FORWARD
 
 
@@ -91,8 +94,11 @@ class Proxy:
     def _report(self, key: str, direction: Direction, **values: object) -> None:
         self._report_line(self._t(key, side=self._t(f"shield.{direction.value}"), **values))
 
-    def _error(self, request_id: RequestId | None, code: int, key: str) -> bytes:
-        return error_response(request_id, code, self._t(key)).encode()
+    def _error(
+        self, request_id: RequestId | None, code: int, key: str, explanation: str = ""
+    ) -> bytes:
+        text = self._t(key) + (" " + explanation if explanation else "")
+        return error_response(request_id, code, text).encode()
 
     def pump(self, direction: Direction, source: IO[bytes]) -> None:
         while True:
@@ -120,8 +126,9 @@ class Proxy:
         pending = self._admit(direction, message)
         if pending is False:
             return True
-        self.session.observe(message, pending if isinstance(pending, Pending) else None)
-        return self._apply(direction, message, self._decide(direction, message))
+        request = pending if isinstance(pending, Pending) else None
+        self.session.observe(message, request)
+        return self._apply(direction, message, self._decide(direction, message, request))
 
     def _admit(self, direction: Direction, message: Message) -> Pending | bool:
         if message.kind is MessageKind.RESPONSE:
@@ -143,9 +150,9 @@ class Proxy:
         self._writers[direction.opposite].write(self._error(message.id, INVALID_REQUEST, key))
         return False
 
-    def _decide(self, direction: Direction, message: Message) -> Decision:
+    def _decide(self, direction: Direction, message: Message, pending: Pending | None) -> Decision:
         try:
-            decision = self._inspector.inspect(direction, message)
+            decision = self._inspector.inspect(direction, message, pending)
         except Exception:
             self._report("shield.inspector_failed", direction)
             return INTERNAL_FAILURE
@@ -165,8 +172,10 @@ class Proxy:
             self.session.forget(direction, message.id)
             if rejected:
                 self._writers[direction.opposite].write(
-                    self._error(message.id, SHIELD_BLOCKED, "shield.blocked")
+                    self._error(message.id, SHIELD_BLOCKED, "shield.blocked", decision.explanation)
                 )
         elif message.kind is MessageKind.RESPONSE and rejected:
-            return target.write(self._error(message.id, SHIELD_BLOCKED, "shield.blocked"))
+            return target.write(
+                self._error(message.id, SHIELD_BLOCKED, "shield.blocked", decision.explanation)
+            )
         return True

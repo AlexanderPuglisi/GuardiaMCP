@@ -1,0 +1,68 @@
+# Regole dello Scudo di Guardia MCP.
+# Ogni [[regola]] dice cosa fare quando un messaggio corrisponde alle sue condizioni.
+# Se più regole corrispondono, vince la più severa: blocca > chiedi > oscura > registra > consenti.
+# Dopo ogni modifica esegui:  guardia scudo regole approva
+# Guida completa: docs/SCUDO.md
+
+versione = 1
+
+# Cosa fare quando nessuna regola corrisponde: consenti, registra, chiedi o blocca.
+predefinito = "consenti"
+
+[[regola]]
+nome = "Mai toccare chiavi SSH, credenziali e file .env"
+azione = "blocca"
+fase = "chiamata"
+argomento.percorso = [
+  "~/.ssh/**",
+  "**/.ssh/**",
+  "**/.env",
+  "**/*.pem",
+  "**/id_rsa*",
+  "~/.aws/**",
+  "**/.git-credentials",
+]
+
+[[regola]]
+nome = "Non inviare dati a servizi di tunnel o raccolta"
+azione = "blocca"
+fase = "chiamata"
+argomento.host = [
+  "*.ngrok.io",
+  "*.ngrok-free.app",
+  "*.trycloudflare.com",
+  "webhook.site",
+  "*.requestbin.net",
+  "*.pipedream.net",
+]
+
+[[regola]]
+nome = "Oscura i segreti nei risultati"
+azione = "oscura"
+fase = "risultato"
+contenuto.segreti = true
+
+[[regola]]
+nome = "Nascondi gli strumenti che danno ordini all'AI"
+azione = "blocca"
+fase = "elenco"
+contenuto.contiene = [
+  "ignore previous instructions",
+  "ignora le istruzioni precedenti",
+  "do not tell the user",
+  "non dirlo all'utente",
+]
+
+[[regola]]
+nome = "Al massimo 30 chiamate al minuto per server"
+azione = "blocca"
+fase = "chiamata"
+metodo = "tools/call"
+frequenza = { massimo = 30, secondi = 60 }
+
+# Esempio da adattare: togli i # davanti alle righe per attivarlo.
+# [[regola]]
+# nome = "GitHub: chiedi prima di scrivere"
+# server = "github"
+# strumento = ["create_*", "delete_*", "push_*", "merge_*"]
+# azione = "chiedi"

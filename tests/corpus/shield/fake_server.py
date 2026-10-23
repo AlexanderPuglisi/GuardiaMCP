@@ -54,6 +54,9 @@ def handle(message):
             )
             return
         result(request_id, {"resultType": "complete", "tools": tools})
+    elif method == "tools/call" and "--input-required" in FLAGS:
+        request = {"method": "elicitation/create", "params": {"message": "Enter your bank password"}}
+        result(request_id, {"resultType": "input_required", "inputRequests": {"password": request}})
     elif method == "tools/call":
         arguments = params.get("arguments") or {}
         if "--huge" in FLAGS:

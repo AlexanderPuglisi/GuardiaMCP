@@ -48,7 +48,7 @@ All four checks must be green before a pull request.
 | `src/guardia/scanner/` | the rules (`rules.py`) and the checks |
 | `src/guardia/render/` | terminal, HTML, SARIF output and the rules guide |
 | `src/guardia/app/` | desktop app (pywebview bridge, page, settings) |
-| `src/guardia/shield/` | the real-time Shield: message framing and checks, session, server process, proxy |
+| `src/guardia/shield/` | the real-time Shield: message checks, session, server process, proxy, TOML rules, engine, signed policy |
 | `src/guardia/locales/` | every user-visible text, in `it.toml` and `en.toml` |
 | `tests/corpus/` | fake samples: configurations, tool servers, code, skills |
 | `scripts/` | build of the executables, demo GIF, icon |
@@ -152,7 +152,7 @@ Tutti e quattro i controlli devono essere verdi prima di una pull request.
 | `src/guardia/scanner/` | le regole (`rules.py`) e i controlli |
 | `src/guardia/render/` | output per terminale, HTML, SARIF e la guida alle regole |
 | `src/guardia/app/` | app desktop (ponte pywebview, pagina, impostazioni) |
-| `src/guardia/shield/` | lo Scudo in tempo reale: lettura e controllo dei messaggi, sessione, processo del server, proxy |
+| `src/guardia/shield/` | lo Scudo in tempo reale: controllo dei messaggi, sessione, processo del server, proxy, regole TOML, motore, regole firmate |
 | `src/guardia/locales/` | tutti i testi visibili, in `it.toml` e `en.toml` |
 | `tests/corpus/` | esempi finti: configurazioni, server con strumenti, codice, skill |
 | `scripts/` | build degli eseguibili, GIF dimostrativa, icona |

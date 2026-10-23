@@ -64,7 +64,19 @@ client talks to Guardia, Guardia talks to the server. Today (phase 2.0) the Shie
 - refuses to start the server if it cannot write to the ledger, and records every session;
 - supports MCP 2025-11-25 and 2026-07-28 over stdio and adds about 0.06 ms per message.
 
-It does not apply user rules yet: they arrive in phase 2.1, together with the guide.
+- applies **your rules** written in TOML (phase 2.1): block, hide tools, redact secrets, limit the
+  call rate, with English or Italian keys. Rules must be approved and are signed: if they are
+  changed behind your back, the Shield goes into full lockdown.
+
+```powershell
+guardia shield rules example --save
+guardia shield rules verify
+guardia shield rules test --tool read_file --arguments '{"path": "~/.ssh/id_rsa"}'
+guardia shield rules approve
+```
+
+Full guide: [docs/SHIELD.md](docs/SHIELD.md). Still to come: the confirmation window for `ask`
+(phase 2.3) and automatic client setup (phase 2.4).
 
 ### Install from source (recommended)
 
@@ -164,7 +176,19 @@ client parla con Guardia, Guardia parla con il server. Oggi (fase 2.0) lo Scudo 
 - non avvia il server se non riesce a scrivere nel registro, e registra ogni sessione;
 - supporta MCP 2025-11-25 e 2026-07-28 su stdio e aggiunge circa 0,06 ms per messaggio.
 
-Non applica ancora regole scritte da te: arrivano nella fase 2.1, insieme alla guida.
+- applica **le tue regole** scritte in TOML (fase 2.1): blocca, nasconde strumenti, oscura i
+  segreti, limita la frequenza delle chiamate, con chiavi in italiano o in inglese. Le regole vanno
+  approvate e vengono firmate: se qualcuno le cambia di nascosto, lo Scudo va in blocco totale.
+
+```powershell
+guardia scudo regole esempio --salva
+guardia scudo regole verifica
+guardia scudo regole prova --strumento read_file --argomenti '{"path": "~/.ssh/id_rsa"}'
+guardia scudo regole approva
+```
+
+Guida completa: [docs/SCUDO.md](docs/SCUDO.md). In arrivo: la finestra di conferma per `chiedi`
+(fase 2.3) e il collegamento automatico dei client (fase 2.4).
 
 Vuoi capire MCP da zero? Leggi [docs/IMPARA-MCP.md](docs/IMPARA-MCP.md).
 

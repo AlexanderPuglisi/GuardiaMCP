@@ -103,7 +103,7 @@ def head_mac(key: bytes, seq: int, digest: str) -> str:
     return record_mac(key, f"head:{seq}:{digest}")
 
 
-def _write_atomic(path: Path, payload: bytes) -> None:
+def write_atomic(path: Path, payload: bytes) -> None:
     handle, temporary = tempfile.mkstemp(prefix=".tmp-", dir=path.parent)
     try:
         with os.fdopen(handle, "wb") as stream:
@@ -222,6 +222,23 @@ class Ledger:
         if not same or not signed:
             result.issues.append(Issue(LedgerProblem.HEAD_MISMATCH))
 
+    def _fast_last(self, key: bytes) -> tuple[int, str] | None:
+        try:
+            head = json.loads(self.head_path.read_text(encoding="utf-8"))
+            size = self.path.stat().st_size
+        except (OSError, ValueError):
+            return None
+        if not isinstance(head, dict):
+            return None
+        seq, digest, mac = head.get("seq"), head.get("hash"), head.get("mac")
+        if not isinstance(seq, int) or isinstance(seq, bool) or not isinstance(digest, str):
+            return None
+        if head.get("size") != size or not isinstance(mac, str):
+            return None
+        if not hmac.compare_digest(head_mac(key, seq, digest), mac):
+            return None
+        return seq, digest
+
     def _last(self) -> tuple[int, str]:
         seq, digest = 0, GENESIS
         for record in self.records():
@@ -237,7 +254,7 @@ class Ledger:
         key, _ = self._key(create=True)
         if key is None:
             raise KeyStoreError("ledger key unavailable")
-        seq, previous = self._last()
+        seq, previous = self._fast_last(key) or self._last()
         record: dict[str, Any] = {
             "seq": seq + 1,
             "time": datetime.now(UTC).isoformat(),
@@ -256,8 +273,9 @@ class Ledger:
             "seq": record["seq"],
             "hash": record["hash"],
             "mac": head_mac(key, record["seq"], record["hash"]),
+            "size": self.path.stat().st_size,
             "tool": "guardia-mcp",
             "version": __version__,
         }
-        _write_atomic(self.head_path, canonical_json(head))
+        write_atomic(self.head_path, canonical_json(head))
         return record
