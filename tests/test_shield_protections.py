@@ -448,3 +448,18 @@ def test_calls_racing_the_first_listing_are_blocked(tmp_path: Path) -> None:
     assert [t["name"] for t in answers[1]["result"]["tools"]] == ["echo"]
     assert answers[2]["error"]["code"] == SHIELD_BLOCKED
     session.close()
+
+
+def test_duplicate_tool_names_cannot_hide_a_rug_pull(tmp_path: Path) -> None:
+    first = Session(tmp_path)
+    assert first.tools() == ["echo"]
+    first.close()
+    second = Session(tmp_path, "--duplicate-tool")
+    assert second.tools() == []
+    blocked = second.shield.ask(call(1, "echo", {"text": "x"}))
+    assert blocked["error"]["code"] == SHIELD_BLOCKED
+    assert "più strumenti con lo stesso nome" in blocked["error"]["message"]
+    second.close()
+    assert any("strumenti nascosti all'AI: echo" in line for line in second.reports)
+    hidden = [d for d in second.decisions() if d.get("hidden")]
+    assert "protection:duplicate_tool" in hidden[0]["rules"]

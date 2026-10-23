@@ -926,6 +926,7 @@ tool_hidden_changed = "Lo strumento «{tool}» è cambiato dall'ultima approvazi
 tool_hidden_unknown = "Lo strumento «{tool}» non è mai comparso negli elenchi visti dallo Scudo: per sicurezza è bloccato. Chiedi di nuovo l'elenco degli strumenti."
 tool_hidden_unverified = "Lo strumento «{tool}» non è verificabile: le impronte degli strumenti sono state modificate. Esegui «guardia scudo strumenti elenco»."
 tool_hidden_unavailable = "Lo strumento «{tool}» non è verificabile: le impronte degli strumenti non sono leggibili."
+tool_hidden_duplicate = "Lo strumento «{tool}» è nascosto: il server ha presentato più strumenti con lo stesso nome e non si può sapere quale verrebbe usato."
 protection_outgoing_secrets = "Protezione di base: gli argomenti contengono un segreto (chiave o token)."
 protection_credentials = "Protezione di base: il server chiede credenziali («{keyword}»)."
 protection_results = "Protezione di base: il risultato contiene istruzioni per l'AI ({rules})."

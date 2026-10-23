@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import threading
 import time
+from collections import Counter, defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -323,6 +324,7 @@ class RulesInspector:
         noteworthy = False
         tools = [tool for tool in result["tools"] if isinstance(tool, dict)]
         malformed = len(result["tools"]) - len(tools)
+        counts = Counter(_name(tool.get("name")) for tool in tools)
         for tool in tools:
             name = _name(tool.get("name"))
             evaluation = engine.evaluate(
@@ -344,6 +346,10 @@ class RulesInspector:
             if risky:
                 hidden[name] = "analysis"
                 labels.update(f"protection:analysis:{rule}" for rule in rule_ids(risky))
+        for name, count in counts.items():
+            if count > 1:
+                hidden.setdefault(name, "duplicate")
+                labels.add("protection:duplicate_tool")
         if protections.approved_tools:
             outcome = self._review_pins(tools, result, hidden)
             if outcome is None:
@@ -380,7 +386,13 @@ class RulesInspector:
     ) -> dict[str, ToolStatus] | None:
         if self._pins is None:
             return {}
-        fingerprints = {_name(tool.get("name")): tool_fingerprint(tool) for tool in tools}
+        groups: dict[str, list[str]] = defaultdict(list)
+        for tool in tools:
+            groups[_name(tool.get("name"))].append(tool_fingerprint(tool))
+        fingerprints = {
+            name: found[0] if len(found) == 1 else sha256_hex(canonical_json(sorted(found)))
+            for name, found in groups.items()
+        }
         try:
             review = self._pins.review(
                 self._server, fingerprints, continuing=self._continuing, flags=hidden

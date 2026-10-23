@@ -926,6 +926,7 @@ tool_hidden_changed = "The tool \"{tool}\" changed since its approval (possible 
 tool_hidden_unknown = "The tool \"{tool}\" never appeared in the lists seen by the Shield: blocked for safety. Ask for the tool list again."
 tool_hidden_unverified = "The tool \"{tool}\" cannot be verified: the tool fingerprints were changed. Run \"guardia shield tools list\"."
 tool_hidden_unavailable = "The tool \"{tool}\" cannot be verified: the tool fingerprints cannot be read."
+tool_hidden_duplicate = "The tool \"{tool}\" is hidden: the server listed more than one tool with this name, so there is no way to know which one would be used."
 protection_outgoing_secrets = "Built-in protection: the arguments contain a secret (key or token)."
 protection_credentials = "Built-in protection: the server asks for credentials (\"{keyword}\")."
 protection_results = "Built-in protection: the result contains instructions for the AI ({rules})."
