@@ -317,3 +317,26 @@ def test_window_page_is_strict() -> None:
         assert forbidden not in script_text
     assert re.search(r'id="block"', page)
     assert "pywebview-drag-region" in page
+
+
+class OneWindowAtATime(FakeConfirmer):
+    def __init__(self, *answers: Answer) -> None:
+        super().__init__(*answers)
+        self.lock = threading.Lock()
+
+    def __call__(self, confirm: ConfirmRequest) -> Answer:
+        with self.lock:
+            time.sleep(0.3)
+            return super().__call__(confirm)
+
+
+def test_remembered_choice_covers_calls_already_waiting(tmp_path: Path) -> None:
+    confirmer = OneWindowAtATime(Answer.ALLOW_REMEMBER)
+    live, ledger, _ = shield(tmp_path, confirmer)
+    live.send(call(1, "echo", {"text": "a"}))
+    live.send(call(2, "echo", {"text": "b"}))
+    results = {live.receive()["id"], live.receive()["id"]}
+    live.close()
+    assert results == {1, 2}
+    assert len(confirmer.requests) == 1
+    assert sorted(answers(ledger)) == ["allow_remember", "remembered"]

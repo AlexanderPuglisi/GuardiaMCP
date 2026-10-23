@@ -120,6 +120,7 @@ class RulesInspector:
         self._continuing = False
         self._approved_tools = True
         self._lock = threading.Lock()
+        self._asking = threading.Lock()
 
     def describe(self) -> str:
         policy = self._policy()
@@ -524,14 +525,18 @@ class RulesInspector:
 
     def _ask(self, context: Context, message: Message, verdicts: Verdicts) -> Decision:
         key = (context.tool or context.method, tuple(sorted(verdicts.labels)))
-        with self._lock:
-            remembered = self._remembered.get(key, 0.0) > time.monotonic()
-        if remembered:
-            answer = Answer.ALLOW
-        elif self._confirm is None:
-            answer = Answer.UNAVAILABLE
-        else:
-            answer = self._confirm(self._confirmation(context, verdicts))
+        with self._asking:
+            with self._lock:
+                remembered = self._remembered.get(key, 0.0) > time.monotonic()
+            if remembered:
+                answer = Answer.ALLOW
+            elif self._confirm is None:
+                answer = Answer.UNAVAILABLE
+            else:
+                answer = self._confirm(self._confirmation(context, verdicts))
+            if answer is Answer.ALLOW_REMEMBER:
+                with self._lock:
+                    self._remembered[key] = time.monotonic() + REMEMBER_SECONDS
         if not self._log(
             message,
             phase=context.phase,
@@ -542,9 +547,6 @@ class RulesInspector:
             answer="remembered" if remembered else answer.value,
         ):
             return self._ledger_failure()
-        if answer is Answer.ALLOW_REMEMBER:
-            with self._lock:
-                self._remembered[key] = time.monotonic() + REMEMBER_SECONDS
         label = "remembered" if remembered else answer.value
         self._report(
             self._t(
