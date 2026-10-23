@@ -100,7 +100,17 @@ def test_unwrap_recognizes_only_shield_wrappers() -> None:
 def test_launcher_uses_the_running_guardia(monkeypatch: pytest.MonkeyPatch) -> None:
     assert launcher() == [sys.executable, "-m", "guardia"]
     monkeypatch.setattr(sys, "frozen", True, raising=False)
-    assert launcher() == [sys.executable]
+    assert launcher() == [str(Path(sys.executable).with_name("guardia.exe"))]
+
+
+def test_launcher_from_the_desktop_app_points_to_the_command_line(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", str(tmp_path / "GuardiaMCP" / "GuardiaMCP.exe"))
+    assert launcher() == [str(tmp_path / "GuardiaMCP" / "guardia.exe")]
+    command, args = wrap(launcher(), "github", "npx", ["-y", "server"])
+    assert unwrap(command, args) is not None
 
 
 def test_support_classification(

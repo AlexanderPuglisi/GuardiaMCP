@@ -3,11 +3,12 @@ from __future__ import annotations
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
-from pathlib import PurePath
+from pathlib import Path, PurePath
 
 SHIELD_WORDS = frozenset({"scudo", "shield"})
 NAME_OPTIONS = frozenset({"--server", "--nome"})
 GUARDIA_PROGRAMS = frozenset({"guardia", "guardia.exe"})
+COMMAND_LINE_PROGRAM = "guardia.exe"
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,7 +49,7 @@ def unwrap(command: str | None, args: Sequence[str]) -> Wrapped | None:
 
 def launcher() -> list[str]:
     if getattr(sys, "frozen", False):
-        return [sys.executable]
+        return [str(Path(sys.executable).with_name(COMMAND_LINE_PROGRAM))]
     return [sys.executable, "-m", "guardia"]
 
 
