@@ -75,6 +75,12 @@ guardia shield rules test --tool read_file --arguments '{"path": "~/.ssh/id_rsa"
 guardia shield rules approve
 ```
 
+- protects you even without rules (phase 2.2): it remembers each server's tools and **hides tools
+  that change or appear suddenly** until you approve them (`guardia shield tools approve`), applies
+  the 88 v1 rules in real time to hide poisoned tools and remove dangerous server instructions,
+  flags prompt injection in results, redacts secrets in results, and stops secrets in arguments
+  and requests for passwords. Hidden tools cannot be called either.
+
 Full guide: [docs/SHIELD.md](docs/SHIELD.md). Still to come: the confirmation window for `ask`
 (phase 2.3) and automatic client setup (phase 2.4).
 
@@ -186,6 +192,13 @@ guardia scudo regole verifica
 guardia scudo regole prova --strumento read_file --argomenti '{"path": "~/.ssh/id_rsa"}'
 guardia scudo regole approva
 ```
+
+- ti protegge anche senza regole (fase 2.2): ricorda gli strumenti di ogni server e **nasconde
+  quelli che cambiano o compaiono all'improvviso** finché non li approvi
+  (`guardia scudo strumenti approva`), applica in tempo reale le 88 regole della v1 per nascondere
+  gli strumenti avvelenati e togliere le istruzioni pericolose del server, segnala la prompt
+  injection nei risultati, oscura i segreti nei risultati e ferma i segreti negli argomenti e le
+  richieste di password. Gli strumenti nascosti non si possono nemmeno chiamare.
 
 Guida completa: [docs/SCUDO.md](docs/SCUDO.md). In arrivo: la finestra di conferma per `chiedi`
 (fase 2.3) e il collegamento automatico dei client (fase 2.4).

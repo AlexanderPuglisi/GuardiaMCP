@@ -6,7 +6,7 @@ Lo Scudo è la parte di Guardia che lavora **mentre** l'AI usa i server MCP. L'a
 guarda i file e ti dice cosa c'è di rischioso; lo Scudo invece si mette in mezzo ai messaggi e può
 **bloccarli, nasconderli o oscurarli** seguendo regole scritte da te.
 
-> **Stato: anteprima di sviluppo (fase 2.1).** Le regole funzionano. La finestra per l'azione
+> **Stato: anteprima di sviluppo (fase 2.2).** Regole e protezioni di base funzionano. La finestra per l'azione
 > `chiedi` arriva nella fase 2.3; fino ad allora `chiedi` **blocca**. Il collegamento automatico
 > dei client arriva nella fase 2.4: per ora la configurazione si modifica a mano (vedi sotto).
 
@@ -81,6 +81,60 @@ guardia scudo regole stato
 
 I comandi esistono anche in inglese: `guardia shield rules verify | approve | test | example | status`.
 
+## Le protezioni di base
+
+Lo Scudo protegge anche **senza nessuna regola scritta da te**. Queste protezioni usano le stesse
+88 regole dell'analisi della v1, applicate in tempo reale.
+
+| Protezione | Cosa fa | Predefinito | Valori |
+|---|---|---|---|
+| `strumenti_approvati` | La prima volta che vede un server ne memorizza gli strumenti. Se poi uno strumento **cambia** (rug pull) o **compare all'improvviso**, viene nascosto all'AI finché non lo approvi | `true` | `true`, `false` |
+| `analisi` | Controlla la descrizione e lo schema di ogni strumento elencato e le istruzioni del server: nasconde gli strumenti e toglie le istruzioni con problemi da quel livello in su | `"alto"` | `"critico"`, `"alto"`, `"medio"`, `"spento"` |
+| `risultati` | Cerca prompt injection e istruzioni nascoste nei risultati degli strumenti | `"avvisa"` | `"avvisa"`, `"blocca"`, `"spento"` |
+| `segreti_in_uscita` | Un segreto (chiave, token) negli argomenti di una chiamata | `"chiedi"` | `"chiedi"`, `"blocca"`, `"registra"`, `"spento"` |
+| `segreti_nei_risultati` | Segreti nei risultati: vengono sostituiti da `[REDACTED]` | `"oscura"` | `"oscura"`, `"spento"` |
+| `richieste_credenziali` | Un server chiede password, OTP, chiavi, frasi di recupero o dati della carta | `"blocca"` | `"blocca"`, `"chiedi"`, `"registra"`, `"spento"` |
+
+`avvisa` lascia passare il risultato ma lo segnala nel registro e nel log del client.
+
+**Uno strumento nascosto non si può nemmeno chiamare**: se l'AI prova a usarlo (perché lo
+ricordava da prima, o perché il client ha tenuto in memoria un vecchio elenco), lo Scudo blocca
+la chiamata e spiega perché. Per lo stesso motivo blocca le chiamate a strumenti che **non ha mai
+visto** in un elenco: un client normale chiede sempre l'elenco prima di usare uno strumento.
+
+Le protezioni si allentano **solo** nel file delle regole, quindi solo con la tua approvazione
+firmata. `verifica` mostra un avviso per ogni protezione allentata:
+
+```toml
+versione = 1
+
+[protezioni]
+risultati = "blocca"
+segreti_in_uscita = "registra"
+```
+
+### Approvare gli strumenti nuovi o cambiati
+
+```powershell
+guardia scudo strumenti elenco
+guardia scudo strumenti approva --server github
+guardia scudo strumenti approva --server github --strumento create_issue
+guardia scudo strumenti dimentica --server github
+```
+
+- **elenco** mostra, per ogni server, quanti strumenti sono approvati e quali sono in attesa, con il
+  motivo (nuovo o cambiato) e un pezzo della loro impronta.
+- **approva** approva tutti gli strumenti in attesa di un server, oppure solo quelli indicati.
+- **dimentica** cancella la memoria di un server: alla prossima connessione gli strumenti verranno
+  memorizzati di nuovo come se fosse la prima volta.
+
+Dopo l'approvazione, riavvia la connessione del server nel client per vedere gli strumenti.
+
+**Rug pull** — un server che era innocuo e cambia di nascosto dopo che ti sei fidato.
+La memoria degli strumenti (`scudo-strumenti.json`) è **firmata**: se qualcuno la modifica o la
+cancella, lo Scudo se ne accorge (anche grazie al registro) e nasconde tutti gli strumenti di quel
+server finché non li approvi di nuovo.
+
 ## Dove sta il file e perché va approvato
 
 Il file è `%LOCALAPPDATA%\GuardiaMCP\regole.toml`. Quando lo approvi, Guardia salva una **firma**
@@ -151,6 +205,13 @@ l'intestazione: in tutto il file usa `[[regola]]` oppure `[[rule]]`, non entramb
 | `frequenza` | `rate` | Limite di chiamate nel tempo | `frequenza = { massimo = 30, secondi = 60 }` |
 | `massimo` | `max` | Numero massimo nella finestra di tempo | |
 | `secondi` | `seconds` | Durata della finestra di tempo | |
+| `protezioni` | `protections` | Sezione che regola le protezioni di base | `[protezioni]` |
+| `strumenti_approvati` | `approved_tools` | Memoria degli strumenti approvati | `strumenti_approvati = true` |
+| `analisi` | `analysis` | Analisi in tempo reale di strumenti e istruzioni | `analisi = "alto"` |
+| `risultati` | `results` | Controllo dei risultati | `risultati = "avvisa"` |
+| `segreti_in_uscita` | `outgoing_secrets` | Segreti negli argomenti | `segreti_in_uscita = "chiedi"` |
+| `segreti_nei_risultati` | `result_secrets` | Segreti nei risultati | `segreti_nei_risultati = "oscura"` |
+| `richieste_credenziali` | `credential_requests` | Richieste di password e credenziali | `richieste_credenziali = "blocca"` |
 
 ### Le fasi
 
@@ -308,7 +369,9 @@ delle regole e un'**impronta** del messaggio.
 era senza conservarne il contenuto.
 
 Gli argomenti e i risultati **non** vengono mai scritti nel registro. Ci sono anche gli eventi
-`shield_start` e `shield_stop` per ogni sessione, e `rules_approved` per ogni approvazione.
+`shield_start` e `shield_stop` per ogni sessione, `rules_approved` per ogni approvazione delle
+regole, e `tools_pinned`, `tools_pending`, `tools_approved`, `tools_forgotten` per la memoria degli
+strumenti.
 
 ## Cosa vede l'AI quando un messaggio è bloccato
 
@@ -330,6 +393,12 @@ Così sia tu sia l'AI capite cosa è successo e perché.
 - Per ora lo Scudo protegge solo i server locali (stdio). I server remoti HTTP richiedono che
   Guardia inoltri traffico di rete: è una decisione separata.
 - `chiedi` blocca finché non arriva la finestra di conferma (fase 2.3).
+- La memoria degli strumenti si fida della **prima volta**: un server già malevolo al primo
+  incontro viene giudicato solo dall'analisi e dalle tue regole.
+- Il controllo dei risultati guarda il primo milione di caratteri di ogni risultato.
+- Le richieste di credenziali vengono riconosciute da parole chiave in italiano e inglese: una
+  richiesta formulata in modo diverso può sfuggire.
+- Dopo che approvi uno strumento, il client lo vede solo quando richiede di nuovo l'elenco.
 - Su Windows, i programmi avviati a loro volta da un server (per esempio `node` avviato da `npx`)
   possono restare attivi se il server viene chiuso a forza.
 

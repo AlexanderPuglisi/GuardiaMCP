@@ -6,7 +6,7 @@ The Shield is the part of Guardia that works **while** the AI is using MCP serve
 reads files and tells you what is risky; the Shield sits between the messages and can **block,
 hide or redact** them following rules you write.
 
-> **Status: development preview (phase 2.1).** Rules work. The window for the `ask` action
+> **Status: development preview (phase 2.2).** Rules and built-in protections work. The window for the `ask` action
 > arrives in phase 2.3; until then `ask` **blocks**. Automatic client setup arrives in phase 2.4:
 > for now you edit the configuration by hand (see below).
 
@@ -83,6 +83,60 @@ guardia shield rules status
 The commands also exist in Italian: `guardia scudo regole verifica | approva | prova | esempio | stato`.
 The example file is in English when your language is English (`--lang en`).
 
+## Built-in protections
+
+The Shield protects you even **without any rule written by you**. These protections use the same
+88 rules as the v1 scanner, applied in real time.
+
+| Protection | What it does | Default | Values |
+|---|---|---|---|
+| `approved_tools` | The first time it sees a server it stores its tools. If a tool later **changes** (rug pull) or **suddenly appears**, it is hidden from the AI until you approve it | `true` | `true`, `false` |
+| `analysis` | Checks the description and schema of every listed tool and the server instructions: hides tools and removes instructions with findings at that level or above | `"high"` | `"critical"`, `"high"`, `"medium"`, `"off"` |
+| `results` | Looks for prompt injection and hidden instructions in tool results | `"warn"` | `"warn"`, `"block"`, `"off"` |
+| `outgoing_secrets` | A secret (key, token) in the arguments of a call | `"ask"` | `"ask"`, `"block"`, `"log"`, `"off"` |
+| `result_secrets` | Secrets in results: replaced with `[REDACTED]` | `"redact"` | `"redact"`, `"off"` |
+| `credential_requests` | A server asks for passwords, OTPs, keys, recovery phrases or card data | `"block"` | `"block"`, `"ask"`, `"log"`, `"off"` |
+
+`warn` lets the result through but reports it in the ledger and in the client log.
+
+**A hidden tool cannot be called either**: if the AI tries to use it (because it remembered it,
+or because the client kept an old list in memory), the Shield blocks the call and explains why.
+For the same reason it blocks calls to tools it has **never seen** in a list: a normal client
+always asks for the list before using a tool.
+
+Protections can be relaxed **only** in the rules file, so only with your signed approval.
+`verify` shows a warning for every relaxed protection:
+
+```toml
+version = 1
+
+[protections]
+results = "block"
+outgoing_secrets = "log"
+```
+
+### Approving new or changed tools
+
+```powershell
+guardia shield tools list
+guardia shield tools approve --server github
+guardia shield tools approve --server github --tool create_issue
+guardia shield tools forget --server github
+```
+
+- **list** shows, for every server, how many tools are approved and which are waiting, with the
+  reason (new or changed) and part of their fingerprint.
+- **approve** approves all the waiting tools of a server, or only the ones you name.
+- **forget** deletes the memory of a server: at the next connection its tools will be stored again
+  as if it were the first time.
+
+After approving, restart the server connection in the client to see the tools.
+
+**Rug pull** — a server that was harmless and secretly changes after you trusted it.
+The tool memory (`scudo-strumenti.json`) is **signed**: if someone changes or deletes it, the
+Shield notices (also thanks to the ledger) and hides all the tools of that server until you
+approve them again.
+
 ## Where the file lives and why it must be approved
 
 The file is `%LOCALAPPDATA%\GuardiaMCP\regole.toml` (the name is the same in every language).
@@ -154,6 +208,13 @@ header: in the whole file use either `[[rule]]` or `[[regola]]`, not both.
 | `rate` | `frequenza` | Limit on calls over time | `rate = { max = 30, seconds = 60 }` |
 | `max` | `massimo` | Maximum number in the time window | |
 | `seconds` | `secondi` | Length of the time window | |
+| `protections` | `protezioni` | Section that tunes the built-in protections | `[protections]` |
+| `approved_tools` | `strumenti_approvati` | Memory of approved tools | `approved_tools = true` |
+| `analysis` | `analisi` | Real-time analysis of tools and instructions | `analysis = "high"` |
+| `results` | `risultati` | Result checking | `results = "warn"` |
+| `outgoing_secrets` | `segreti_in_uscita` | Secrets in arguments | `outgoing_secrets = "ask"` |
+| `result_secrets` | `segreti_nei_risultati` | Secrets in results | `result_secrets = "redact"` |
+| `credential_requests` | `richieste_credenziali` | Requests for passwords and credentials | `credential_requests = "block"` |
 
 ### Phases
 
@@ -311,7 +372,8 @@ names and a **fingerprint** of the message.
 without keeping its content.
 
 Arguments and results are **never** written to the ledger. There are also `shield_start` and
-`shield_stop` events for every session, and `rules_approved` for every approval.
+`shield_stop` events for every session, `rules_approved` for every rules approval, and
+`tools_pinned`, `tools_pending`, `tools_approved`, `tools_forgotten` for the tool memory.
 
 ## What the AI sees when a message is blocked
 
@@ -333,6 +395,12 @@ This way both you and the AI understand what happened and why.
 - For now the Shield protects only local servers (stdio). Remote HTTP servers would require
   Guardia to forward network traffic: that is a separate decision.
 - `ask` blocks until the confirmation window arrives (phase 2.3).
+- The tool memory trusts the **first time**: a server that is already malicious when first met is
+  judged only by the analysis and by your rules.
+- Result checking looks at the first million characters of each result.
+- Credential requests are recognized by keywords in English and Italian: a request worded
+  differently can slip through.
+- After you approve a tool, the client sees it only when it asks for the list again.
 - On Windows, programs started in turn by a server (for example `node` started by `npx`) may keep
   running if the server is closed by force.
 

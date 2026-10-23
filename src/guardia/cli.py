@@ -25,6 +25,7 @@ from guardia.scanner import RULES, ScanReport
 from guardia.shield import commands as shield_commands
 from guardia.shield.inspector import RulesInspector
 from guardia.shield.patterns import home_text
+from guardia.shield.pins import PinStore
 from guardia.shield.policy import PolicyWatcher
 from guardia.shield.runner import ShieldOptions, run_shield
 
@@ -44,6 +45,14 @@ RULE_ACTIONS = {
     "example": "example",
     "stato": "status",
     "status": "status",
+}
+TOOL_ACTIONS = {
+    "elenco": "list",
+    "list": "list",
+    "approva": "approve",
+    "approve": "approve",
+    "dimentica": "forget",
+    "forget": "forget",
 }
 SHIELD_PREFIX = "[Guardia MCP]"
 FORMATS = ("text", "testo", "json", "html", "sarif")
@@ -236,6 +245,21 @@ def build_parser(t: Translator) -> argparse.ArgumentParser:
     )
     shield_rules.add_argument(
         "--salva", "--save", dest="save", action="store_true", help=t("shield_rules.cli_save")
+    )
+    shield_tools = shield_commands_parser.add_parser(
+        "tools", aliases=["strumenti"], help=t("shield_rules.tools_help"), parents=[language]
+    )
+    shield_tools.add_argument(
+        "action", choices=sorted(TOOL_ACTIONS), help=t("shield_rules.tools_action")
+    )
+    shield_tools.add_argument("--server", dest="tools_server", help=t("shield_rules.tools_server"))
+    shield_tools.add_argument(
+        "--strumento",
+        "--tool",
+        dest="tool_names",
+        action="append",
+        default=[],
+        help=t("shield_rules.tools_tool"),
     )
     rules = commands.add_parser(
         "rules", aliases=["regole"], help=t("guide.cli_help"), parents=[language]
@@ -431,6 +455,7 @@ def run_shield_command(
         ledger=ledger,
         t=t,
         report=_report_stderr,
+        pins=PinStore(env.data_dir, None, ledger),
     )
     _report_stderr(inspector.describe())
     return run_shield(
@@ -468,6 +493,19 @@ def run_shield_rules(
     return shield_commands.simulate(ws, args.file, simulation)
 
 
+def run_shield_tools(
+    args: argparse.Namespace, t: Translator, env: HostEnvironment, out: TextIO
+) -> int:
+    action = TOOL_ACTIONS[args.action]
+    ws = shield_commands.Workspace(t, env.data_dir, home_text(str(env.home)), out)
+    store = PinStore(env.data_dir, None, Ledger(env.data_dir))
+    if action == "list":
+        return shield_commands.tools_list(ws, store)
+    if action == "approve":
+        return shield_commands.tools_approve(ws, store, args.tools_server, args.tool_names)
+    return shield_commands.tools_forget(ws, store, args.tools_server)
+
+
 def dispatch_shield(
     args: argparse.Namespace,
     t: Translator,
@@ -475,6 +513,8 @@ def dispatch_shield(
     env: HostEnvironment,
     out: TextIO,
 ) -> int:
+    if getattr(args, "shield_command", None) in ("tools", "strumenti"):
+        return run_shield_tools(args, t, env, out)
     if getattr(args, "shield_command", None):
         return run_shield_rules(args, t, env, out)
     return run_shield_command(args, t, command, env)

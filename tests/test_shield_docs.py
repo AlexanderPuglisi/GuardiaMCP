@@ -34,7 +34,7 @@ def test_every_toml_example_in_the_guides_is_valid(name: str) -> None:
         )
         result = parse_rules(source, HOME)
         assert result.ruleset is not None, (block, [(i.code, i.line) for i in result.issues])
-        assert result.ruleset.rules
+        assert result.ruleset.rules or "[protezioni]" in block or "[protections]" in block
 
 
 @pytest.mark.parametrize("name", GUIDES)

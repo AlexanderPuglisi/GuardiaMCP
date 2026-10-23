@@ -494,9 +494,16 @@ def test_live_list_hides_tools(tmp_path: Path) -> None:
 
 
 def test_live_redaction_of_results_and_arguments(tmp_path: Path) -> None:
-    text = rules(
-        rule('nome = "results"\nazione = "oscura"\nfase = "risultato"\ncontenuto.segreti = true'),
-        rule('nome = "names"\nazione = "oscura"\nfase = "chiamata"\nargomento.contiene = "Mario"'),
+    text = (
+        rules(
+            rule(
+                'nome = "results"\nazione = "oscura"\nfase = "risultato"\ncontenuto.segreti = true'
+            ),
+            rule(
+                'nome = "names"\nazione = "oscura"\nfase = "chiamata"\nargomento.contiene = "Mario"'
+            ),
+        )
+        + '[protezioni]\nsegreti_in_uscita = "registra"\n'
     )
     shield, _, _ = shield_with_rules(tmp_path, text)
     result = shield.ask(call(1, "echo", {"text": f"here {SECRET} end"}))
@@ -702,8 +709,19 @@ def test_cli_shield_applies_approved_rules_end_to_end(tmp_path: Path) -> None:
         [*guardia, "scudo", "regole", "approva"], env=environment, capture_output=True, check=False
     )
     assert approved.returncode == 0, approved.stdout
+    listing = subprocess.run(
+        [*guardia, "scudo", "--server", "demo", "--", *SERVER],
+        input=request(1, "initialize", {"protocolVersion": "2025-11-25"})
+        + b"\n"
+        + request(4, "tools/list")
+        + b"\n",
+        env=environment,
+        capture_output=True,
+        timeout=60,
+        check=False,
+    )
+    assert b'"echo"' in listing.stdout, listing.stderr
     messages = [
-        request(1, "initialize", {"protocolVersion": "2025-11-25"}),
         call(2, "echo", {"text": "type ~/.ssh/id_rsa"}),
         call(3, "echo", {"text": "hello"}),
     ]

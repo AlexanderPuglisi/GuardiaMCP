@@ -12,6 +12,7 @@ from guardia.i18n import Translator
 from guardia.safeio import SafeReadError
 from guardia.secure_store import Protector
 from guardia.shield.engine import Context, Engine, redact
+from guardia.shield.pins import PinError, PinStore
 from guardia.shield.policy import (
     ApprovalError,
     PolicyState,
@@ -256,3 +257,70 @@ def simulate(ws: Workspace, file: Path | None, simulation: Simulation) -> int:
         for line in preview.splitlines()[:MAX_PREVIEW_LINES]:
             ws.write(safe_text(line, 400))
     return EXIT_OK
+
+
+def tools_list(ws: Workspace, store: PinStore) -> int:
+    ws.write(ws.t("shield_rules.tools_file", path=ws.path(store.path)))
+    try:
+        waiting, approved, valid = store.pending()
+    except (OSError, PinError) as exc:
+        ws.write(ws.t("shield_rules.tools_failed", error=safe_text(str(exc), 200)))
+        return EXIT_FAILED
+    if not valid:
+        ws.write(ws.t("shield_rules.tools_unverified"))
+        return EXIT_INVALID
+    if not approved:
+        ws.write(ws.t("shield_rules.tools_none"))
+        return EXIT_OK
+    for server, count in approved.items():
+        mine = [item for item in waiting if item.server == server]
+        ws.write(
+            ws.t(
+                "shield_rules.tools_server_line",
+                server=safe_text(server, 80),
+                approved=count,
+                pending=len(mine),
+            )
+        )
+        for item in mine:
+            ws.write(
+                ws.t(
+                    "shield_rules.tools_pending_line",
+                    tool=safe_text(item.name, 120),
+                    reason=ws.t(f"shield_rules.reason_{item.reason.value}"),
+                    seen=safe_text(item.seen, 40),
+                    fingerprint=item.fingerprint[:12],
+                )
+            )
+    return EXIT_OK
+
+
+def tools_approve(ws: Workspace, store: PinStore, server: str | None, names: list[str]) -> int:
+    if not server:
+        ws.write(ws.t("shield_rules.tools_need_server"))
+        return EXIT_USAGE
+    try:
+        chosen = store.approve(server, names)
+    except (OSError, PinError) as exc:
+        ws.write(ws.t("shield_rules.tools_failed", error=safe_text(str(exc), 200)))
+        return EXIT_FAILED
+    if not chosen:
+        ws.write(ws.t("shield_rules.tools_nothing", server=safe_text(server, 80)))
+        return EXIT_INVALID
+    listed = ", ".join(safe_text(name, 120) for name in chosen)
+    ws.write(ws.t("shield_rules.tools_approved", server=safe_text(server, 80), tools=listed))
+    return EXIT_OK
+
+
+def tools_forget(ws: Workspace, store: PinStore, server: str | None) -> int:
+    if not server:
+        ws.write(ws.t("shield_rules.tools_need_server"))
+        return EXIT_USAGE
+    try:
+        forgotten = store.forget(server)
+    except (OSError, PinError) as exc:
+        ws.write(ws.t("shield_rules.tools_failed", error=safe_text(str(exc), 200)))
+        return EXIT_FAILED
+    key = "shield_rules.tools_forgotten" if forgotten else "shield_rules.tools_unknown"
+    ws.write(ws.t(key, server=safe_text(server, 80)))
+    return EXIT_OK if forgotten else EXIT_INVALID

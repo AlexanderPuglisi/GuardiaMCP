@@ -5,7 +5,7 @@ import enum
 import re
 import tomllib
 from collections.abc import Callable, Iterator, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from guardia.model import sha256_hex
@@ -63,6 +63,7 @@ TOP_KEYS = {
     "version": ("versione", "version"),
     "default": ("predefinito", "default"),
     "rules": ("regola", "rule"),
+    "protections": ("protezioni", "protections"),
 }
 RULE_KEYS = {
     "name": ("nome", "name"),
@@ -92,6 +93,14 @@ CONTENT_KEYS = {
     "max_size": ("dimensione_max", "max_size"),
 }
 RATE_KEYS = {"max": ("massimo", "max"), "seconds": ("secondi", "seconds")}
+PROTECTION_KEYS = {
+    "approved_tools": ("strumenti_approvati", "approved_tools"),
+    "analysis": ("analisi", "analysis"),
+    "results": ("risultati", "results"),
+    "outgoing_secrets": ("segreti_in_uscita", "outgoing_secrets"),
+    "result_secrets": ("segreti_nei_risultati", "result_secrets"),
+    "credential_requests": ("richieste_credenziali", "credential_requests"),
+}
 
 
 class Level(enum.StrEnum):
@@ -147,11 +156,53 @@ class Rule:
     rate: RateLimit | None = None
 
 
+class Sensitivity(enum.StrEnum):
+    OFF = "off"
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+
+
+class ResultMode(enum.StrEnum):
+    OFF = "off"
+    WARN = "warn"
+    BLOCK = "block"
+
+
+SENSITIVITY_NAMES = {
+    "spento": Sensitivity.OFF,
+    "critico": Sensitivity.CRITICAL,
+    "alto": Sensitivity.HIGH,
+    "medio": Sensitivity.MEDIUM,
+    **{item.value: item for item in Sensitivity},
+}
+RESULT_MODE_NAMES = {
+    "spento": ResultMode.OFF,
+    "avvisa": ResultMode.WARN,
+    "blocca": ResultMode.BLOCK,
+    **{item.value: item for item in ResultMode},
+}
+OFF_NAMES = frozenset({"spento", "off"})
+SECRET_ACTIONS = frozenset({Action.ASK, Action.BLOCK, Action.LOG})
+RESULT_SECRET_ACTIONS = frozenset({Action.REDACT})
+
+
+@dataclass(frozen=True, slots=True)
+class Protections:
+    approved_tools: bool = True
+    analysis: Sensitivity = Sensitivity.HIGH
+    results: ResultMode = ResultMode.WARN
+    outgoing_secrets: Action | None = Action.ASK
+    result_secrets: Action | None = Action.REDACT
+    credential_requests: Action | None = Action.BLOCK
+
+
 @dataclass(frozen=True, slots=True)
 class RuleSet:
     default: Action = Action.ALLOW
     rules: tuple[Rule, ...] = ()
     sha256: str = ""
+    protections: Protections = field(default_factory=Protections)
 
 
 @dataclass(slots=True)
@@ -193,6 +244,14 @@ class _Lines:
             if pattern.match(self.lines[number - 1]):
                 return number
         return start
+
+    def top_table(self, names: tuple[str, ...]) -> int | None:
+        alternatives = "|".join(map(re.escape, names))
+        pattern = re.compile(rf"^\s*(?:\[\s*(?:{alternatives})\s*\]|(?:{alternatives})\s*[.=])")
+        for number, line in enumerate(self.lines, 1):
+            if pattern.match(line):
+                return number
+        return None
 
     def top(self, names: tuple[str, ...]) -> int | None:
         pattern = re.compile(r"^\s*(?:" + "|".join(map(re.escape, names)) + r")\s*=")
@@ -460,6 +519,75 @@ class _Checker:
         self.warnings(rule)
         return rule if action is not None and enabled is True else None
 
+    def choice(self, value: Any, names: Mapping[str, Any], key: str, line: int | None) -> Any:
+        if not isinstance(value, str) or value.lower() not in names:
+            options = ", ".join(sorted(names))
+            self.issue(Level.ERROR, "bad_choice", line, key=key, value=value, options=options)
+            return None
+        return names[value.lower()]
+
+    def secret_action(
+        self, value: Any, allowed: frozenset[Action], key: str, line: int | None
+    ) -> tuple[bool, Action | None]:
+        names: dict[str, Action | None] = {
+            name: action for name, action in ACTION_NAMES.items() if action in allowed
+        }
+        names.update(dict.fromkeys(OFF_NAMES, None))
+        if not isinstance(value, str) or value.lower() not in names:
+            options = ", ".join(sorted(names))
+            self.issue(Level.ERROR, "bad_choice", line, key=key, value=value, options=options)
+            return False, None
+        return True, names[value.lower()]
+
+    def protections(self, value: Any) -> Protections:
+        line = self.lines.top_table(TOP_KEYS["protections"])
+        if not isinstance(value, dict):
+            self.issue(Level.ERROR, "not_table", line, key="protezioni")
+            return Protections()
+        data = self.table(value, PROTECTION_KEYS, line, rule="", context="protezioni")
+        result = Protections()
+        if "approved_tools" in data:
+            if isinstance(data["approved_tools"], bool):
+                result = replace(result, approved_tools=data["approved_tools"])
+            else:
+                self.issue(Level.ERROR, "not_bool", line, key="strumenti_approvati")
+        if "analysis" in data:
+            chosen = self.choice(data["analysis"], SENSITIVITY_NAMES, "analisi", line)
+            result = replace(result, analysis=chosen or result.analysis)
+        if "results" in data:
+            chosen = self.choice(data["results"], RESULT_MODE_NAMES, "risultati", line)
+            result = replace(result, results=chosen or result.results)
+        if "outgoing_secrets" in data:
+            valid, action = self.secret_action(
+                data["outgoing_secrets"], SECRET_ACTIONS, "segreti_in_uscita", line
+            )
+            result = replace(result, outgoing_secrets=action) if valid else result
+        if "result_secrets" in data:
+            valid, action = self.secret_action(
+                data["result_secrets"], RESULT_SECRET_ACTIONS, "segreti_nei_risultati", line
+            )
+            result = replace(result, result_secrets=action) if valid else result
+        if "credential_requests" in data:
+            valid, action = self.secret_action(
+                data["credential_requests"], SECRET_ACTIONS, "richieste_credenziali", line
+            )
+            result = replace(result, credential_requests=action) if valid else result
+        self.relaxed(result, line)
+        return result
+
+    def relaxed(self, protections: Protections, line: int | None) -> None:
+        checks = (
+            ("strumenti_approvati", protections.approved_tools is False),
+            ("analisi", protections.analysis in (Sensitivity.OFF, Sensitivity.CRITICAL)),
+            ("risultati", protections.results is ResultMode.OFF),
+            ("segreti_in_uscita", protections.outgoing_secrets in (None, Action.LOG)),
+            ("segreti_nei_risultati", protections.result_secrets is None),
+            ("richieste_credenziali", protections.credential_requests in (None, Action.LOG)),
+        )
+        for key, weaker in checks:
+            if weaker:
+                self.issue(Level.WARNING, "protection_relaxed", line, key=key)
+
     def warnings(self, rule: Rule) -> None:
         if rule.argument is not None and rule.phases and not rule.phases & ARGUMENT_PHASES:
             self.issue(Level.WARNING, "argument_never_matches", rule.line, rule.name)
@@ -489,7 +617,9 @@ def _toml_line(error: tomllib.TOMLDecodeError) -> int | None:
     return int(match.group(1)) if match else None
 
 
-def _top(checker: _Checker, document: dict[str, Any]) -> tuple[Action, list[Any]] | None:
+def _top(
+    checker: _Checker, document: dict[str, Any]
+) -> tuple[Action, list[Any], Protections] | None:
     if all(name in document for name in TOP_KEYS["rules"]):
         checker.issue(Level.ERROR, "mixed_rule_tables", checker.lines.rule(0))
         return None
@@ -519,7 +649,10 @@ def _top(checker: _Checker, document: dict[str, Any]) -> tuple[Action, list[Any]
     if len(rules) > MAX_RULES:
         checker.issue(Level.ERROR, "too_many_rules", None, limit=MAX_RULES)
         return None
-    return default, rules
+    protections = (
+        checker.protections(data["protections"]) if "protections" in data else Protections()
+    )
+    return default, rules, protections
 
 
 def parse_rules(text: str, home: str) -> ParseResult:
@@ -532,18 +665,18 @@ def parse_rules(text: str, home: str) -> ParseResult:
     top = _top(checker, document)
     if top is None:
         return ParseResult(None, checker.issues)
-    default, raw_rules = top
+    default, raw_rules, protections = top
     rules = [rule for index, item in enumerate(raw_rules) if (rule := checker.rule(item, index))]
     names = [rule.name for rule in rules]
     for name in sorted({name for name in names if names.count(name) > 1}):
         checker.issue(Level.WARNING, "duplicate_name", None, name)
     if any(issue.level is Level.ERROR for issue in checker.issues):
         return ParseResult(None, checker.issues)
-    ruleset = RuleSet(default, tuple(rules), sha256_hex(text.encode("utf-8")))
+    ruleset = RuleSet(default, tuple(rules), sha256_hex(text.encode("utf-8")), protections)
     return ParseResult(ruleset, checker.issues)
 
 
 def all_keys() -> Iterator[str]:
-    for schema in (TOP_KEYS, RULE_KEYS, ARGUMENT_KEYS, CONTENT_KEYS, RATE_KEYS):
+    for schema in (TOP_KEYS, RULE_KEYS, ARGUMENT_KEYS, CONTENT_KEYS, RATE_KEYS, PROTECTION_KEYS):
         for names in schema.values():
             yield from names
