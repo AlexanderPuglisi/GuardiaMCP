@@ -15,6 +15,7 @@ DARK_RED = (142, 27, 27)
 TEXT = (236, 233, 230)
 MUTED = (155, 152, 160)
 FAINT = (109, 106, 114)
+PILL = (29, 29, 35)
 
 
 def font(name: str, size: int) -> ImageFont.FreeTypeFont:
@@ -38,14 +39,28 @@ def build() -> Image.Image:
     image.paste(shield, (90, 150), shield)
     draw = ImageDraw.Draw(image)
     title = font("segoeuib.ttf", 92)
-    draw.text((470, 205), "Guardia", font=title, fill=TEXT)
+    draw.text((470, 170), "Guardia", font=title, fill=TEXT)
     width = draw.textlength("Guardia ", font=title)
-    draw.text((470 + width, 205), "MCP", font=title, fill=RED)
-    draw.text((474, 330), "Free, offline security shield", font=font("segoeui.ttf", 38), fill=TEXT)
-    draw.text((474, 378), "for AI agents that use MCP", font=font("segoeui.ttf", 38), fill=TEXT)
+    draw.text((470 + width, 170), "MCP", font=title, fill=RED)
+    draw.text((474, 290), "Free, offline security shield", font=font("segoeui.ttf", 38), fill=TEXT)
+    draw.text((474, 336), "for AI agents that use MCP", font=font("segoeui.ttf", 38), fill=TEXT)
     small = font("segoeui.ttf", 24)
-    draw.text((476, 450), "Scanner · Real-time Shield · Signed ledger", font=small, fill=MUTED)
-    draw.text((476, 486), "Italiano / English · Apache 2.0", font=small, fill=MUTED)
+    draw.text((476, 400), "Scanner · Real-time Shield · Signed ledger", font=small, fill=MUTED)
+    rows = (
+        ("OPEN SOURCE", "100% OFFLINE", "NO TELEMETRY"),
+        ("645 TESTS", "INDEPENDENT REVIEW", "APACHE 2.0"),
+    )
+    label = font("segoeuib.ttf", 17)
+    for index, row in enumerate(rows):
+        left = 476.0
+        top = 448 + index * 50
+        for text in row:
+            width = draw.textlength(text, font=label) + 36
+            draw.rounded_rectangle(
+                (left, top, left + width, top + 36), radius=18, fill=PILL, outline=RED, width=2
+            )
+            draw.text((left + width / 2, top + 18), text, font=label, fill=TEXT, anchor="mm")
+            left += width + 12
     draw.text(
         (1190, 590), "by Alexander Puglisi", font=font("segoeui.ttf", 22), fill=FAINT, anchor="ra"
     )
