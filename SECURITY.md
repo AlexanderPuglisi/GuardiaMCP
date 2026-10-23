@@ -26,7 +26,8 @@ Each guarantee below is enforced by an automated test, not only by a promise.
 
 | Guarantee | How it is enforced |
 |---|---|
-| Never runs the code it analyzes | No process, `eval`/`exec`, dynamic import or pickle anywhere in the source (`tests/test_tool_corpus.py`). The only `ctypes` use is the Windows DPAPI call in `secure_store.py`. |
+| Never runs the code it analyzes | No `eval`/`exec`, dynamic import or pickle anywhere in the source (`tests/test_tool_corpus.py`). The only `ctypes` use is the Windows DPAPI call in `secure_store.py`. |
+| Starts a process only for the Shield, and only the one you configured | `subprocess` is allowed in exactly one module, `shield/process.py`, which starts the server command written in your configuration, never through a shell (`tests/test_tool_corpus.py`). The scanner and the app never start processes. |
 | Never connects to the network | No network module is imported; `urllib.parse` is used only to read text (`tests/test_self_defense.py`). The desktop app page has `connect-src 'none'`. |
 | Never changes your configuration files | Guardia writes only to `%LOCALAPPDATA%\GuardiaMCP` (baseline, ledger, app settings) and to the report files you choose. |
 | Text from analyzed files can never become code | Terminal output escapes control and bidirectional characters; the HTML report has no scripts and a strict CSP; the desktop app builds the page with `textContent` only and refuses `innerHTML` (`tests/test_app.py`). |
@@ -72,6 +73,14 @@ defense is an **anchor saved outside the PC** (`guardia ledger anchor`), checked
 system, only by file permissions.
 
 **Version 1 does not block anything.** It reports. It does not stop an agent while it is running.
+
+**The Shield (v2) is a development preview.** In phase 2.0 it validates the protocol but does not
+apply rules to the content yet. It sees only MCP messages: a malicious server is still a program
+on your PC and can read your files directly, without using MCP. On Windows, if a server does not
+stop when asked, the Shield ends the process it started, but programs that process started in turn
+(for example `node` started by `npx`) may keep running. Commands that are `.cmd` or `.bat` files
+(such as `npx` on Windows) pass their arguments through `cmd.exe`, exactly as when your client runs
+them: the Shield does not add this risk, but it does not remove it either.
 
 **A compromised PC cannot check itself.** If malware already runs with your privileges or as
 administrator, it can alter Guardia, its data or its output. No local tool can fix that.
@@ -119,7 +128,8 @@ Ogni garanzia è verificata da un test automatico, non solo promessa.
 
 | Garanzia | Come viene verificata |
 |---|---|
-| Non esegue mai il codice che analizza | Nel sorgente non c'è nessun avvio di processi, `eval`/`exec`, import dinamico o pickle (`tests/test_tool_corpus.py`). L'unico uso di `ctypes` è la chiamata a DPAPI di Windows in `secure_store.py`. |
+| Non esegue mai il codice che analizza | Nel sorgente non c'è nessun `eval`/`exec`, import dinamico o pickle (`tests/test_tool_corpus.py`). L'unico uso di `ctypes` è la chiamata a DPAPI di Windows in `secure_store.py`. |
+| Avvia un processo solo per lo Scudo, e solo quello che hai configurato tu | `subprocess` è permesso in un solo modulo, `shield/process.py`, che avvia il comando del server scritto nella tua configurazione, mai tramite una shell (`tests/test_tool_corpus.py`). Lo scanner e l'app non avviano mai processi. |
 | Non si collega mai alla rete | Nessun modulo di rete viene importato; `urllib.parse` serve solo a leggere testo (`tests/test_self_defense.py`). La pagina dell'app desktop ha `connect-src 'none'`. |
 | Non modifica i tuoi file di configurazione | Guardia scrive solo in `%LOCALAPPDATA%\GuardiaMCP` (base di confronto, registro, impostazioni dell'app) e nei file di rapporto che scegli tu. |
 | Il testo dei file analizzati non diventa mai codice | L'output nel terminale neutralizza i caratteri di controllo e bidirezionali; il rapporto HTML non ha script e ha una CSP rigida; l'app desktop costruisce la pagina solo con `textContent` e rifiuta `innerHTML` (`tests/test_app.py`). |
@@ -171,6 +181,15 @@ oppure cancellare tutta la cartella. L'unica difesa è un'**ancora salvata fuori
 Su macOS e Linux la chiave non è protetta dal sistema operativo, solo dai permessi dei file.
 
 **La versione 1 non blocca nulla.** Segnala. Non ferma un agente mentre lavora.
+
+**Lo Scudo (v2) è un'anteprima di sviluppo.** Nella fase 2.0 controlla il protocollo ma non applica
+ancora regole al contenuto. Vede solo i messaggi MCP: un server malevolo resta un programma sul tuo
+PC e può leggere i tuoi file direttamente, senza passare da MCP. Su Windows, se un server non si
+ferma quando glielo si chiede, lo Scudo chiude il processo che ha avviato, ma i programmi avviati a
+loro volta da quel processo (per esempio `node` avviato da `npx`) possono restare attivi. I comandi
+che sono file `.cmd` o `.bat` (come `npx` su Windows) passano i loro argomenti attraverso `cmd.exe`,
+esattamente come quando li avvia il tuo client: lo Scudo non aggiunge questo rischio, ma nemmeno
+lo toglie.
 
 **Un PC già compromesso non può controllare se stesso.** Se un malware gira già con i tuoi permessi
 o come amministratore, può alterare Guardia, i suoi dati o i suoi risultati. Nessuno strumento

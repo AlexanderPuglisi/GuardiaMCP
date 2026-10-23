@@ -507,3 +507,13 @@ def test_glow_option_is_persisted(env: HostEnvironment) -> None:
     assert api.state()["settings"]["glow"] is True
     api.set_option("glow", False)
     assert make_api(env).state()["settings"]["glow"] is False
+
+
+def test_shield_events_are_labelled_in_the_ledger_view(env: HostEnvironment) -> None:
+    ledger = Ledger(env.data_dir, RAW_PROTECTOR)
+    ledger.append("shield_start", {"server": "github", "command": ["npx"]})
+    ledger.append("shield_stop", {"server": "github", "forwarded": 12, "blocked": 2, "dropped": 1})
+    events = make_api(env).ledger(5)["events"]
+    assert [event["label"] for event in events] == ["Scudo fermato", "Scudo avviato"]
+    assert events[0]["details"] == "github: 12 inoltrati, 2 bloccati, 1 scartati"
+    assert events[1]["details"] == "github"

@@ -59,12 +59,13 @@ select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF", "PTH", "N", "C4", "P
 ignore = ["PLR0913", "PLR2004"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "PLR2004", "S105", "S106"]
+"tests/**" = ["S101", "PLR2004", "S105", "S106", "S603"]
 "src/guardia/extract/**" = ["PLR0911", "PLR0912"]
 "src/guardia/model.py" = ["S105"]
 "src/guardia/render/html.py" = ["E501"]
 "src/guardia/app/main.py" = ["PLC0415"]
 "scripts/demo.py" = ["S603"]
+"src/guardia/shield/process.py" = ["S603"]
 
 [tool.mypy]
 strict = true

@@ -14,12 +14,14 @@ from pathlib import Path
 from typing import Any
 
 from guardia import __version__
+from guardia.filelock import exclusive
 from guardia.model import canonical_json, sha256_hex
 from guardia.secure_store import KeyStore, KeyStoreError, Protector
 
 LEDGER_FILE = "registro.jsonl"
 HEAD_FILE = "registro.head"
 KEY_FILE = "registro.key"
+LOCK_FILE = "registro.lock"
 GENESIS = "0" * 64
 MAX_LINE_BYTES = 1024 * 1024
 
@@ -228,7 +230,10 @@ class Ledger:
         return seq, digest
 
     def append(self, event: str, data: Mapping[str, Any]) -> dict[str, Any]:
-        self.directory.mkdir(parents=True, exist_ok=True)
+        with exclusive(self.directory / LOCK_FILE):
+            return self._append(event, data)
+
+    def _append(self, event: str, data: Mapping[str, Any]) -> dict[str, Any]:
         key, _ = self._key(create=True)
         if key is None:
             raise KeyStoreError("ledger key unavailable")

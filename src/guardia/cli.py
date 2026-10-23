@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import io
 import json
 import sys
@@ -21,11 +22,14 @@ from guardia.render.rules_guide import render_rule_detail, render_rules_list, re
 from guardia.render.sarif import build_sarif
 from guardia.render.terminal import render_inventory, render_scan, severity_label
 from guardia.scanner import RULES, ScanReport
+from guardia.shield.runner import ShieldOptions, run_shield
 
 INVENTORY_COMMANDS = frozenset({"inventory", "inventario"})
 SCAN_COMMANDS = frozenset({"scan", "scansiona"})
 LEDGER_COMMANDS = frozenset({"ledger", "registro"})
 RULES_COMMANDS = frozenset({"rules", "regole"})
+SHIELD_COMMANDS = frozenset({"shield", "scudo"})
+SHIELD_PREFIX = "[Guardia MCP]"
 FORMATS = ("text", "testo", "json", "html", "sarif")
 FORMAT_ALIASES = {"testo": "text"}
 LEDGER_ACTIONS = ("verify", "verifica", "show", "mostra", "anchor", "ancora")
@@ -177,6 +181,17 @@ def build_parser(t: Translator) -> argparse.ArgumentParser:
     ledger.add_argument("action", choices=LEDGER_ACTIONS, help=t("cli.ledger_action"))
     ledger.add_argument("--last", "--ultimi", dest="last", type=int, default=10, help=t("cli.last"))
     ledger.add_argument("--anchor", "--ancora", dest="anchor", help=t("cli.anchor"))
+    shield = commands.add_parser(
+        "shield", aliases=["scudo"], help=t("shield.cli_help"), parents=[language]
+    )
+    shield.add_argument("--server", "--nome", dest="server", help=t("shield.cli_server"))
+    shield.add_argument(
+        "--no-ledger",
+        "--senza-registro",
+        dest="ledger",
+        action="store_false",
+        help=t("shield.cli_no_ledger"),
+    )
     rules = commands.add_parser(
         "rules", aliases=["regole"], help=t("guide.cli_help"), parents=[language]
     )
@@ -342,13 +357,52 @@ def run_rules(args: argparse.Namespace, t: Translator, out: TextIO) -> int:
     return EXIT_OK
 
 
+def _report_stderr(line: str) -> None:
+    stream = sys.stderr
+    if stream is None:
+        return
+    with contextlib.suppress(OSError, ValueError):
+        stream.write(f"{SHIELD_PREFIX} {line}\n")
+        stream.flush()
+
+
+def run_shield_command(
+    args: argparse.Namespace, t: Translator, command: list[str], env: HostEnvironment
+) -> int:
+    if isinstance(sys.stderr, io.TextIOWrapper):
+        sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
+    if not command:
+        _report_stderr(t("shield.no_command"))
+        return EXIT_USAGE
+    options = ShieldOptions(
+        server=args.server or Path(command[0]).stem or command[0], command=tuple(command)
+    )
+    return run_shield(
+        options,
+        t=t,
+        client_in=sys.stdin.buffer,
+        client_out=sys.stdout.buffer,
+        report=_report_stderr,
+        ledger=Ledger(env.data_dir) if args.ledger else None,
+    )
+
+
+def split_command(arguments: list[str]) -> tuple[list[str], list[str]]:
+    if "--" not in arguments:
+        return arguments, []
+    split = arguments.index("--")
+    if not any(argument in SHIELD_COMMANDS for argument in arguments[:split]):
+        return arguments, []
+    return arguments[:split], arguments[split + 1 :]
+
+
 def main(
     argv: Sequence[str] | None = None,
     *,
     env: HostEnvironment | None = None,
     stdout: TextIO | None = None,
 ) -> int:
-    arguments = list(sys.argv[1:] if argv is None else argv)
+    arguments, command = split_command(list(sys.argv[1:] if argv is None else argv))
     out = stdout if stdout is not None else sys.stdout
     _prepare_stream(out)
     t = Translator(detect_language(peek_language(arguments)))
@@ -359,6 +413,8 @@ def main(
         return EXIT_OK
     if args.command in RULES_COMMANDS:
         return run_rules(args, t, out)
+    if args.command in SHIELD_COMMANDS:
+        return run_shield_command(args, t, command, env or HostEnvironment.from_os())
     missing = _missing_paths(args)
     if missing:
         out.write(t("cli.missing_path", path=str(missing[0])) + "\n")

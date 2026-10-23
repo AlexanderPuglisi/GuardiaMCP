@@ -48,6 +48,7 @@ INTEGRATION_ONLY_RULES = frozenset(
 
 
 DPAPI_EXCEPTION = frozenset({"ctypes"})
+ALLOWED_EXECUTION = {"secure_store.py": DPAPI_EXCEPTION, "process.py": frozenset({"subprocess"})}
 
 
 def extract(path: Path) -> list[ToolDefinition]:
@@ -175,7 +176,9 @@ def test_guardia_never_imports_execution_primitives() -> None:
     source = Path(__file__).parent.parent / "src" / "guardia"
     for path in source.rglob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"))
-        allowed = DPAPI_EXCEPTION if path.name == "secure_store.py" else frozenset()
+        allowed = ALLOWED_EXECUTION.get(path.name, frozenset())
+        if path.name == "process.py":
+            assert path.parent.name == "shield", path
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 names = {alias.name.split(".")[0] for alias in node.names}
@@ -189,3 +192,22 @@ def test_guardia_never_imports_execution_primitives() -> None:
                     assert func.id not in forbidden_names, f"{path}:{node.lineno}: {func.id}"
                 elif isinstance(func, ast.Attribute):
                     assert func.attr not in forbidden_attributes, f"{path}:{node.lineno}"
+
+
+def test_no_shell_execution_anywhere() -> None:
+    source = Path(__file__).parent.parent / "src" / "guardia"
+    importers = []
+    for path in source.rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.keyword) and node.arg == "shell":
+                assert isinstance(node.value, ast.Constant) and node.value.value is False, path
+            if isinstance(node, ast.Import | ast.ImportFrom):
+                names = (
+                    [node.module or ""]
+                    if isinstance(node, ast.ImportFrom)
+                    else [alias.name for alias in node.names]
+                )
+                if any(name.split(".")[0] == "subprocess" for name in names):
+                    importers.append(path.relative_to(source).as_posix())
+    assert importers == ["shield/process.py"]

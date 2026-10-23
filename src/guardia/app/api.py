@@ -174,9 +174,20 @@ class GuardiaApi:
                 details += " · " + t("ui.event_accepted")
         elif event == "export":
             details = f"{str(data.get('format', '')).upper()} · {data.get('file', '')}"
+        elif event == "shield_stop" and "forwarded" in data:
+            details = t(
+                "ui.event_shield_counts",
+                server=data.get("server", ""),
+                forwarded=int(data.get("forwarded", 0) or 0),
+                blocked=int(data.get("blocked", 0) or 0),
+                dropped=int(data.get("dropped", 0) or 0),
+            )
+        elif event in ("shield_start", "shield_stop"):
+            details = str(data.get("server", ""))
         else:
             details = ""
-        label_key = f"ui.event_{event}" if event in ("scan", "export") else "ui.event_other"
+        known = ("scan", "export", "shield_start", "shield_stop")
+        label_key = f"ui.event_{event}" if event in known else "ui.event_other"
         return {
             "seq": record.get("seq"),
             "time": safe_text(str(record.get("time", "")), 40),

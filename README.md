@@ -50,8 +50,21 @@ Exit codes of `guardia scan`: `0` nothing at or above `--fail-on` (default `high
 `1` problems found, `2` usage error, `3` incomplete analysis.
 
 Read [SECURITY.md](SECURITY.md) for what Guardia guarantees and its honest limits, and
-[CONTRIBUTING.md](CONTRIBUTING.md) to help. Planned for v2: a real-time shield (proxy) with
-user-written rules.
+[CONTRIBUTING.md](CONTRIBUTING.md) to help.
+
+### Shield (v2, development preview)
+
+`guardia shield --server NAME -- command arguments` starts a local MCP server behind Guardia: the
+client talks to Guardia, Guardia talks to the server. Today (phase 2.0) the Shield already:
+
+- accepts only valid JSON-RPC messages and forwards exactly what it checked (duplicate keys,
+  batches, wrong ids and oversized messages are dropped);
+- drops responses the server sends for requests nobody made;
+- blocks a message, instead of letting it through, if its own check fails;
+- refuses to start the server if it cannot write to the ledger, and records every session;
+- supports MCP 2025-11-25 and 2026-07-28 over stdio and adds about 0.06 ms per message.
+
+It does not apply user rules yet: they arrive in phase 2.1, together with the guide.
 
 ### Install from source (recommended)
 
@@ -137,8 +150,21 @@ Codici di uscita di `guardia scansiona`: `0` nessun problema dal livello `--fall
 (predefinito `high`), `1` problemi trovati, `2` errore d'uso, `3` analisi incompleta.
 
 Leggi [SECURITY.md](SECURITY.md) per sapere cosa garantisce Guardia e quali sono i suoi limiti, e
-[CONTRIBUTING.md](CONTRIBUTING.md) per contribuire. In arrivo nella v2: scudo in tempo reale
-(proxy) con regole scritte da te.
+[CONTRIBUTING.md](CONTRIBUTING.md) per contribuire.
+
+### Scudo (v2, anteprima di sviluppo)
+
+`guardia scudo --server NOME -- comando argomenti` avvia un server MCP locale dietro Guardia: il
+client parla con Guardia, Guardia parla con il server. Oggi (fase 2.0) lo Scudo già:
+
+- accetta solo messaggi JSON-RPC validi e inoltra esattamente quello che ha controllato (chiavi
+  duplicate, lotti di messaggi, id sbagliati e messaggi troppo grandi vengono scartati);
+- scarta le risposte che il server invia a richieste che nessuno ha fatto;
+- blocca un messaggio, invece di lasciarlo passare, se il suo stesso controllo va in errore;
+- non avvia il server se non riesce a scrivere nel registro, e registra ogni sessione;
+- supporta MCP 2025-11-25 e 2026-07-28 su stdio e aggiunge circa 0,06 ms per messaggio.
+
+Non applica ancora regole scritte da te: arrivano nella fase 2.1, insieme alla guida.
 
 Vuoi capire MCP da zero? Leggi [docs/IMPARA-MCP.md](docs/IMPARA-MCP.md).
 
