@@ -139,6 +139,11 @@ tbody tr:hover { background: var(--surface-2); }
 tbody tr[aria-selected="true"] { background: var(--accent-soft); }
 td .name { font-weight: 600; }
 td .where { color: var(--faint); font-size: 12px; font-family: var(--mono); }
+.path-line { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
+.path-line > span { min-width: 0; overflow-wrap: anywhere; }
+.icon-btn { flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--faint); cursor: pointer; transition: color .15s, background .15s, border-color .15s; }
+.icon-btn svg { width: 14px; height: 14px; }
+.icon-btn:hover { color: var(--text); background: var(--surface-3); border-color: var(--line-2); }
 .detail { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); position: sticky; top: 0; }
 .detail-head { padding: 16px; border-bottom: 1px solid var(--line); }
 .detail-head h3 { margin: 6px 0 2px; font-size: 17px; overflow-wrap: anywhere; }

@@ -8,6 +8,7 @@
     ledger: ["M4 3h16v18H4z", "M9 7h6", "M9 12h6", "M9 17h4"],
     reports: ["M12 3v12", "M7 10l5 5 5-5", "M4 19h16"],
     shield: ["M12 3 4.5 6v5.5c0 4.7 3.1 8.1 7.5 9.5 4.4-1.4 7.5-4.8 7.5-9.5V6z", "m9 12 2 2 4-4"],
+    copy: ["M9 9h11v11H9z", "M5 15H4V4h11v1"],
     settings: ["M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z", "M12 2v3", "M12 19v3", "M2 12h3", "M19 12h3", "M4.9 4.9l2.1 2.1", "M17 17l2.1 2.1", "M4.9 19.1 7 17", "M17 7l2.1-2.1"],
   };
   const VIEWS = ["overview", "inventory", "findings", "shield", "ledger", "reports", "settings"];
@@ -103,6 +104,28 @@
       area.remove();
     }
     toast(t("copied"));
+  }
+
+  function copyButton(text) {
+    const label = t("copy_path");
+    return el("button", {
+      cls: "icon-btn", attrs: { type: "button", title: label, "aria-label": label },
+      on: { click: (event) => { event.stopPropagation(); copy(text); } },
+    }, icon("copy"));
+  }
+
+  function pathLine(cls, path) {
+    return el("div", { cls: "path-line" }, el("span", { cls, text: path }), copyButton(path));
+  }
+
+  function cleanCopy(event) {
+    const active = document.activeElement;
+    if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) return;
+    const text = window.getSelection().toString();
+    const trimmed = text.trim();
+    if (!trimmed || trimmed === text) return;
+    event.clipboardData.setData("text/plain", trimmed);
+    event.preventDefault();
   }
 
   function apply(next) {
@@ -231,8 +254,10 @@
   }
 
   function findingBlock(finding) {
+    const place = finding.where.startsWith(finding.path) ? finding.where.slice(finding.path.length).replace(/^,\s*/, "") : "";
     const rows = el("dl", {},
-      el("dt", { text: state.ui["scan.where"] }), el("dd", { cls: "mono", text: finding.where }));
+      el("dt", { text: state.ui["scan.where"] }),
+      el("dd", {}, pathLine("mono", finding.path), place ? el("div", { cls: "muted mono", text: place }) : null));
     if (finding.evidence) rows.append(el("dt", { text: state.ui["scan.found"] }), el("dd", { cls: "mono", text: finding.evidence }));
     rows.append(el("dt", { text: state.ui["scan.why"] }), el("dd", { text: finding.why }),
       el("dt", { text: state.ui["scan.fix"] }), el("dd", { text: finding.fix }));
@@ -300,7 +325,7 @@
       for (const entry of entries) {
         const row = el("tr", { attrs: { "aria-selected": String(entry.id === state.entryId), tabindex: 0 } },
           el("td", {}, badge(entry.risk, entry.risk_label)),
-          el("td", {}, el("div", { cls: "name", text: entry.name }), el("div", { cls: "where", text: entry.path })),
+          el("td", {}, el("div", { cls: "name", text: entry.name }), pathLine("where", entry.path)),
           el("td", { text: entry.client }),
           el("td", { text: entry.type_label + (entry.transport ? " · " + entry.transport : "") }));
         const pick = () => { state.entryId = entry.id; render(); };
@@ -417,7 +442,7 @@
         }));
       }
       body.append(el("tr", {},
-        el("td", {}, el("div", { cls: "name", text: server.name }), el("div", { cls: "where", text: server.path })),
+        el("td", {}, el("div", { cls: "name", text: server.name }), pathLine("where", server.path)),
         el("td", { text: server.client }),
         el("td", { text: server.status }),
         action));
@@ -725,6 +750,7 @@
   async function start() {
     apply(await call("state"));
     wireWindow();
+    document.addEventListener("copy", cleanCopy);
     document.getElementById("scan-button").addEventListener("click", runScan);
     for (const button of document.querySelectorAll(".lang button")) {
       button.addEventListener("click", () => setLanguage(button.dataset.lang));
