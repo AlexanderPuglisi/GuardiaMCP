@@ -26,7 +26,7 @@ from guardia.scanner import BaselineSummary, ScanContext, ScanReport, scan_inven
 from guardia.scanner.baseline import run_baseline
 from guardia.scanner.engine import LedgerSummary
 from guardia.scanner.rules import RULES
-from guardia.secure_store import Protector
+from guardia.secure_store import KeyStoreError, Protector
 
 MAX_LEDGER_FINDINGS = 500
 
@@ -158,8 +158,11 @@ def analyze(env: HostEnvironment, options: AnalysisOptions | None = None) -> Sca
         return report
     recorded = False
     if options.write_ledger:
-        ledger.append("scan", scan_event(report))
-        recorded = True
+        try:
+            ledger.append("scan", scan_event(report))
+            recorded = True
+        except (OSError, KeyStoreError):
+            recorded = False
     after = ledger.verify() if recorded else verification
     return replace(
         report,

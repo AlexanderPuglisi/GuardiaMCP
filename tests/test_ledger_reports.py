@@ -4,6 +4,7 @@ import io
 import json
 import re
 import sys
+import threading
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -271,3 +272,69 @@ def test_report_formats_from_the_cli(
     if output_format in ("json", "sarif"):
         json.loads(content)
     assert "G07-004" in content
+
+
+def test_deleting_the_whole_ledger_is_detected(ledger: Ledger) -> None:
+    for number in range(3):
+        last = ledger.append("scan", {"n": number})
+    saved = f"3:{last['hash']}"
+    ledger.path.unlink()
+    assert ledger.verify().tampered
+    assert LedgerProblem.ANCHOR_MISMATCH in problems(ledger, saved)
+
+
+def test_deleting_the_tail_and_the_head_is_detected(ledger: Ledger) -> None:
+    for number in range(3):
+        ledger.append("scan", {"n": number})
+    lines = ledger.path.read_text(encoding="utf-8").splitlines()
+    ledger.path.write_text("\n".join(lines[:2]) + "\n", encoding="utf-8")
+    ledger.head_path.unlink()
+    assert ledger.verify().tampered
+
+
+def test_broken_bytes_and_types_are_reported_not_raised(ledger: Ledger) -> None:
+    ledger.append("scan", {"n": 1})
+    with ledger.path.open("ab") as stream:
+        stream.write(b'{"seq":2,"time":"t","event":"x","data":{},"prev":"p","hash":5,"mac":5}\n')
+        stream.write(b"\xff\xfe broken\n")
+    found = problems(ledger)
+    assert LedgerProblem.MALFORMED in found
+    assert LedgerProblem.HASH in found
+    assert [record["seq"] for record in ledger.records()] == [1, 2]
+
+
+def test_verify_while_another_process_appends(ledger: Ledger) -> None:
+    ledger.append("scan", {"n": 0})
+    stop = threading.Event()
+
+    def writer() -> None:
+        while not stop.is_set():
+            ledger.append("scan", {"n": 1})
+
+    thread = threading.Thread(target=writer)
+    thread.start()
+    try:
+        seen = [problems(ledger) for _ in range(60)]
+    finally:
+        stop.set()
+        thread.join()
+    assert all(found == set() for found in seen)
+
+
+def test_scan_survives_an_unreadable_ledger_key(env: HostEnvironment) -> None:
+    options = AnalysisOptions(protector=RAW_PROTECTOR)
+    analyze(env, options)
+    (env.data_dir / "registro.key").write_bytes(b"GDPAPI1\nnot a key\n")
+    report = analyze(env, options)
+    assert "G13-002" in {finding.rule_id for finding in report.findings}
+    assert report.ledger is not None
+    assert report.ledger.recorded is False
+
+
+def test_ledger_show_survives_odd_event_data(env: HostEnvironment) -> None:
+    ledger = Ledger(env.data_dir)
+    ledger.append("scan", {"summary": "not a table"})
+    ledger.append("scan", {"summary": {"critical": "\x1b[2J"}})
+    out = io.StringIO()
+    assert main(["--lingua", "it", "registro", "mostra"], env=env, stdout=out) == 0
+    assert "\x1b" not in out.getvalue()

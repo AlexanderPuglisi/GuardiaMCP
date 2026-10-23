@@ -47,6 +47,7 @@ TAMPERING = frozenset(
         LedgerProblem.HASH,
         LedgerProblem.MAC,
         LedgerProblem.HEAD_MISMATCH,
+        LedgerProblem.HEAD_MISSING,
         LedgerProblem.ANCHOR_MISMATCH,
     }
 )
@@ -137,8 +138,9 @@ class Ledger:
 
     def lines(self) -> Iterator[tuple[int, str]]:
         try:
-            with self.path.open("r", encoding="utf-8", newline="\n") as stream:
-                for number, line in enumerate(stream, start=1):
+            with self.path.open("rb") as stream:
+                for number, raw in enumerate(stream, start=1):
+                    line = raw.decode("utf-8", errors="replace")
                     if line.strip():
                         yield number, line
         except FileNotFoundError:
@@ -154,15 +156,20 @@ class Ledger:
                 yield record
 
     def verify(self, anchor: str | None = None) -> Verification:
+        with exclusive(self.directory / LOCK_FILE):
+            return self._verify(anchor)
+
+    def _verify(self, anchor: str | None) -> Verification:
         result = Verification()
-        if not self.path.exists():
+        anchors: dict[int, str] = {0: GENESIS}
+        if not self.path.exists() and not self.head_path.exists():
+            self._check_anchor(result, anchor, anchors)
             return result
         key, key_issue = self._key(create=False)
         if key_issue is not None:
             result.issues.append(key_issue)
         previous = GENESIS
         expected_seq = 1
-        anchors: dict[int, str] = {}
         for number, line in self.lines():
             try:
                 record = json.loads(line) if len(line) <= MAX_LINE_BYTES else None
@@ -182,7 +189,7 @@ class Ledger:
             if digest != record["hash"]:
                 result.issues.append(Issue(LedgerProblem.HASH, number))
             if key is not None and not hmac.compare_digest(
-                record_mac(key, record["hash"]), str(record["mac"])
+                record_mac(key, str(record["hash"])), str(record["mac"])
             ):
                 result.issues.append(Issue(LedgerProblem.MAC, number))
             previous = str(record["hash"])
@@ -196,11 +203,17 @@ class Ledger:
             result.head_hash = previous
             anchors[result.head_seq] = previous
         self._check_head(result, key)
-        if anchor is not None:
-            seq_text, _, digest = anchor.partition(":")
-            if not seq_text.isdigit() or anchors.get(int(seq_text)) != digest:
-                result.issues.append(Issue(LedgerProblem.ANCHOR_MISMATCH))
+        self._check_anchor(result, anchor, anchors)
         return result
+
+    def _check_anchor(
+        self, result: Verification, anchor: str | None, anchors: dict[int, str]
+    ) -> None:
+        if anchor is None:
+            return
+        seq_text, _, digest = anchor.partition(":")
+        if not seq_text.isdigit() or anchors.get(int(seq_text)) != digest:
+            result.issues.append(Issue(LedgerProblem.ANCHOR_MISMATCH))
 
     def _check_head(self, result: Verification, key: bytes | None) -> None:
         try:

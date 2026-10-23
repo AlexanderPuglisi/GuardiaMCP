@@ -432,9 +432,11 @@ def run_ledger(args: argparse.Namespace, t: Translator, env: HostEnvironment, ou
         records = list(ledger.records())[-max(args.last, 0) :] if args.last else []
         for record in records:
             data = record.get("data", {})
-            summary = data.get("summary", {}) if isinstance(data, dict) else {}
+            summary = data.get("summary") if isinstance(data, dict) else None
+            counts = summary if isinstance(summary, dict) else {}
             details = " · ".join(
-                f"{severity_label(Severity[name.upper()], t)} {summary.get(name, 0)}"
+                f"{severity_label(Severity[name.upper()], t)} "
+                f"{safe_text(str(counts.get(name, 0)), 20)}"
                 for name in ("critical", "high", "medium", "low")
             )
             lines.append(
