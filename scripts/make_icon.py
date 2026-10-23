@@ -5,7 +5,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 PROJECT = Path(__file__).resolve().parent.parent
-TARGET = PROJECT / "packaging" / "guardia.ico"
+TARGET = PROJECT / "src" / "guardia" / "app" / "guardia.ico"
 CANVAS = 1024
 SCALE = CANVAS / 32
 FILL = (29, 29, 35, 255)

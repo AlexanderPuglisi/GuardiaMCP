@@ -39,8 +39,8 @@ Model Context Protocol (MCP). No account, no telemetry, no data ever leaves your
   scripts and a strict Content Security Policy; SARIF 2.1.0 works with GitHub code scanning.
 - **Rules guide** — `guardia rules` lists all 88 rules, `guardia rules G05-002` explains one.
   The full guide is in [docs/RULES.md](docs/RULES.md) (generated from the code, always up to date).
-- **Desktop app** — overview, servers and skills, findings, ledger, reports and settings, in
-  Italian and English. It uses the same engine as the CLI, shows only text (never HTML from
+- **Desktop app** — a borderless window with the sections centered at the top: overview, servers
+  and skills, findings, ledger, reports and settings, each explained in one line, in Italian and English. It uses the same engine as the CLI, shows only text (never HTML from
   analyzed files), has no network access and a strict CSP.
 
 Guardia never runs the code it analyzes and never changes configuration files. It keeps its own
@@ -126,8 +126,8 @@ Model Context Protocol (MCP). Nessun account, nessuna telemetria, nessun dato es
 - **Guida alle regole** — `guardia regole` elenca tutte le 88 regole, `guardia regole G05-002` ne
   spiega una. La guida completa è in [docs/REGOLE.md](docs/REGOLE.md) (generata dal codice,
   sempre aggiornata).
-- **App desktop** — panoramica, server e skill, problemi, registro, rapporti e impostazioni, in
-  italiano e inglese. Usa lo stesso motore della CLI, mostra solo testo (mai HTML preso dai file
+- **App desktop** — una finestra senza bordi con le sezioni al centro in alto: panoramica, server e
+  skill, problemi, registro, rapporti e impostazioni, ognuna spiegata in una riga, in italiano e inglese. Usa lo stesso motore della CLI, mostra solo testo (mai HTML preso dai file
   analizzati), non ha accesso alla rete e ha una CSP rigida.
 
 Guardia non esegue mai il codice che analizza e non modifica i file di configurazione. Tiene i propri

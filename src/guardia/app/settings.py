@@ -14,7 +14,7 @@ from guardia.safeio import SafeReadError, parse_json, read_text
 SETTINGS_FILE = "app-settings.json"
 MAX_PROJECTS = 50
 MAX_PATH_LENGTH = 1024
-BOOLEAN_OPTIONS = ("skills", "tools", "baseline")
+BOOLEAN_OPTIONS = ("skills", "tools", "baseline", "glow")
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,6 +23,7 @@ class AppSettings:
     skills: bool = True
     tools: bool = True
     baseline: bool = True
+    glow: bool = True
     projects: tuple[str, ...] = field(default_factory=tuple)
 
     def to_dict(self) -> dict[str, Any]:
@@ -31,6 +32,7 @@ class AppSettings:
             "skills": self.skills,
             "tools": self.tools,
             "baseline": self.baseline,
+            "glow": self.glow,
             "projects": list(self.projects),
         }
 
@@ -57,6 +59,8 @@ def with_option(settings: AppSettings, name: str, value: bool) -> AppSettings:
         return replace(settings, tools=value)
     if name == "baseline":
         return replace(settings, baseline=value)
+    if name == "glow":
+        return replace(settings, glow=value)
     raise ValueError("unknown option")
 
 

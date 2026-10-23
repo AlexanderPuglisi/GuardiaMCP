@@ -35,7 +35,7 @@ def test_spec_builds_both_executables_with_resources() -> None:
 
 
 def test_icon_contains_small_and_large_sizes() -> None:
-    data = (PACKAGING / "guardia.ico").read_bytes()
+    data = (PROJECT / "src" / "guardia" / "app" / "guardia.ico").read_bytes()
     reserved, kind, count = struct.unpack_from("<HHH", data)
     assert (reserved, kind) == (0, 1)
     sizes = {data[6 + 16 * index] or 256 for index in range(count)}

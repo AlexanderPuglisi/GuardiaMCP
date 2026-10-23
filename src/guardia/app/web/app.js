@@ -15,6 +15,8 @@
     entryId: null, entryType: "all", problemsOnly: false, entrySearch: "",
     findingLevel: "all", findingSearch: "", ledger: null,
   };
+  const MIN_SIZE = [900, 600];
+  const windowState = { maximized: false, saved: null, resizing: null, target: null, pending: false };
 
   function t(key, values) {
     let text = state.ui[key] || key;
@@ -92,7 +94,7 @@
   async function copy(text) {
     try {
       await navigator.clipboard.writeText(text);
-    } catch (_) {
+    } catch {
       const area = el("textarea", { text });
       document.body.append(area);
       area.select();
@@ -125,10 +127,13 @@
       inventory: report ? report.entries.length : "",
       findings: report ? report.total : "",
     };
+    const severe = report ? report.summary.some((s) => s.count && (s.severity === "critical" || s.severity === "high")) : false;
     for (const view of VIEWS) {
-      const button = el("button", { attrs: { type: "button" }, on: { click: () => show(view) } },
-        icon(view), el("span", { text: t("nav_" + view) }),
-        counts[view] !== undefined && counts[view] !== "" ? el("em", { cls: "count", text: counts[view] }) : null);
+      const label = t("nav_" + view);
+      const count = counts[view] !== undefined && counts[view] !== ""
+        ? el("em", { cls: "count" + (view === "findings" && severe ? " alert" : ""), text: counts[view] }) : null;
+      const button = el("button", { attrs: { type: "button", title: label, "aria-label": label }, on: { click: () => show(view) } },
+        icon(view), el("span", { text: label }), count);
       if (view === state.view) button.setAttribute("aria-current", "page");
       nav.append(button);
     }
@@ -137,6 +142,13 @@
   function renderHeader() {
     const report = state.report;
     document.getElementById("title").textContent = t("nav_" + state.view);
+    document.getElementById("help").textContent = t("help_" + state.view);
+    document.documentElement.dataset.glow = state.settings.glow === false ? "off" : "on";
+    for (const button of document.querySelectorAll("#winctl .wc")) {
+      const key = button.dataset.win === "maximize" && windowState.maximized ? "restore" : button.dataset.win;
+      button.setAttribute("aria-label", t("win_" + key));
+      button.setAttribute("title", t("win_" + key));
+    }
     document.getElementById("subtitle").textContent = report
       ? t("last_scan", { time: localTime(report.generated_at), seconds: report.seconds })
       : t("never");
@@ -346,7 +358,7 @@
     try {
       state.ledger = anchor ? await call("verify_anchor", anchor) : await call("ledger", 50);
       if (state.view === "ledger") render();
-    } catch (_) { /* toast already shown */ }
+    } catch { }
   }
 
   function ledgerView() {
@@ -392,7 +404,7 @@
     try {
       const result = await call("export", format);
       if (result.saved) toast(t("exported", { path: result.path, hash: result.sha256.slice(0, 16) + "…" }));
-    } catch (_) { /* toast already shown */ }
+    } catch { }
   }
 
   function reportsView() {
@@ -417,7 +429,7 @@
     const value = Boolean(state.settings[name]);
     return el("button", {
       cls: "switch", attrs: { type: "button", role: "switch", "aria-checked": String(value), "aria-label": t("settings_" + name) },
-      on: { click: async () => { try { apply(await call("set_option", name, !value)); render(); } catch (_) { /* shown */ } } },
+      on: { click: async () => { try { apply(await call("set_option", name, !value)); render(); } catch { } } },
     });
   }
 
@@ -432,13 +444,14 @@
       settingRow(t("settings_skills"), t("settings_skills_text"), toggle("skills")),
       settingRow(t("settings_tools"), t("settings_tools_text"), toggle("tools")),
       settingRow(t("settings_baseline"), t("settings_baseline_text"), toggle("baseline")),
+      settingRow(t("settings_glow"), t("settings_glow_text"), toggle("glow")),
       settingRow(t("settings_projects"), t("settings_projects_text"),
         el("button", { cls: "btn", text: t("add_folder"), attrs: { type: "button" },
-          on: { click: async () => { try { apply(await call("add_project")); render(); } catch (_) { /* shown */ } } } })));
+          on: { click: async () => { try { apply(await call("add_project")); render(); } catch { } } } })));
     for (const project of state.settings.projects) {
       card.append(el("div", { cls: "project" }, el("span", { cls: "mono", text: project }),
         el("button", { cls: "btn", text: t("remove"), attrs: { type: "button" },
-          on: { click: async () => { try { apply(await call("remove_project", project)); render(); } catch (_) { /* shown */ } } } })));
+          on: { click: async () => { try { apply(await call("remove_project", project)); render(); } catch { } } } })));
     }
     card.append(settingRow(t("settings_data"), state.dataDir,
       el("button", { cls: "btn", text: t("copy_path"), attrs: { type: "button" }, on: { click: () => copy(state.dataDir) } })));
@@ -467,7 +480,7 @@
     try {
       state.report = await call("scan");
       toast(t("scan_done", { total: state.report.total }));
-    } catch (_) { /* shown */ } finally {
+    } catch { } finally {
       busy(false);
       render();
     }
@@ -479,7 +492,7 @@
     try {
       state.report = await call("accept_changes", true);
       toast(t("accepted"));
-    } catch (_) { /* shown */ } finally {
+    } catch { } finally {
       busy(false);
       render();
     }
@@ -489,11 +502,100 @@
     try {
       apply(await call("set_language", language));
       render();
-    } catch (_) { /* shown */ }
+    } catch { }
+  }
+
+  function setMaximized(on) {
+    windowState.maximized = on;
+    document.documentElement.classList.toggle("maximized", on);
+    document.getElementById("titlebar").classList.toggle("pywebview-drag-region", !on);
+    renderHeader();
+  }
+
+  async function toggleMaximize() {
+    try {
+      if (windowState.maximized) {
+        await call("window_place", ...windowState.saved);
+        setMaximized(false);
+        return;
+      }
+      windowState.saved = [window.screenX, window.screenY, window.outerWidth, window.outerHeight];
+      await call("window_place", screen.availLeft || 0, screen.availTop || 0, screen.availWidth, screen.availHeight);
+      setMaximized(true);
+    } catch {
+      return;
+    }
+  }
+
+  function windowAction(action) {
+    if (action === "maximize") {
+      toggleMaximize();
+      return;
+    }
+    call(action === "close" ? "window_close" : "window_minimize").catch(() => undefined);
+  }
+
+  function startResize(grip, event) {
+    if (windowState.maximized) return;
+    event.preventDefault();
+    grip.setPointerCapture(event.pointerId);
+    windowState.resizing = {
+      edge: grip.dataset.edge, x: event.screenX, y: event.screenY, w: window.outerWidth, h: window.outerHeight,
+    };
+  }
+
+  async function flushResize() {
+    const resizing = windowState.resizing;
+    const target = windowState.target;
+    try {
+      if (resizing && target) await window.pywebview.api.window_resize(target[0], target[1], resizing.edge);
+    } catch {
+      windowState.resizing = null;
+    }
+    windowState.pending = false;
+  }
+
+  function moveResize(event) {
+    const resizing = windowState.resizing;
+    if (!resizing) return;
+    const dx = event.screenX - resizing.x;
+    const dy = event.screenY - resizing.y;
+    let width = resizing.w;
+    let height = resizing.h;
+    if (resizing.edge.includes("e")) width += dx;
+    if (resizing.edge.includes("w")) width -= dx;
+    if (resizing.edge.includes("s")) height += dy;
+    if (resizing.edge.includes("n")) height -= dy;
+    windowState.target = [Math.max(MIN_SIZE[0], Math.round(width)), Math.max(MIN_SIZE[1], Math.round(height))];
+    if (windowState.pending) return;
+    windowState.pending = true;
+    requestAnimationFrame(flushResize);
+  }
+
+  async function endResize() {
+    if (windowState.resizing && windowState.target) await flushResize();
+    windowState.resizing = null;
+    windowState.target = null;
+  }
+
+  function wireWindow() {
+    for (const button of document.querySelectorAll("#winctl .wc")) {
+      button.addEventListener("click", () => windowAction(button.dataset.win));
+    }
+    document.getElementById("titlebar").addEventListener("dblclick", (event) => {
+      if (event.target.id === "titlebar") toggleMaximize();
+    });
+    for (const grip of document.querySelectorAll(".grip")) {
+      grip.addEventListener("pointerdown", (event) => startResize(grip, event));
+      grip.addEventListener("pointermove", moveResize);
+      grip.addEventListener("pointerup", endResize);
+      grip.addEventListener("pointercancel", endResize);
+    }
   }
 
   async function start() {
     apply(await call("state"));
+    wireWindow();
     document.getElementById("scan-button").addEventListener("click", runScan);
     for (const button of document.querySelectorAll(".lang button")) {
       button.addEventListener("click", () => setLanguage(button.dataset.lang));

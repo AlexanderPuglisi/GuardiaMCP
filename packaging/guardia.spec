@@ -15,7 +15,7 @@ from guardia import __version__
 
 PACKAGING = Path(SPECPATH)
 PROJECT = PACKAGING.parent
-ICON = str(PACKAGING / "guardia.ico")
+ICON = str(PROJECT / "src" / "guardia" / "app" / "guardia.ico")
 NUMBERS = tuple(int(part) for part in __version__.split(".")[:3]) + (0,)
 EXCLUDES = ["tkinter", "unittest", "pydoc", "doctest", "lib2to3", "PIL", "PyInstaller"]
 

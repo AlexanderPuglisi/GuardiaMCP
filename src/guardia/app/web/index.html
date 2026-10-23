@@ -8,28 +8,47 @@
 <style>/*STYLE*/</style>
 </head>
 <body>
-<div class="app">
-  <aside class="side">
+<div class="frame" id="frame">
+  <header class="titlebar pywebview-drag-region" id="titlebar">
     <div class="brand">
-      <svg class="shield" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2.5 4.5 7v8.2c0 7.3 4.8 12.5 11.5 14.3 6.7-1.8 11.5-7 11.5-14.3V7z" fill="#1d1d23" stroke="#c4332b" stroke-width="1.6"/><path d="m11 16 3.6 3.6L21.5 12.7" fill="none" stroke="#ece9e6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <div class="brand-name">Guardia <span>MCP</span></div>
+      <svg class="shield" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2.5 4.5 7v8.2c0 7.3 4.8 12.5 11.5 14.3 6.7-1.8 11.5-7 11.5-14.3V7z" fill="#1d1d23" stroke="#c4332b" stroke-width="2"/><path d="m11 16 3.6 3.6L21.5 12.7" fill="none" stroke="#ece9e6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="brand-name">Guardia <b>MCP</b></span>
     </div>
     <nav class="nav" id="nav"></nav>
-    <div class="side-foot"><span class="dot"></span><b id="offline"></b><br><span id="version"></span> · by Alexander Puglisi</div>
-  </aside>
+    <div class="winctl" id="winctl">
+      <button type="button" class="wc wc-min" data-win="minimize"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 6h6"/></svg></button>
+      <button type="button" class="wc wc-max" data-win="maximize"><svg viewBox="0 0 12 12" aria-hidden="true"><path class="ic-max" d="M3.5 3.5h5v5h-5z"/><path class="ic-restore" d="M4.5 3h4.5v4.5M3 4.5h4.5V9H3z"/></svg></button>
+      <button type="button" class="wc wc-close" data-win="close"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="m3.5 3.5 5 5m0-5-5 5"/></svg></button>
+    </div>
+  </header>
   <main class="main">
-    <header class="top">
-      <div><h1 id="title"></h1><div class="sub" id="subtitle"></div></div>
-      <div class="spacer"></div>
-      <span class="pill" id="baseline-pill"></span>
-      <div class="lang" role="group" aria-label="Lingua / Language">
-        <button type="button" data-lang="it">IT</button><button type="button" data-lang="en">EN</button>
+    <section class="page-head">
+      <div class="page-title">
+        <h1 id="title"></h1>
+        <p class="help" id="help"></p>
       </div>
-      <button type="button" class="btn primary" id="scan-button"></button>
-    </header>
+      <div class="page-actions">
+        <div class="lang" role="group" aria-label="Lingua / Language">
+          <button type="button" data-lang="it">IT</button><button type="button" data-lang="en">EN</button>
+        </div>
+        <button type="button" class="btn primary" id="scan-button"></button>
+      </div>
+    </section>
     <div class="content" id="content"></div>
   </main>
+  <footer class="statusbar">
+    <span class="status-item"><span class="dot"></span><span id="offline"></span></span>
+    <span class="status-item" id="subtitle"></span>
+    <span class="status-item" id="baseline-pill"></span>
+    <span class="spacer"></span>
+    <span class="status-item"><span id="version"></span> · by Alexander Puglisi</span>
+  </footer>
+  <div class="glow" aria-hidden="true"><i></i></div>
 </div>
+<div class="grip" data-edge="n"></div><div class="grip" data-edge="s"></div>
+<div class="grip" data-edge="e"></div><div class="grip" data-edge="w"></div>
+<div class="grip" data-edge="ne"></div><div class="grip" data-edge="nw"></div>
+<div class="grip" data-edge="se"></div><div class="grip" data-edge="sw"></div>
 <div class="busy" id="busy" hidden><div class="spinner"></div><p id="busy-text"></p></div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <script>/*SCRIPT*/</script>

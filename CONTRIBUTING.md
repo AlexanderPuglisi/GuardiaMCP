@@ -51,7 +51,7 @@ All four checks must be green before a pull request.
 | `src/guardia/locales/` | every user-visible text, in `it.toml` and `en.toml` |
 | `tests/corpus/` | fake samples: configurations, tool servers, code, skills |
 | `scripts/` | build of the executables, demo GIF, icon |
-| `packaging/` | PyInstaller spec, entry points, icon |
+| `packaging/` | PyInstaller spec and entry points |
 
 ### Adding or changing a rule
 
@@ -154,7 +154,7 @@ Tutti e quattro i controlli devono essere verdi prima di una pull request.
 | `src/guardia/locales/` | tutti i testi visibili, in `it.toml` e `en.toml` |
 | `tests/corpus/` | esempi finti: configurazioni, server con strumenti, codice, skill |
 | `scripts/` | build degli eseguibili, GIF dimostrativa, icona |
-| `packaging/` | file di PyInstaller, punti di avvio, icona |
+| `packaging/` | file di PyInstaller e punti di avvio |
 
 ### Aggiungere o modificare una regola
 

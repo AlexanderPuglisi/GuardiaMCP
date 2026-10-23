@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import threading
 import time
@@ -8,7 +9,7 @@ from collections.abc import Callable
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from guardia import __version__
 from guardia.analysis import AnalysisOptions, analyze
@@ -36,6 +37,10 @@ from guardia.secure_store import Protector
 ANCHOR = re.compile(r"^\d{1,9}:[0-9a-f]{64}$")
 EXPORT_FORMATS = {"html": ".html", "json": ".json", "sarif": ".sarif"}
 MAX_LEDGER_EVENTS = 500
+WINDOW_EDGES = frozenset({"n", "s", "e", "w", "ne", "nw", "se", "sw"})
+MAX_COORDINATE = 100_000
+MIN_WINDOW_SIZE = 200
+MAX_WINDOW_SIZE = 20_000
 
 SaveDialog = Callable[[str], str | None]
 FolderDialog = Callable[[], str | None]
@@ -43,6 +48,24 @@ FolderDialog = Callable[[], str | None]
 
 class GuardiaUiError(Exception):
     pass
+
+
+class WindowControls(Protocol):
+    def minimize(self) -> None: ...
+
+    def close(self) -> None: ...
+
+    def place(self, x: int, y: int, width: int, height: int) -> None: ...
+
+    def resize(self, width: int, height: int, edge: str) -> None: ...
+
+
+def bounded(value: object, low: int, high: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ValueError("not a number")
+    if not math.isfinite(value) or not low <= value <= high:
+        raise ValueError("out of range")
+    return round(value)
 
 
 def _no_save(_: str) -> str | None:
@@ -62,6 +85,7 @@ class GuardiaApi:
         save_dialog: SaveDialog = _no_save,
         folder_dialog: FolderDialog = _no_folder,
         protector: Protector | None = None,
+        window: WindowControls | None = None,
     ) -> None:
         self._env = env
         self._store = store
@@ -72,6 +96,7 @@ class GuardiaApi:
         self._save_dialog = save_dialog
         self._folder_dialog = folder_dialog
         self._protector = protector
+        self._window = window
 
     def _t(self) -> Translator:
         return Translator(self._settings.language)
@@ -256,3 +281,37 @@ class GuardiaApi:
         projects = tuple(p for p in self._settings.projects if p != path)
         self._save_settings(replace(self._settings, projects=projects))
         return self.state()
+
+    def window_minimize(self) -> None:
+        if self._window is not None:
+            self._window.minimize()
+
+    def window_close(self) -> None:
+        if self._window is not None:
+            self._window.close()
+
+    def window_place(self, x: object, y: object, width: object, height: object) -> None:
+        try:
+            geometry = (
+                bounded(x, -MAX_COORDINATE, MAX_COORDINATE),
+                bounded(y, -MAX_COORDINATE, MAX_COORDINATE),
+                bounded(width, MIN_WINDOW_SIZE, MAX_WINDOW_SIZE),
+                bounded(height, MIN_WINDOW_SIZE, MAX_WINDOW_SIZE),
+            )
+        except ValueError as exc:
+            raise self._fail("invalid") from exc
+        if self._window is not None:
+            self._window.place(*geometry)
+
+    def window_resize(self, width: object, height: object, edge: object) -> None:
+        if not isinstance(edge, str) or edge not in WINDOW_EDGES:
+            raise self._fail("invalid")
+        try:
+            size = (
+                bounded(width, MIN_WINDOW_SIZE, MAX_WINDOW_SIZE),
+                bounded(height, MIN_WINDOW_SIZE, MAX_WINDOW_SIZE),
+            )
+        except ValueError as exc:
+            raise self._fail("invalid") from exc
+        if self._window is not None:
+            self._window.resize(*size, edge)

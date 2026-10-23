@@ -15,10 +15,22 @@
     }
   }
 
+  function showControls() {
+    const colors = { minimize: "#e0a43a", maximize: "#3fbf7f", close: "#e5484d" };
+    for (const button of document.querySelectorAll("#winctl .wc")) {
+      const glyph = button.querySelector("svg");
+      button.style.transition = "none";
+      glyph.style.transition = "none";
+      button.style.background = colors[button.dataset.win];
+      glyph.style.opacity = "1";
+    }
+  }
+
   function navigate() {
     const index = VIEWS.indexOf(view);
     if (index > 0) document.querySelectorAll("#nav button")[index].click();
-    if (detail) setTimeout(pickEntry, 50);
+    if (detail === "hover") showControls();
+    else if (detail) setTimeout(pickEntry, 50);
     document.getElementById("toast").hidden = view !== "overview";
   }
 
@@ -38,6 +50,10 @@
       set_option: async () => DEMO.state,
       add_project: async () => DEMO.state,
       remove_project: async () => DEMO.state,
+      window_minimize: async () => null,
+      window_close: async () => null,
+      window_place: async () => null,
+      window_resize: async () => null,
     },
   };
 })();
