@@ -312,7 +312,9 @@ allowed a call, its result goes through (unless an explicit rule says otherwise)
   - `~`, `%USERPROFILE%` and `$HOME` become your user folder;
   - `\` becomes `/`;
   - `..` steps are resolved;
-  - `file:///` addresses become paths.
+  - `file:///` addresses become paths;
+  - Windows spellings that open the same file are reduced to the plain path: `\\?\C:\…`,
+    `\\.\C:\…`, `\\localhost\C$\…`, trailing dots (`.ssh.`) and streams (`.env::$DATA`).
 
   So `~/projects/../.ssh/id_rsa` becomes `~/.ssh/id_rsa`. In patterns, `*` does not cross
   folders while `**` does: `**/.env` hits `.env` in any folder.

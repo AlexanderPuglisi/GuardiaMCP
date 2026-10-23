@@ -205,6 +205,31 @@ def test_path_normalization(value: str, blocked: bool) -> None:
     assert (result.action is Action.BLOCK) is blocked
 
 
+@pytest.mark.parametrize(
+    "value",
+    [
+        r"\\?\C:\Users\demo\.ssh\id_rsa",
+        r"\\.\C:\Users\demo\.ssh\id_rsa",
+        r"\\?\UNC\localhost\C$\Users\demo\.ssh\id_rsa",
+        r"\\localhost\C$\Users\demo\.ssh\id_rsa",
+        r"\\127.0.0.1\c$\Users\demo\.ssh\id_rsa",
+        r"C:\Users\demo\.ssh.\id_rsa",
+        r"C:\Users\demo.\.ssh\id_rsa",
+        r"C:\Users\demo\.ssh::$INDEX_ALLOCATION\id_rsa",
+    ],
+)
+def test_windows_spellings_of_the_same_path_are_blocked(value: str) -> None:
+    text = rules(rule('nome = "ssh"\nazione = "blocca"\nargomento.percorso = "~/.ssh/**"'))
+    assert evaluate(text, tool="read", arguments={"path": value}).action is Action.BLOCK
+
+
+@pytest.mark.parametrize("value", ["C:/proj/.env.", "C:/proj/.env ", "C:/proj/.env::$DATA"])
+def test_windows_file_name_tricks_are_blocked(value: str) -> None:
+    text = rules(rule('nome = "env"\nazione = "blocca"\nargomento.percorso = "**/.env"'))
+    assert evaluate(text, arguments={"p": value}).action is Action.BLOCK
+    assert evaluate(text, arguments={"p": "C:/proj/.env.example"}).action is Action.ALLOW
+
+
 def test_relative_paths_need_double_star_patterns() -> None:
     text = rules(
         rule('nome = "env"\nazione = "blocca"\nargomento.percorso = ["**/.env", "**/.ssh/**"]')

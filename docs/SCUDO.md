@@ -309,7 +309,9 @@ altro). Con `predefinito = "blocca"` ottieni una **lista bianca**: passa solo ci
   - `~`, `%USERPROFILE%` e `$HOME` diventano la tua cartella utente;
   - le barre `\` diventano `/`;
   - i passaggi `..` vengono risolti;
-  - gli indirizzi `file:///` diventano percorsi.
+  - gli indirizzi `file:///` diventano percorsi;
+  - le scritture Windows che aprono lo stesso file diventano il percorso normale: `\\?\C:\…`,
+    `\\.\C:\…`, `\\localhost\C$\…`, i punti finali (`.ssh.`) e i flussi (`.env::$DATA`).
 
   `~/progetti/../.ssh/id_rsa` diventa quindi `~/.ssh/id_rsa`. Negli schemi, `*` non attraversa le
   cartelle mentre `**` sì: `**/.env` colpisce `.env` in qualsiasi cartella.

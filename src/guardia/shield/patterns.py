@@ -16,6 +16,9 @@ HOME_TOKENS = re.compile(
     r"^(?:~|%userprofile%|%home%|\$home|\$\{home\}|\$env:userprofile)(?=$|[\\/])", re.IGNORECASE
 )
 DRIVE_URL_PATH = re.compile(r"^/[a-zA-Z]:/")
+DEVICE_PREFIX = re.compile(r"^//[?.]/(unc/)?", re.IGNORECASE)
+LOCAL_SHARE = re.compile(r"^//(?:localhost|127\.0\.0\.1|\.)/([a-z])\$(?=/|$)", re.IGNORECASE)
+DRIVE = re.compile(r"^[a-z]:$", re.IGNORECASE)
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,6 +72,23 @@ def name_glob(pattern: str) -> re.Pattern[str]:
     return re.compile(_translate(pattern, separator=None), re.IGNORECASE | re.DOTALL)
 
 
+def _windows_part(index: int, part: str) -> str:
+    if part in ("", ".", "..") or (index == 0 and DRIVE.match(part)):
+        return part
+    stream = part.split(":", 1)[0]
+    return stream.rstrip(" .") or stream
+
+
+def _windows_path(text: str) -> str:
+    device = DEVICE_PREFIX.match(text)
+    if device:
+        text = ("//" if device.group(1) else "") + text[device.end() :]
+    text = LOCAL_SHARE.sub(lambda match: match.group(1) + ":", text, count=1)
+    prefix = "//" if text.startswith("//") else ""
+    parts = text[len(prefix) :].split("/")
+    return prefix + "/".join(_windows_part(index, part) for index, part in enumerate(parts))
+
+
 def normalize_path(value: str, home: str) -> str | None:
     text = value.strip()
     if not text or len(text) > MAX_PATH_TEXT or "\n" in text or "\x00" in text:
@@ -78,7 +98,7 @@ def normalize_path(value: str, home: str) -> str | None:
         if DRIVE_URL_PATH.match(text):
             text = text[1:]
     text = HOME_TOKENS.sub(lambda _: home, text, count=1)
-    text = text.replace("\\", "/")
+    text = _windows_path(text.replace("\\", "/"))
     prefix = "//" if text.startswith("//") else ""
     normalized = posixpath.normpath(text[len(prefix) :]) if text[len(prefix) :] else ""
     return (prefix + normalized).lower()
