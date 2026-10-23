@@ -38,6 +38,10 @@ class ParsedDocument:
     text: str = ""
 
 
+def is_network_path(text: str) -> bool:
+    return text.strip().strip('"').replace("/", "\\").startswith("\\\\")
+
+
 def read_bytes(path: Path, max_bytes: int = MAX_FILE_BYTES) -> bytes:
     try:
         info = path.stat()

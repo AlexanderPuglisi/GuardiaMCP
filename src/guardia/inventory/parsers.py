@@ -17,7 +17,7 @@ from guardia.model import (
     frozen_mapping,
     json_pointer,
 )
-from guardia.safeio import depth_exceeds
+from guardia.safeio import depth_exceeds, is_network_path
 from guardia.shield.wrapping import unwrap
 
 TRANSPORT_ALIASES: Mapping[str, Transport] = {
@@ -228,10 +228,12 @@ def _parse_extension_manifest(
 
 
 def _resolve_inside(root: Path, reference: str) -> Path | None:
+    if is_network_path(reference):
+        return None
     try:
         candidate = (root / reference).resolve()
         base = root.resolve()
-    except (OSError, RuntimeError):
+    except (OSError, RuntimeError, ValueError):
         return None
     if candidate.is_relative_to(base):
         return candidate

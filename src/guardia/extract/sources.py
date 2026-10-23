@@ -26,7 +26,7 @@ from guardia.model import (
     ToolGap,
     Transport,
 )
-from guardia.safeio import SafeReadError, parse_json, read_text
+from guardia.safeio import SafeReadError, is_network_path, parse_json, read_text
 from guardia.scanner.checks import effective_command
 from guardia.scanner.commandline import parse_runner, program_name
 
@@ -188,11 +188,13 @@ def _expand(token: str, server: ServerEntry) -> str:
 def _as_path(token: str, server: ServerEntry) -> Path | None:
     if not token or "://" in token or "${" in token or token.startswith("-"):
         return None
+    if is_network_path(token):
+        return None
     candidate = Path(token)
     if not candidate.is_absolute():
         if server.source.scope in (Scope.EXTENSION, Scope.PLUGIN):
             candidate = server_base(server) / candidate
-        elif server.cwd:
+        elif server.cwd and not is_network_path(server.cwd):
             candidate = Path(server.cwd) / candidate
         else:
             return None
@@ -239,7 +241,7 @@ def code_roots(server: ServerEntry) -> list[Path]:
         ):
             roots.append(candidate)
             roots.append(candidate.parent)
-    if server.cwd and _is_dir(Path(server.cwd)):
+    if server.cwd and not is_network_path(server.cwd) and _is_dir(Path(server.cwd)):
         roots.append(Path(server.cwd))
     unique: list[Path] = []
     seen: set[str] = set()
