@@ -139,6 +139,7 @@ def normalize_entry(
         enabled=enabled and not force_disabled,
         raw=frozen_mapping(raw),
         shielded=wrapped is not None,
+        shield_launcher=wrapped.launcher if wrapped is not None else (),
     )
 
 

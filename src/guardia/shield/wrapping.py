@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import enum
+import os
+import shutil
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -11,11 +14,18 @@ GUARDIA_PROGRAMS = frozenset({"guardia", "guardia.exe"})
 COMMAND_LINE_PROGRAM = "guardia.exe"
 
 
+class LauncherState(enum.StrEnum):
+    CURRENT = "current"
+    OTHER = "other"
+    MISSING = "missing"
+
+
 @dataclass(frozen=True, slots=True)
 class Wrapped:
     command: str
     args: tuple[str, ...]
     name: str
+    launcher: tuple[str, ...] = ()
 
 
 def _program(command: str) -> str:
@@ -31,7 +41,10 @@ def unwrap(command: str | None, args: Sequence[str]) -> Wrapped | None:
         if rest[:2] != ["-m", "guardia"]:
             return None
         rest = rest[2:]
-    elif program not in GUARDIA_PROGRAMS:
+        starter: tuple[str, ...] = (command, "-m", "guardia")
+    elif program in GUARDIA_PROGRAMS:
+        starter = (command,)
+    else:
         return None
     if not rest or rest[0] not in SHIELD_WORDS or "--" not in rest:
         return None
@@ -44,13 +57,34 @@ def unwrap(command: str | None, args: Sequence[str]) -> Wrapped | None:
     for index, option in enumerate(options[:-1]):
         if option in NAME_OPTIONS:
             name = options[index + 1]
-    return Wrapped(original[0], tuple(original[1:]), name)
+    return Wrapped(original[0], tuple(original[1:]), name, starter)
 
 
 def launcher() -> list[str]:
     if getattr(sys, "frozen", False):
         return [str(Path(sys.executable).with_name(COMMAND_LINE_PROGRAM))]
     return [sys.executable, "-m", "guardia"]
+
+
+def _same_program(first: str, second: str) -> bool:
+    return os.path.normcase(str(Path(first).absolute())) == os.path.normcase(
+        str(Path(second).absolute())
+    )
+
+
+def launcher_state(used: Sequence[str], current: Sequence[str] | None = None) -> LauncherState:
+    wanted = list(launcher() if current is None else current)
+    if not used:
+        return LauncherState.MISSING
+    if (
+        len(used) == len(wanted)
+        and _same_program(used[0], wanted[0])
+        and list(used[1:]) == wanted[1:]
+    ):
+        return LauncherState.CURRENT
+    program = Path(used[0])
+    found = program.is_file() if program.is_absolute() else shutil.which(used[0]) is not None
+    return LauncherState.OTHER if found else LauncherState.MISSING
 
 
 def wrap(

@@ -34,14 +34,14 @@ from guardia.display import safe_text
 from guardia.i18n import SUPPORTED_LANGUAGES, Translator
 from guardia.inventory import DiscoveryOptions, HostEnvironment
 from guardia.ledger import Ledger, write_atomic
-from guardia.model import Severity, sha256_hex
+from guardia.model import ServerEntry, Severity, sha256_hex
 from guardia.render.html import render_html
 from guardia.render.sarif import build_sarif
 from guardia.render.terminal import severity_label
 from guardia.safeio import SafeReadError
 from guardia.scanner import ScanReport
 from guardia.secure_store import KeyStoreError, Protector
-from guardia.shield.activation import ActivationStore, Support
+from guardia.shield.activation import ActivationStore, Support, editable
 from guardia.shield.commands import example_text, format_issue
 from guardia.shield.pins import PinError, PinStore
 from guardia.shield.policy import (
@@ -75,6 +75,8 @@ class GuardiaUiError(Exception):
 
 
 class WindowControls(Protocol):
+    maximized: bool
+
     def minimize(self) -> None: ...
 
     def close(self) -> None: ...
@@ -223,6 +225,7 @@ class GuardiaApi:
             "shield_decision",
             "shield_enabled",
             "shield_disabled",
+            "shield_relinked",
             "tools_pinned",
             "tools_pending",
             "tools_approved",
@@ -461,21 +464,34 @@ class GuardiaApi:
         lines = outcome_lines(report.changes, self._t())
         return self._shield_result("\n".join(lines), succeeded(report.changes))
 
-    def shield_disable(self, key: object, confirmed: object) -> dict[str, Any]:
-        if confirmed is not True:
-            raise self._fail("confirmation")
+    def _protected(self, key: object) -> ServerEntry:
         if not isinstance(key, str):
             raise self._fail("invalid")
-        store = ActivationStore(self._env.data_dir, self._ledger())
-        recorded = {(str(r.get("server")), str(r.get("file"))) for r in store.records()}
         chosen = [
             c.server
             for c in server_candidates(self._env)
-            if c.server.key == key and (c.server.name, str(c.server.source.path)) in recorded
+            if c.server.key == key and c.support is Support.PROTECTED
         ]
-        if not chosen:
+        if not chosen or not editable(chosen[0].source.path):
             raise self._fail("invalid")
-        report = store.disable([chosen[0].name], file=chosen[0].source.path)
+        return chosen[0]
+
+    def shield_disable(self, key: object, confirmed: object) -> dict[str, Any]:
+        if confirmed is not True:
+            raise self._fail("confirmation")
+        server = self._protected(key)
+        store = ActivationStore(self._env.data_dir, self._ledger())
+        store.adopt([server])
+        report = store.disable([server.name], file=server.source.path)
+        lines = outcome_lines(report.changes, self._t())
+        return self._shield_result("\n".join(lines), succeeded(report.changes))
+
+    def shield_relink(self, key: object, confirmed: object) -> dict[str, Any]:
+        if confirmed is not True:
+            raise self._fail("confirmation")
+        server = self._protected(key)
+        store = ActivationStore(self._env.data_dir, self._ledger())
+        report = store.relink([server], launcher())
         lines = outcome_lines(report.changes, self._t())
         return self._shield_result("\n".join(lines), succeeded(report.changes))
 
@@ -577,6 +593,9 @@ class GuardiaApi:
     def window_close(self) -> None:
         if self._window is not None:
             self._window.close()
+
+    def window_state(self) -> dict[str, bool]:
+        return {"maximized": self._window is not None and self._window.maximized}
 
     def window_maximize(self) -> None:
         if self._window is not None:

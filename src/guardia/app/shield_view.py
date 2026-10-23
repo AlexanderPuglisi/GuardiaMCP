@@ -8,16 +8,16 @@ from guardia.inventory import DiscoveryOptions, HostEnvironment, discover
 from guardia.ledger import Ledger
 from guardia.secure_store import Protector
 from guardia.shield.activation import (
-    ActivationStore,
     Candidate,
     Outcome,
     Support,
     candidates,
+    editable,
     manual_snippet,
 )
 from guardia.shield.pins import PinError, PinStore
 from guardia.shield.policy import PolicyState, load_policy, rules_path
-from guardia.shield.wrapping import launcher
+from guardia.shield.wrapping import LauncherState, launcher, launcher_state
 
 SHIELD_EVENTS = frozenset(
     {
@@ -26,6 +26,7 @@ SHIELD_EVENTS = frozenset(
         "shield_decision",
         "shield_enabled",
         "shield_disabled",
+        "shield_relinked",
         "tools_pinned",
         "tools_pending",
         "tools_approved",
@@ -63,19 +64,26 @@ def _rules(env: HostEnvironment, t: Translator, protector: Protector | None) -> 
     return base | {"state": "none", "text": t("shield.state_none")}
 
 
-def _server(candidate: Candidate, t: Translator, recorded: set[tuple[str, str]]) -> dict[str, Any]:
+def _server(candidate: Candidate, t: Translator) -> dict[str, Any]:
     server = candidate.server
     snippet = manual_snippet(server, launcher()) if candidate.support in MANUAL else ""
+    protected = candidate.support is Support.PROTECTED
+    writable = protected and editable(server.source.path)
+    state = launcher_state(server.shield_launcher) if protected else None
+    status = t(f"shield_setup.support_{candidate.support.value}")
+    if state is not None and state is not LauncherState.CURRENT:
+        status = t(f"shield_setup.launcher_{state.value}")
     return {
         "key": safe_text(server.key),
         "name": safe_text(server.name, 80),
         "client": t(f"client.{server.source.client.value}"),
         "path": safe_text(str(server.source.path)),
         "support": candidate.support.value,
-        "status": t(f"shield_setup.support_{candidate.support.value}"),
+        "status": status,
+        "launcher": state.value if state is not None else "",
         "can_enable": candidate.support is Support.AUTO,
-        "can_disable": candidate.support is Support.PROTECTED
-        and (server.name, str(server.source.path)) in recorded,
+        "can_disable": writable,
+        "can_relink": writable and state is not LauncherState.CURRENT,
         "snippet": safe_text(snippet, 4000),
     }
 
@@ -141,10 +149,7 @@ def shield_state(
     found: list[Candidate] | None = None,
 ) -> dict[str, Any]:
     servers = found if found is not None else server_candidates(env)
-    recorded = {
-        (str(r.get("server")), str(r.get("file"))) for r in ActivationStore(env.data_dir).records()
-    }
-    listed = [_server(c, t, recorded) for c in servers]
+    listed = [_server(c, t) for c in servers]
     return {
         "rules": _rules(env, t, protector),
         "servers": listed,

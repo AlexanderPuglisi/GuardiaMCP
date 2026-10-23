@@ -61,6 +61,7 @@ class Change:
 class Report:
     changes: list[Change] = field(default_factory=list)
     backups: list[Path] = field(default_factory=list)
+    events: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
 
 
 def _decode_pointer(pointer: str) -> list[str]:
@@ -152,6 +153,12 @@ class ActivationStore:
         self.directory.mkdir(parents=True, exist_ok=True)
         write_atomic(self.path, _serialize({"version": 1, "activations": records}))
 
+    def _log(self, report: Report) -> None:
+        if self._ledger is None:
+            return
+        for event, data in report.events:
+            self._ledger.append(event, data)
+
     def records(self) -> list[dict[str, Any]]:
         with exclusive(self.directory / LOCK_FILE):
             return self._records()
@@ -181,6 +188,7 @@ class ActivationStore:
             for path, group in grouped.items():
                 self._enable_file(path, group, starter, records, report)
             self._save(records)
+        self._log(report)
         return report
 
     def _enable_file(
@@ -234,11 +242,12 @@ class ActivationStore:
                 }
             )
             report.changes.append(Change(server.name, path, Outcome.DONE))
-        if self._ledger is not None:
-            self._ledger.append(
+        report.events.append(
+            (
                 "shield_enabled",
                 {"file": str(path), "servers": sorted(s.name for s, _, _ in pending)},
             )
+        )
 
     def disable(self, names: Iterable[str] | None = None, *, file: Path | None = None) -> Report:
         wanted = set(names) if names is not None else None
@@ -263,6 +272,7 @@ class ActivationStore:
                 done = self._disable_file(Path(target), group, report)
                 records = [r for r in records if r not in done]
             self._save(records)
+        self._log(report)
         return report
 
     def _disable_file(
@@ -295,12 +305,142 @@ class ActivationStore:
             ]
             return []
         report.changes += [Change(str(r.get("server")), path, Outcome.DONE) for r in restored]
-        if self._ledger is not None:
-            self._ledger.append(
+        report.events.append(
+            (
                 "shield_disabled",
                 {"file": str(path), "servers": sorted(str(r.get("server")) for r in restored)},
             )
+        )
         return restored
+
+    def _known(self, records: list[dict[str, Any]], name: str, path: Path) -> dict[str, Any] | None:
+        for record in records:
+            if record.get("server") == name and record.get("file") == str(path):
+                return record
+        return None
+
+    def _remember(
+        self,
+        records: list[dict[str, Any]],
+        server: ServerEntry,
+        entries: tuple[dict[str, Any], dict[str, Any]],
+        backup: str,
+    ) -> None:
+        original, wrapped = entries
+        record = self._known(records, server.name, server.source.path)
+        if record is not None:
+            record["wrapped"] = wrapped
+            if backup:
+                record["backup"] = backup
+            return
+        records.append(
+            {
+                "file": str(server.source.path),
+                "pointer": server.pointer,
+                "server": server.name,
+                "client": server.source.client.value,
+                "original": original,
+                "wrapped": wrapped,
+                "backup": backup,
+                "at": datetime.now(UTC).isoformat(timespec="seconds"),
+            }
+        )
+
+    def adopt(self, servers: Sequence[ServerEntry]) -> int:
+        adopted = 0
+        with exclusive(self.directory / LOCK_FILE):
+            records = self._records()
+            for server in servers:
+                if self._known(records, server.name, server.source.path) is not None:
+                    continue
+                loaded = _strict_document(server.source.path)
+                found = None if isinstance(loaded, Support) else _locate(loaded[1], server.pointer)
+                if found is None:
+                    continue
+                parent, key = found
+                current = parent[key]
+                wrapped = unwrap(current.get("command"), current.get("args") or [])
+                if wrapped is None:
+                    continue
+                original = {**current, "command": wrapped.command, "args": list(wrapped.args)}
+                self._remember(records, server, (original, current), "")
+                adopted += 1
+            if adopted:
+                self._save(records)
+        return adopted
+
+    def relink(self, servers: Sequence[ServerEntry], starter: Sequence[str]) -> Report:
+        report = Report()
+        grouped: dict[Path, list[ServerEntry]] = defaultdict(list)
+        for server in servers:
+            grouped[server.source.path].append(server)
+        with exclusive(self.directory / LOCK_FILE):
+            records = self._records()
+            for path, group in grouped.items():
+                self._relink_file(path, group, starter, records, report)
+            self._save(records)
+        self._log(report)
+        return report
+
+    def _relink_file(
+        self,
+        path: Path,
+        group: list[ServerEntry],
+        starter: Sequence[str],
+        records: list[dict[str, Any]],
+        report: Report,
+    ) -> None:
+        loaded = _strict_document(path)
+        if isinstance(loaded, Support):
+            report.changes += [Change(s.name, path, Outcome.FAILED, loaded.value) for s in group]
+            return
+        data, document = loaded
+        pending: list[tuple[ServerEntry, dict[str, Any], dict[str, Any]]] = []
+        for server in group:
+            found = _locate(document, server.pointer)
+            if found is None:
+                report.changes.append(Change(server.name, path, Outcome.MISSING))
+                continue
+            parent, key = found
+            current = parent[key]
+            wrapped = unwrap(current.get("command"), current.get("args") or [])
+            if wrapped is None:
+                report.changes.append(Change(server.name, path, Outcome.CHANGED))
+                continue
+            known = self._known(records, server.name, path)
+            original = (
+                known["original"]
+                if known is not None and isinstance(known.get("original"), dict)
+                else {**current, "command": wrapped.command, "args": list(wrapped.args)}
+            )
+            command, args = wrap(
+                starter, wrapped.name or server.name, wrapped.command, wrapped.args
+            )
+            updated = {**current, "command": command, "args": args}
+            if updated == current:
+                self._remember(records, server, (original, current), "")
+                report.changes.append(Change(server.name, path, Outcome.DONE))
+                continue
+            parent[key] = updated
+            pending.append((server, original, updated))
+        if not pending:
+            return
+        if not self._rewrite(path, data, document, report):
+            report.changes += [Change(s.name, path, Outcome.CHANGED, "file") for s, _, _ in pending]
+            return
+        for server, original, updated in pending:
+            self._remember(records, server, (original, updated), str(report.backups[-1]))
+            report.changes.append(Change(server.name, path, Outcome.DONE))
+        report.events.append(
+            (
+                "shield_relinked",
+                {"file": str(path), "servers": sorted(s.name for s, _, _ in pending)},
+            )
+        )
+
+
+def editable(path: Path) -> bool:
+    return not isinstance(_strict_document(path), Support)
 
 
 def manual_snippet(server: ServerEntry, starter: Sequence[str]) -> str:

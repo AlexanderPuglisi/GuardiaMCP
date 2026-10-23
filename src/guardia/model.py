@@ -173,6 +173,7 @@ class ServerEntry:
     raw: Mapping[str, Any] = field(default_factory=frozen_mapping, repr=False)
     lines: Mapping[str, int] = field(default_factory=frozen_mapping, repr=False)
     shielded: bool = False
+    shield_launcher: tuple[str, ...] = ()
 
     @property
     def key(self) -> str:

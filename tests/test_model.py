@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -25,8 +26,8 @@ from guardia.model import (
 SOURCE = ConfigSource(Client.CLAUDE_DESKTOP, Scope.USER, Path("config.json"))
 
 
-def make_server(raw: dict[str, object], **overrides: object) -> ServerEntry:
-    fields: dict[str, object] = {
+def make_server(raw: dict[str, object], **overrides: Any) -> ServerEntry:
+    fields: dict[str, Any] = {
         "name": "demo",
         "source": SOURCE,
         "pointer": "/mcpServers/demo",
@@ -38,7 +39,7 @@ def make_server(raw: dict[str, object], **overrides: object) -> ServerEntry:
         "raw": frozen_mapping(raw),
     }
     fields.update(overrides)
-    return ServerEntry(**fields)  # type: ignore[arg-type]
+    return ServerEntry(**fields)
 
 
 def test_fingerprint_does_not_depend_on_key_order() -> None:
@@ -71,9 +72,9 @@ def test_repr_never_contains_secret_values() -> None:
 def test_server_entry_is_immutable() -> None:
     server = make_server({"command": "npx"})
     with pytest.raises(AttributeError):
-        server.name = "other"  # type: ignore[misc]
+        server.__setattr__("name", "other")
     with pytest.raises(TypeError):
-        server.env["DEMO_TOKEN"] = "x"  # type: ignore[index]
+        cast(dict[str, str], server.env)["DEMO_TOKEN"] = "x"
 
 
 def test_display_target_for_stdio_and_http() -> None:

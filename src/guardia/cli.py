@@ -55,7 +55,9 @@ RULE_ACTIONS = {
     "stato": "status",
     "status": "status",
 }
-SETUP_COMMANDS = frozenset({"list", "elenco", "enable", "attiva", "disable", "disattiva"})
+SETUP_COMMANDS = frozenset(
+    {"list", "elenco", "enable", "attiva", "disable", "disattiva", "relink", "ricollega"}
+)
 TOOL_ACTIONS = {
     "elenco": "list",
     "list": "list",
@@ -263,6 +265,7 @@ def build_parser(t: Translator) -> argparse.ArgumentParser:
         (("list", "elenco"), "shield_setup.cli_list"),
         (("enable", "attiva"), "shield_setup.cli_enable"),
         (("disable", "disattiva"), "shield_setup.cli_disable"),
+        (("relink", "ricollega"), "shield_setup.cli_relink"),
     ):
         setup = shield_commands_parser.add_parser(
             names[0], aliases=[names[1]], help=t(help_key), parents=[language]
@@ -578,13 +581,14 @@ def run_shield_setup(
     ws = shield_commands.Workspace(t, env.data_dir, home_text(str(env.home)), out)
     store = ActivationStore(env.data_dir, Ledger(env.data_dir))
     action = args.shield_command
-    if action in ("disable", "disattiva"):
-        selection = (args.setup_servers, args.setup_all, args.setup_confirm)
-        return shield_commands.shield_disable(ws, store, selection)
     found = candidates(discover(env, DiscoveryOptions(skills=False)))
     if action in ("list", "elenco"):
         return shield_commands.shield_list(ws, found)
     selection = (args.setup_servers, args.setup_all, args.setup_confirm)
+    if action in ("disable", "disattiva"):
+        return shield_commands.shield_disable(ws, found, store, selection)
+    if action in ("relink", "ricollega"):
+        return shield_commands.shield_relink(ws, found, store, selection)
     return shield_commands.shield_enable(ws, found, selection, store)
 
 

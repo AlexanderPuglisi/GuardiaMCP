@@ -179,6 +179,7 @@ def test_api_exposes_only_intended_methods(env: HostEnvironment) -> None:
         "remove_project",
         "window_minimize",
         "window_close",
+        "window_state",
         "window_maximize",
         "window_restore",
         "settings_history",
@@ -187,6 +188,7 @@ def test_api_exposes_only_intended_methods(env: HostEnvironment) -> None:
         "shield",
         "shield_enable",
         "shield_disable",
+        "shield_relink",
         "shield_approve_tools",
         "shield_approve_rules",
         "shield_rules_text",
@@ -378,6 +380,7 @@ def test_report_view_is_json_serializable(poisoned: HostEnvironment) -> None:
 class FakeWindow:
     def __init__(self) -> None:
         self.calls: list[tuple[object, ...]] = []
+        self.maximized = False
 
     def minimize(self) -> None:
         self.calls.append(("minimize",))
@@ -387,6 +390,7 @@ class FakeWindow:
 
     def maximize(self) -> None:
         self.calls.append(("maximize",))
+        self.maximized = True
 
     def restore(self) -> None:
         self.calls.append(("restore",))
@@ -399,7 +403,9 @@ def test_window_controls_are_forwarded(env: HostEnvironment) -> None:
     window = FakeWindow()
     api = GuardiaApi(env, SettingsStore(env.data_dir), window=window)
     api.window_minimize()
+    assert api.window_state() == {"maximized": False}
     api.window_maximize()
+    assert api.window_state() == {"maximized": True}
     api.window_restore()
     api.window_resize(1000, 700, "nw")
     api.window_close()
@@ -427,6 +433,7 @@ def test_window_controls_without_a_window_do_nothing(env: HostEnvironment) -> No
     api.window_close()
     api.window_maximize()
     api.window_restore()
+    assert api.window_state() == {"maximized": False}
     api.window_resize(900, 600, "se")
 
 

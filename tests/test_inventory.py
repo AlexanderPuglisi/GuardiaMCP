@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -16,8 +17,8 @@ def by_name(inventory: Inventory) -> dict[str, ServerEntry]:
     return {server.name: server for server in inventory.servers}
 
 
-def run(env: HostEnvironment, **options: object) -> Inventory:
-    return discover(env, DiscoveryOptions(**options))  # type: ignore[arg-type]
+def run(env: HostEnvironment, **options: Any) -> Inventory:
+    return discover(env, DiscoveryOptions(**options))
 
 
 def test_empty_machine_has_no_servers_and_no_errors(env: HostEnvironment) -> None:

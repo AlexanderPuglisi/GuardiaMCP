@@ -12,7 +12,14 @@ from guardia.i18n import Translator
 from guardia.model import Scope
 from guardia.safeio import SafeReadError
 from guardia.secure_store import Protector
-from guardia.shield.activation import ActivationStore, Candidate, Outcome, Support, manual_snippet
+from guardia.shield.activation import (
+    ActivationStore,
+    Candidate,
+    Outcome,
+    Support,
+    editable,
+    manual_snippet,
+)
 from guardia.shield.activation import Report as ActivationReport
 from guardia.shield.engine import Context, Engine, redact
 from guardia.shield.pins import PinError, PinStore
@@ -26,7 +33,7 @@ from guardia.shield.policy import (
     rules_path,
 )
 from guardia.shield.rules import PHASE_NAMES, Action, Issue, Phase, RuleSet, parse_rules
-from guardia.shield.wrapping import launcher
+from guardia.shield.wrapping import LauncherState, launcher, launcher_state
 
 EXIT_OK = 0
 EXIT_INVALID = 1
@@ -333,14 +340,26 @@ def tools_forget(ws: Workspace, store: PinStore, server: str | None) -> int:
     return EXIT_OK if forgotten else EXIT_INVALID
 
 
+def _status(ws: Workspace, candidate: Candidate) -> str:
+    if candidate.support is Support.PROTECTED:
+        state = launcher_state(candidate.server.shield_launcher)
+        if state is not LauncherState.CURRENT:
+            return ws.t(f"shield_setup.launcher_{state.value}")
+    return ws.t(f"shield_setup.support_{candidate.support.value}")
+
+
 def _setup_line(ws: Workspace, candidate: Candidate) -> str:
     server = candidate.server
     return ws.t(
         "shield_setup.line",
         name=safe_text(server.name, 80),
         client=ws.t(f"client.{server.source.client.value}"),
-        status=ws.t(f"shield_setup.support_{candidate.support.value}"),
+        status=_status(ws, candidate),
     )
+
+
+def _rewritable(candidate: Candidate) -> bool:
+    return candidate.support is Support.PROTECTED and editable(candidate.server.source.path)
 
 
 def shield_list(ws: Workspace, found: list[Candidate]) -> int:
@@ -425,26 +444,66 @@ def shield_enable(
 
 
 def shield_disable(
-    ws: Workspace, store: ActivationStore, selection: tuple[list[str], bool, bool]
+    ws: Workspace,
+    found: list[Candidate],
+    store: ActivationStore,
+    selection: tuple[list[str], bool, bool],
 ) -> int:
     names, everything, confirmed = selection
     if not names and not everything:
         ws.write(ws.t("shield_setup.need_selection"))
         return EXIT_USAGE
+    chosen, _ = _selected(found, names, everything)
+    protected = [c.server for c in chosen if _rewritable(c)]
     records = [r for r in store.records() if everything or r.get("server") in names]
-    if not records:
+    pending = sorted(
+        {(str(r.get("server")), str(r.get("file"))) for r in records}
+        | {(s.name, str(s.source.path)) for s in protected}
+    )
+    if not pending:
         ws.write(ws.t("shield_setup.nothing_recorded"))
         return EXIT_INVALID
     if not confirmed:
         ws.write(ws.t("shield_setup.preview_disable_title"))
-        for record in records:
+        for name, path in pending:
             ws.write(
                 ws.t(
                     "shield_setup.preview_line",
-                    name=safe_text(str(record.get("server")), 80),
-                    path=safe_text(str(record.get("file"))),
+                    name=safe_text(name, 80),
+                    path=safe_text(path),
                 )
             )
         ws.write(ws.t("shield_setup.preview_hint", flag=_confirm_flag(ws)))
         return EXIT_OK
+    store.adopt(protected)
     return _report_changes(ws, store.disable(None if everything else names))
+
+
+def shield_relink(
+    ws: Workspace,
+    found: list[Candidate],
+    store: ActivationStore,
+    selection: tuple[list[str], bool, bool],
+) -> int:
+    names, everything, confirmed = selection
+    if not names and not everything:
+        ws.write(ws.t("shield_setup.need_selection"))
+        return EXIT_USAGE
+    chosen, missing = _selected(found, names, everything)
+    for name in missing:
+        ws.write(ws.t("shield_setup.unknown", name=safe_text(name, 80)))
+    stale = [
+        c
+        for c in chosen
+        if _rewritable(c) and launcher_state(c.server.shield_launcher) is not LauncherState.CURRENT
+    ]
+    if not stale:
+        ws.write(ws.t("shield_setup.relink_nothing"))
+        return EXIT_OK if not missing else EXIT_INVALID
+    if not confirmed:
+        ws.write(ws.t("shield_setup.preview_relink_title"))
+        for candidate in stale:
+            ws.write(_setup_line(ws, candidate))
+        ws.write(ws.t("shield_setup.preview_hint", flag=_confirm_flag(ws)))
+        return EXIT_OK
+    return _report_changes(ws, store.relink([c.server for c in stale], launcher()))

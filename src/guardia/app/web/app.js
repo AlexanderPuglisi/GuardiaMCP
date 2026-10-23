@@ -193,8 +193,35 @@
     return el("div", { cls: "card empty", text: t("need_scan") });
   }
 
+  function verdict(report) {
+    const all = [...report.findings, ...report.file_findings];
+    const severe = all.filter((finding) => finding.severity_rank >= 3).length;
+    const servers = report.entries.filter((entry) => entry.type === "server").length;
+    const skills = report.entries.length - servers;
+    let level = "ok";
+    let title = t("verdict_ok_title");
+    let text = t("verdict_ok_text", { servers, skills });
+    if (!report.entries.length && !all.length) {
+      level = "off";
+      title = t("verdict_none_title");
+      text = t("verdict_none_text");
+    } else if (severe) {
+      level = "bad";
+      title = t("verdict_severe_title", { count: severe });
+      text = t("verdict_severe_text");
+    } else if (all.length) {
+      level = "warn";
+      title = t("verdict_minor_title", { count: all.length });
+      text = t("verdict_minor_text");
+    }
+    return el("div", { cls: "card verdict " + level, attrs: { role: "status" } },
+      el("h3", {}, el("span", { cls: "led " + (level === "ok" ? "" : level) }), title),
+      el("p", { text }));
+  }
+
   function overview(report) {
     const root = el("section");
+    root.append(verdict(report));
     const max = Math.max(1, ...report.summary.map((s) => s.count));
     const cards = el("div", { cls: "grid sev-cards" });
     for (const item of report.summary) {
@@ -491,13 +518,19 @@
   function shieldServers(shield) {
     const body = el("tbody");
     for (const server of shield.servers) {
-      const action = el("td");
+      const action = el("td", { cls: "actions-cell" });
       if (server.can_enable) {
         action.append(el("button", {
           cls: "btn primary", text: t("shield_protect"), attrs: { type: "button" },
           on: { click: () => shieldAction("shield_enable", [server.key], t("shield_confirm_enable", { name: server.name, path: server.path })) },
         }));
       } else if (server.can_disable) {
+        if (server.can_relink) {
+          action.append(el("button", {
+            cls: "btn primary", text: t("shield_relink"), attrs: { type: "button" },
+            on: { click: () => shieldAction("shield_relink", [server.key], t("shield_confirm_relink", { name: server.name })) },
+          }));
+        }
         action.append(el("button", {
           cls: "btn", text: t("shield_unprotect"), attrs: { type: "button" },
           on: { click: () => shieldAction("shield_disable", [server.key], t("shield_confirm_disable", { name: server.name })) },
@@ -511,7 +544,7 @@
       body.append(el("tr", {},
         el("td", {}, el("div", { cls: "name", text: server.name }), pathLine("where", server.path)),
         el("td", { text: server.client }),
-        el("td", { text: server.status }),
+        el("td", { cls: server.launcher === "missing" ? "status-bad" : "", text: server.status }),
         action));
     }
     if (!shield.servers.length) body.append(el("tr", {}, el("td", { cls: "empty", text: t("no_results"), attrs: { colspan: 4 } })));
@@ -846,7 +879,7 @@
       button.addEventListener("click", () => windowAction(button.dataset.win));
     }
     document.getElementById("titlebar").addEventListener("dblclick", (event) => {
-      if (event.target.id === "titlebar") toggleMaximize();
+      if (!event.target.closest("button, a, input, select")) toggleMaximize();
     });
     for (const grip of document.querySelectorAll(".grip")) {
       grip.addEventListener("pointerdown", (event) => startResize(grip, event));
@@ -859,6 +892,9 @@
   async function start() {
     apply(await call("state"));
     wireWindow();
+    try {
+      setMaximized(Boolean((await call("window_state")).maximized));
+    } catch { }
     document.addEventListener("copy", cleanCopy);
     document.getElementById("scan-button").addEventListener("click", runScan);
     for (const button of document.querySelectorAll(".lang button")) {
