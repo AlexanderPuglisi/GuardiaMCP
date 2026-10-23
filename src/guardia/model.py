@@ -137,6 +137,7 @@ class ServerEntry:
     enabled: bool = True
     raw: Mapping[str, Any] = field(default_factory=frozen_mapping, repr=False)
     lines: Mapping[str, int] = field(default_factory=frozen_mapping, repr=False)
+    shielded: bool = False
 
     @property
     def key(self) -> str:
@@ -178,6 +179,7 @@ class ServerEntry:
             "header_keys": sorted(self.headers),
             "cwd": self.cwd,
             "enabled": self.enabled,
+            "shielded": self.shielded,
             "fingerprint": self.fingerprint,
         }
 

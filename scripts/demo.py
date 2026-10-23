@@ -17,7 +17,10 @@ from guardia.app.api import GuardiaApi
 from guardia.app.page import CSP_MARK, SCRIPT_MARK, STYLE_MARK, content_security_policy
 from guardia.app.settings import SettingsStore
 from guardia.cli import main as cli_main
-from guardia.inventory import HostEnvironment
+from guardia.inventory import DiscoveryOptions, HostEnvironment, discover
+from guardia.ledger import Ledger
+from guardia.shield.activation import ActivationStore
+from guardia.shield.pins import PinStore
 
 PROJECT = Path(__file__).resolve().parent.parent
 WEB = PROJECT / "src" / "guardia" / "app" / "web"
@@ -48,6 +51,7 @@ FRAMES = (
     ("overview", 3200),
     ("inventory:calc", 3400),
     ("findings", 3000),
+    ("shield", 3200),
     ("ledger", 2800),
 )
 TERMINAL_COLORS = {
@@ -138,12 +142,56 @@ def scrubber(root: Path) -> Callable[[Any], Any]:
     return scrub
 
 
+def shield_history(env: HostEnvironment) -> None:
+    ledger = Ledger(env.data_dir)
+    notes = [s for s in discover(env, DiscoveryOptions(skills=False)).servers if s.name == "notes"]
+    ActivationStore(env.data_dir, ledger).enable(notes, ["guardia"])
+    pins = PinStore(env.data_dir, None, ledger)
+    pins.review("github", {"create_issue": "a1", "search_code": "b2"})
+    pins.review("github", {"create_issue": "c3", "search_code": "b2", "delete_repo": "d4"})
+    ledger.append(
+        "shield_start", {"server": "notes", "command": ["uvx", "mcp-server-notes==1.4.0"]}
+    )
+    ledger.append(
+        "shield_decision",
+        {
+            "server": "notes",
+            "phase": "call",
+            "method": "tools/call",
+            "tool": "read_note",
+            "action": "block",
+            "rules": ["Mai toccare chiavi SSH, credenziali e file .env"],
+            "defaulted": False,
+            "fingerprint": "0" * 64,
+        },
+    )
+    ledger.append(
+        "shield_decision",
+        {
+            "server": "notes",
+            "phase": "call",
+            "method": "tools/call",
+            "tool": "write_note",
+            "action": "ask",
+            "rules": ["protection:outgoing_secrets"],
+            "defaulted": False,
+            "fingerprint": "1" * 64,
+            "answer": "block",
+        },
+    )
+
+
 def record(env: HostEnvironment, language: str, scrub: Callable[[Any], Any]) -> dict[str, Any]:
     api = GuardiaApi(env, SettingsStore(env.data_dir))
     api.set_language(language)
     report = api.scan()
     data: dict[str, Any] = scrub(
-        {"state": api.state() | {"report": None}, "report": report, "ledger": api.ledger(50)}
+        {
+            "state": api.state() | {"report": None},
+            "report": report,
+            "ledger": api.ledger(50),
+            "shield": api.shield(),
+        }
     )
     return data
 
@@ -246,6 +294,7 @@ def build(language: str, output: Path) -> None:
         install_extension(env, "Adds two numbers.")
         GuardiaApi(env, SettingsStore(env.data_dir)).scan()
         install_extension(env, POISON)
+        shield_history(env)
         scrub = scrubber(root / "pc")
         out = io.StringIO()
         cli_main(["scansiona", "--lingua", language], env=env, stdout=out)

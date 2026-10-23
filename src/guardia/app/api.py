@@ -22,6 +22,12 @@ from guardia.app.settings import (
     validate_project,
     with_option,
 )
+from guardia.app.shield_view import (
+    outcome_lines,
+    server_candidates,
+    shield_state,
+    succeeded,
+)
 from guardia.app.viewmodel import report_view, ui_strings
 from guardia.display import safe_text
 from guardia.i18n import Translator
@@ -31,12 +37,18 @@ from guardia.model import Severity, sha256_hex
 from guardia.render.html import render_html
 from guardia.render.sarif import build_sarif
 from guardia.render.terminal import severity_label
+from guardia.safeio import SafeReadError
 from guardia.scanner import ScanReport
 from guardia.secure_store import Protector
+from guardia.shield.activation import ActivationStore, Support
+from guardia.shield.pins import PinError, PinStore
+from guardia.shield.policy import ApprovalError, approve_rules
+from guardia.shield.wrapping import launcher
 
 ANCHOR = re.compile(r"^\d{1,9}:[0-9a-f]{64}$")
 EXPORT_FORMATS = {"html": ".html", "json": ".json", "sarif": ".sarif"}
 MAX_LEDGER_EVENTS = 500
+MAX_NAME = 200
 WINDOW_EDGES = frozenset({"n", "s", "e", "w", "ne", "nw", "se", "sw"})
 MAX_COORDINATE = 100_000
 MIN_WINDOW_SIZE = 200
@@ -186,7 +198,20 @@ class GuardiaApi:
             details = str(data.get("server", ""))
         else:
             details = ""
-        known = ("scan", "export", "shield_start", "shield_stop")
+        known = (
+            "scan",
+            "export",
+            "shield_start",
+            "shield_stop",
+            "shield_decision",
+            "shield_enabled",
+            "shield_disabled",
+            "tools_pinned",
+            "tools_pending",
+            "tools_approved",
+            "tools_forgotten",
+            "rules_approved",
+        )
         label_key = f"ui.event_{event}" if event in known else "ui.event_other"
         return {
             "seq": record.get("seq"),
@@ -292,6 +317,85 @@ class GuardiaApi:
         projects = tuple(p for p in self._settings.projects if p != path)
         self._save_settings(replace(self._settings, projects=projects))
         return self.state()
+
+    def _home(self) -> str:
+        return str(self._env.home).replace("\\", "/").rstrip("/").lower()
+
+    def _shield_result(self, message: str, ok: bool) -> dict[str, Any]:
+        state = shield_state(self._env, self._t(), self._protector)
+        state["message"] = message
+        state["ok"] = ok
+        return state
+
+    def shield(self) -> dict[str, Any]:
+        return shield_state(self._env, self._t(), self._protector)
+
+    def shield_enable(self, key: object, confirmed: object) -> dict[str, Any]:
+        if confirmed is not True:
+            raise self._fail("confirmation")
+        if not isinstance(key, str):
+            raise self._fail("invalid")
+        chosen = [
+            c
+            for c in server_candidates(self._env)
+            if c.server.key == key and c.support is Support.AUTO
+        ]
+        if not chosen:
+            raise self._fail("invalid")
+        store = ActivationStore(self._env.data_dir, self._ledger())
+        report = store.enable([chosen[0].server], launcher())
+        lines = outcome_lines(report.changes, self._t())
+        return self._shield_result("\n".join(lines), succeeded(report.changes))
+
+    def shield_disable(self, name: object, confirmed: object) -> dict[str, Any]:
+        if confirmed is not True:
+            raise self._fail("confirmation")
+        store = ActivationStore(self._env.data_dir, self._ledger())
+        recorded = {str(r.get("server")) for r in store.records()}
+        if not isinstance(name, str) or name not in recorded:
+            raise self._fail("invalid")
+        report = store.disable([name])
+        lines = outcome_lines(report.changes, self._t())
+        return self._shield_result("\n".join(lines), succeeded(report.changes))
+
+    def shield_approve_tools(self, server: object, confirmed: object) -> dict[str, Any]:
+        if confirmed is not True:
+            raise self._fail("confirmation")
+        if not isinstance(server, str) or not server or len(server) > MAX_NAME:
+            raise self._fail("invalid")
+        t = self._t()
+        try:
+            chosen = PinStore(self._env.data_dir, self._protector, self._ledger()).approve(server)
+        except (OSError, PinError) as exc:
+            message = t("shield_rules.tools_failed", error=safe_text(str(exc), 200))
+            return self._shield_result(message, False)
+        if not chosen:
+            return self._shield_result(t("shield_rules.tools_nothing", server=server), False)
+        tools = ", ".join(safe_text(item, 120) for item in chosen)
+        return self._shield_result(
+            t("shield_rules.tools_approved", server=server, tools=tools), True
+        )
+
+    def shield_approve_rules(self, confirmed: object) -> dict[str, Any]:
+        if confirmed is not True:
+            raise self._fail("confirmation")
+        t = self._t()
+        try:
+            result, _ = approve_rules(self._env.data_dir, self._home(), self._protector)
+        except SafeReadError:
+            return self._shield_result(t("ui.shield_no_rules_file"), False)
+        except ApprovalError as exc:
+            message = t("shield_rules.approval_failed", error=safe_text(str(exc), 200))
+            return self._shield_result(message, False)
+        if result.ruleset is None:
+            message = t("shield_rules.invalid", count=len(result.errors))
+            return self._shield_result(message, False)
+        message = t(
+            "shield_rules.approved",
+            count=len(result.ruleset.rules),
+            sha=result.ruleset.sha256[:16],
+        )
+        return self._shield_result(message, True)
 
     def window_minimize(self) -> None:
         if self._window is not None:

@@ -7,13 +7,14 @@
     findings: ["M12 3 2.5 20h19z", "M12 10v4", "M12 17h.01"],
     ledger: ["M4 3h16v18H4z", "M9 7h6", "M9 12h6", "M9 17h4"],
     reports: ["M12 3v12", "M7 10l5 5 5-5", "M4 19h16"],
+    shield: ["M12 3 4.5 6v5.5c0 4.7 3.1 8.1 7.5 9.5 4.4-1.4 7.5-4.8 7.5-9.5V6z", "m9 12 2 2 4-4"],
     settings: ["M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z", "M12 2v3", "M12 19v3", "M2 12h3", "M19 12h3", "M4.9 4.9l2.1 2.1", "M17 17l2.1 2.1", "M4.9 19.1 7 17", "M17 7l2.1-2.1"],
   };
-  const VIEWS = ["overview", "inventory", "findings", "ledger", "reports", "settings"];
+  const VIEWS = ["overview", "inventory", "findings", "shield", "ledger", "reports", "settings"];
   const state = {
     ui: {}, settings: {}, report: null, view: "overview", version: "", dataDir: "",
     entryId: null, entryType: "all", problemsOnly: false, entrySearch: "",
-    findingLevel: "all", findingSearch: "", ledger: null,
+    findingLevel: "all", findingSearch: "", ledger: null, shield: null,
   };
   const MIN_SIZE = [900, 600];
   const windowState = { maximized: false, saved: null, resizing: null, target: null, pending: false };
@@ -116,6 +117,7 @@
   function show(view) {
     state.view = view;
     if (view === "ledger") loadLedger();
+    if (view === "shield") loadShield();
     render();
   }
 
@@ -126,12 +128,13 @@
     const counts = {
       inventory: report ? report.entries.length : "",
       findings: report ? report.total : "",
+      shield: state.shield && state.shield.pending.items.length ? state.shield.pending.items.length : "",
     };
     const severe = report ? report.summary.some((s) => s.count && (s.severity === "critical" || s.severity === "high")) : false;
     for (const view of VIEWS) {
       const label = t("nav_" + view);
       const count = counts[view] !== undefined && counts[view] !== ""
-        ? el("em", { cls: "count" + (view === "findings" && severe ? " alert" : ""), text: counts[view] }) : null;
+        ? el("em", { cls: "count" + ((view === "findings" && severe) || view === "shield" ? " alert" : ""), text: counts[view] }) : null;
       const button = el("button", { attrs: { type: "button", title: label, "aria-label": label }, on: { click: () => show(view) } },
         icon(view), el("span", { text: label }), count);
       if (view === state.view) button.setAttribute("aria-current", "page");
@@ -354,6 +357,131 @@
     return root;
   }
 
+  async function loadShield() {
+    try {
+      state.shield = await call("shield");
+      if (state.view === "shield") render();
+      else renderNav();
+    } catch { }
+  }
+
+  async function shieldAction(method, args, question) {
+    if (!window.confirm(question)) return;
+    busy(true, t("shield_working"));
+    try {
+      const next = await call(method, ...args, true);
+      state.shield = next;
+      if (next.message) toast(next.message);
+    } catch { } finally {
+      busy(false);
+      render();
+    }
+  }
+
+  function shieldRules(shield) {
+    const rules = shield.rules;
+    const level = rules.state === "locked" ? "bad" : rules.state === "active" ? "" : "off";
+    const actions = el("div", { cls: "row" },
+      el("button", { cls: "btn", text: t("shield_copy_rules_path"), attrs: { type: "button" }, on: { click: () => copy(rules.path) } }));
+    if (rules.state === "locked") {
+      actions.append(el("button", {
+        cls: "btn danger", text: t("shield_approve_rules"), attrs: { type: "button" },
+        on: { click: () => shieldAction("shield_approve_rules", [], t("shield_confirm_rules")) },
+      }));
+    }
+    return el("div", { cls: "card status-card" },
+      el("h3", {}, el("span", { cls: "led " + level }), t("shield_rules_title")),
+      el("p", { text: rules.text }),
+      el("p", { cls: "muted", text: t("shield_rules_hint") }),
+      actions);
+  }
+
+  function shieldServers(shield) {
+    const body = el("tbody");
+    for (const server of shield.servers) {
+      const action = el("td");
+      if (server.can_enable) {
+        action.append(el("button", {
+          cls: "btn primary", text: t("shield_protect"), attrs: { type: "button" },
+          on: { click: () => shieldAction("shield_enable", [server.key], t("shield_confirm_enable", { name: server.name, path: server.path })) },
+        }));
+      } else if (server.can_disable) {
+        action.append(el("button", {
+          cls: "btn", text: t("shield_unprotect"), attrs: { type: "button" },
+          on: { click: () => shieldAction("shield_disable", [server.name], t("shield_confirm_disable", { name: server.name })) },
+        }));
+      } else if (server.snippet) {
+        action.append(el("button", {
+          cls: "btn", text: t("shield_copy_snippet"), attrs: { type: "button" },
+          on: { click: () => copy(server.snippet) },
+        }));
+      }
+      body.append(el("tr", {},
+        el("td", {}, el("div", { cls: "name", text: server.name }), el("div", { cls: "where", text: server.path })),
+        el("td", { text: server.client }),
+        el("td", { text: server.status }),
+        action));
+    }
+    if (!shield.servers.length) body.append(el("tr", {}, el("td", { cls: "empty", text: t("no_results"), attrs: { colspan: 4 } })));
+    return el("table", {},
+      el("thead", {}, el("tr", {}, el("th", { text: t("col_name") }), el("th", { text: t("col_client") }),
+        el("th", { text: t("col_status") }), el("th", { text: t("col_action") }))), body);
+  }
+
+  function shieldPending(shield) {
+    const list = el("div", { cls: "list" });
+    if (!shield.pending.valid) list.append(el("div", { cls: "empty issue", text: t("shield_pins_invalid") }));
+    const servers = [...new Set(shield.pending.items.map((item) => item.server))];
+    if (!servers.length && shield.pending.valid) list.append(el("div", { cls: "empty", text: t("shield_pending_empty") }));
+    for (const server of servers) {
+      const items = shield.pending.items.filter((item) => item.server === server);
+      const names = el("div", {});
+      for (const item of items) {
+        names.append(el("div", {}, el("b", { text: item.tool }), " · " + item.reason + " · ",
+          el("span", { cls: "mono", text: item.fingerprint })));
+      }
+      list.append(el("div", { cls: "event" },
+        el("span", { cls: "seq", text: items.length }),
+        el("div", {}, el("b", { text: server }), names),
+        el("button", {
+          cls: "btn danger", text: t("shield_approve_tools"), attrs: { type: "button" },
+          on: { click: () => shieldAction("shield_approve_tools", [server], t("shield_confirm_tools", { name: server })) },
+        })));
+    }
+    return list;
+  }
+
+  function shieldEvents(shield) {
+    const list = el("div", { cls: "list" });
+    if (!shield.events.length) list.append(el("div", { cls: "empty", text: t("shield_events_empty") }));
+    for (const event of shield.events) {
+      list.append(el("div", { cls: "event" },
+        el("span", { cls: "seq", text: event.seq }),
+        el("div", {}, el("b", { text: event.label }), event.details ? " · " + event.details : ""),
+        el("span", { cls: "muted", text: localTime(event.time) })));
+    }
+    return list;
+  }
+
+  function shieldView() {
+    const root = el("section");
+    const shield = state.shield;
+    if (!shield) {
+      root.append(el("div", { cls: "card empty", text: t("loading") }));
+      return root;
+    }
+    root.append(
+      shieldRules(shield),
+      el("h2", { text: t("shield_servers_title") }),
+      el("p", { cls: "muted", text: t("shield_summary", { protected: shield.protected, total: shield.servers.length }) + " " + t("shield_servers_hint") }),
+      shieldServers(shield),
+      el("h2", { text: t("shield_pending_title") }),
+      shieldPending(shield),
+      el("h2", { text: t("shield_events_title") }),
+      shieldEvents(shield));
+    return root;
+  }
+
   async function loadLedger(anchor) {
     try {
       state.ledger = anchor ? await call("verify_anchor", anchor) : await call("ledger", 50);
@@ -467,6 +595,7 @@
     let view;
     if (state.view === "ledger") view = ledgerView();
     else if (state.view === "settings") view = settingsView();
+    else if (state.view === "shield") view = shieldView();
     else if (!report) view = needScan();
     else if (state.view === "inventory") view = inventory(report);
     else if (state.view === "findings") view = findingsView(report);
@@ -601,6 +730,7 @@
       button.addEventListener("click", () => setLanguage(button.dataset.lang));
     }
     render();
+    loadShield();
     await runScan();
   }
 

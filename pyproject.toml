@@ -70,6 +70,8 @@ ignore = ["PLR0913", "PLR2004"]
 "src/guardia/shield/process.py" = ["S603"]
 "tests/test_shield_rules.py" = ["E501"]
 "tests/test_shield_protections.py" = ["E501"]
+"tests/test_shield_activation.py" = ["E501"]
+"tests/test_shield_confirm.py" = ["E501"]
 
 [tool.mypy]
 strict = true

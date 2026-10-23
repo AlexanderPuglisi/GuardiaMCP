@@ -1,7 +1,7 @@
 "use strict";
 (() => {
   const DEMO = __DEMO_DATA__;
-  const VIEWS = ["overview", "inventory", "findings", "ledger", "reports", "settings"];
+  const VIEWS = ["overview", "inventory", "findings", "shield", "ledger", "reports", "settings"];
   const target = decodeURIComponent(location.hash.slice(1));
   const [view, detail] = target.split(":");
 
@@ -50,6 +50,7 @@
       set_option: async () => DEMO.state,
       add_project: async () => DEMO.state,
       remove_project: async () => DEMO.state,
+      shield: async () => DEMO.shield,
       window_minimize: async () => null,
       window_close: async () => null,
       window_place: async () => null,

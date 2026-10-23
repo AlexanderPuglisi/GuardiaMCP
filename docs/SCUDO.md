@@ -6,9 +6,8 @@ Lo Scudo è la parte di Guardia che lavora **mentre** l'AI usa i server MCP. L'a
 guarda i file e ti dice cosa c'è di rischioso; lo Scudo invece si mette in mezzo ai messaggi e può
 **bloccarli, nasconderli o oscurarli** seguendo regole scritte da te.
 
-> **Stato: anteprima di sviluppo (fase 2.3).** Regole, protezioni di base e finestra di conferma
-> funzionano. Il collegamento automatico
-> dei client arriva nella fase 2.4: per ora la configurazione si modifica a mano (vedi sotto).
+> **Stato: anteprima di sviluppo (fase 2.4).** Regole, protezioni di base, finestra di conferma,
+> collegamento automatico dei client e vista «Scudo» nell'app funzionano.
 
 ## Come funziona, in 30 secondi
 
@@ -56,8 +55,39 @@ a:
 }
 ```
 
-Lo stesso schema vale per Claude Code, Cursor e VS Code. Nella fase 2.4 Guardia lo farà da solo,
-con copia di sicurezza e comando per tornare indietro.
+Lo stesso schema vale per Claude Code, Cursor e VS Code, ma **non serve farlo a mano**: Guardia lo
+fa per te.
+
+### Collegare i server in automatico
+
+```powershell
+guardia scudo elenco
+guardia scudo attiva --server github
+guardia scudo attiva --server github --conferma
+guardia scudo disattiva --server github --conferma
+```
+
+- **elenco** mostra tutti i server MCP del PC e, per ognuno, se è protetto dallo Scudo, se si può
+  collegare in automatico o perché no.
+- **attiva** senza `--conferma` mostra solo cosa farebbe; con `--conferma` salva una copia di
+  sicurezza del file nella cartella `backup` di Guardia, modifica solo la voce di quel server e
+  annota la voce originale. `--tutti` collega tutti i server collegabili.
+- **disattiva** rimette la voce originale, ma solo se nel frattempo non l'hai cambiata tu.
+- Le stesse azioni sono nella sezione **Scudo** dell'app, con una conferma prima di ogni modifica.
+
+Prima di collegare un server **chiudi l'app AI**: alcune app riscrivono il proprio file di
+configurazione e potrebbero cancellare la modifica. Se Guardia si accorge che il file è cambiato
+mentre lavorava, non scrive nulla.
+
+| Dove sta il server | Cosa fa Guardia |
+|---|---|
+| File JSON normale (Claude Desktop, Claude Code, Cursor, `mcp.json` di VS Code, Windsurf, Gemini, Copilot) | Collegamento automatico |
+| File con commenti (per esempio `settings.json` di VS Code) o file TOML (Codex) | Ti mostra il testo esatto da incollare, per non toccare i tuoi commenti |
+| Estensioni di Claude Desktop, plugin, configurazioni gestite dall'amministratore | Non collegabili: le gestiscono le app |
+| Server remoti (HTTP) | Non ancora protetti dallo Scudo |
+
+Un server collegato continua a essere analizzato dalla scansione della v1 con il suo **comando
+originale**: la protezione non nasconde nulla all'analisi.
 
 ## Le regole in cinque minuti
 

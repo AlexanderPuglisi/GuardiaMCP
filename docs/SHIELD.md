@@ -6,9 +6,8 @@ The Shield is the part of Guardia that works **while** the AI is using MCP serve
 reads files and tells you what is risky; the Shield sits between the messages and can **block,
 hide or redact** them following rules you write.
 
-> **Status: development preview (phase 2.3).** Rules, built-in protections and the confirmation
-> window work. Automatic client setup arrives in phase 2.4:
-> for now you edit the configuration by hand (see below).
+> **Status: development preview (phase 2.4).** Rules, built-in protections, the confirmation
+> window, automatic client setup and the "Shield" view in the app work.
 
 ## How it works, in 30 seconds
 
@@ -57,8 +56,39 @@ to:
 }
 ```
 
-The same pattern works for Claude Code, Cursor and VS Code. In phase 2.4 Guardia will do it for
-you, with a backup and a command to undo it.
+The same pattern works for Claude Code, Cursor and VS Code, but **you do not need to do it by
+hand**: Guardia does it for you.
+
+### Connecting servers automatically
+
+```powershell
+guardia shield list
+guardia shield enable --server github
+guardia shield enable --server github --confirm
+guardia shield disable --server github --confirm
+```
+
+- **list** shows every MCP server on the PC and, for each, whether it is protected by the Shield,
+  whether it can be connected automatically, or why not.
+- **enable** without `--confirm` only shows what it would do; with `--confirm` it saves a backup of
+  the file in Guardia's `backup` folder, changes only that server's entry and records the original
+  entry. `--all` connects every server that can be connected.
+- **disable** restores the original entry, but only if you did not change it in the meantime.
+- The same actions are in the **Shield** section of the app, with a confirmation before every change.
+
+**Close the AI app** before connecting a server: some apps rewrite their own configuration file and
+could erase the change. If Guardia notices that the file changed while it was working, it writes
+nothing.
+
+| Where the server lives | What Guardia does |
+|---|---|
+| Plain JSON file (Claude Desktop, Claude Code, Cursor, VS Code `mcp.json`, Windsurf, Gemini, Copilot) | Automatic connection |
+| File with comments (for example VS Code `settings.json`) or TOML file (Codex) | Shows you the exact text to paste, so your comments are not touched |
+| Claude Desktop extensions, plugins, administrator-managed configurations | Cannot be connected: the apps manage them |
+| Remote (HTTP) servers | Not protected by the Shield yet |
+
+A connected server is still analyzed by the v1 scan with its **original command**: protection hides
+nothing from the analysis.
 
 ## Rules in five minutes
 

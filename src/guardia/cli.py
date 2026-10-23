@@ -14,7 +14,7 @@ from guardia import __version__
 from guardia.analysis import AnalysisOptions, analyze
 from guardia.display import safe_text
 from guardia.i18n import SUPPORTED_LANGUAGES, Translator, detect_language
-from guardia.inventory import DiscoveryOptions, HostEnvironment
+from guardia.inventory import DiscoveryOptions, HostEnvironment, discover
 from guardia.ledger import Ledger, Verification
 from guardia.model import Severity
 from guardia.render.html import render_html
@@ -23,6 +23,7 @@ from guardia.render.sarif import build_sarif
 from guardia.render.terminal import render_inventory, render_scan, severity_label
 from guardia.scanner import RULES, ScanReport
 from guardia.shield import commands as shield_commands
+from guardia.shield.activation import ActivationStore, candidates
 from guardia.shield.confirm import (
     MAX_REQUEST_BYTES,
     Answer,
@@ -54,6 +55,7 @@ RULE_ACTIONS = {
     "stato": "status",
     "status": "status",
 }
+SETUP_COMMANDS = frozenset({"list", "elenco", "enable", "attiva", "disable", "disattiva"})
 TOOL_ACTIONS = {
     "elenco": "list",
     "list": "list",
@@ -257,6 +259,38 @@ def build_parser(t: Translator) -> argparse.ArgumentParser:
     shield_commands_parser.add_parser(
         "confirm", aliases=["conferma"], help=argparse.SUPPRESS, parents=[language]
     )
+    for names, help_key in (
+        (("list", "elenco"), "shield_setup.cli_list"),
+        (("enable", "attiva"), "shield_setup.cli_enable"),
+        (("disable", "disattiva"), "shield_setup.cli_disable"),
+    ):
+        setup = shield_commands_parser.add_parser(
+            names[0], aliases=[names[1]], help=t(help_key), parents=[language]
+        )
+        if names[0] == "list":
+            continue
+        setup.add_argument(
+            "--server",
+            "--nome",
+            dest="setup_servers",
+            action="append",
+            default=[],
+            help=t("shield_setup.cli_server"),
+        )
+        setup.add_argument(
+            "--tutti",
+            "--all",
+            dest="setup_all",
+            action="store_true",
+            help=t("shield_setup.cli_all"),
+        )
+        setup.add_argument(
+            "--conferma",
+            "--confirm",
+            dest="setup_confirm",
+            action="store_true",
+            help=t("shield_setup.cli_confirm"),
+        )
     shield_tools = shield_commands_parser.add_parser(
         "tools", aliases=["strumenti"], help=t("shield_rules.tools_help"), parents=[language]
     )
@@ -536,6 +570,22 @@ def run_shield_confirm() -> int:
     return EXIT_OK
 
 
+def run_shield_setup(
+    args: argparse.Namespace, t: Translator, env: HostEnvironment, out: TextIO
+) -> int:
+    ws = shield_commands.Workspace(t, env.data_dir, home_text(str(env.home)), out)
+    store = ActivationStore(env.data_dir, Ledger(env.data_dir))
+    action = args.shield_command
+    if action in ("disable", "disattiva"):
+        selection = (args.setup_servers, args.setup_all, args.setup_confirm)
+        return shield_commands.shield_disable(ws, store, selection)
+    found = candidates(discover(env, DiscoveryOptions(skills=False)))
+    if action in ("list", "elenco"):
+        return shield_commands.shield_list(ws, found)
+    selection = (args.setup_servers, args.setup_all, args.setup_confirm)
+    return shield_commands.shield_enable(ws, found, selection, store)
+
+
 def dispatch_shield(
     args: argparse.Namespace,
     t: Translator,
@@ -545,6 +595,8 @@ def dispatch_shield(
 ) -> int:
     if getattr(args, "shield_command", None) in ("confirm", "conferma"):
         return run_shield_confirm()
+    if getattr(args, "shield_command", None) in SETUP_COMMANDS:
+        return run_shield_setup(args, t, env, out)
     if getattr(args, "shield_command", None) in ("tools", "strumenti"):
         return run_shield_tools(args, t, env, out)
     if getattr(args, "shield_command", None):

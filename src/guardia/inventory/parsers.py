@@ -18,6 +18,7 @@ from guardia.model import (
     json_pointer,
 )
 from guardia.safeio import depth_exceeds
+from guardia.shield.wrapping import unwrap
 
 TRANSPORT_ALIASES: Mapping[str, Transport] = {
     "stdio": Transport.STDIO,
@@ -116,6 +117,11 @@ def normalize_entry(
     force_disabled: bool = False,
 ) -> ServerEntry:
     command = raw.get("command")
+    args = _string_tuple(raw.get("args"), pointer + "/args", outcome)
+    wrapped = unwrap(command if isinstance(command, str) else None, args)
+    if wrapped is not None:
+        command, args = wrapped.command, wrapped.args
+        raw = {**raw, "command": command, "args": list(args)}
     url = next((raw[key] for key in URL_KEYS if isinstance(raw.get(key), str)), None)
     cwd = raw.get("cwd")
     enabled = raw.get("disabled") is not True and raw.get("enabled") is not False
@@ -125,13 +131,14 @@ def normalize_entry(
         pointer=pointer,
         transport=infer_transport(raw, source.client),
         command=command if isinstance(command, str) else None,
-        args=_string_tuple(raw.get("args"), pointer + "/args", outcome),
+        args=args,
         env=_string_map(raw.get("env"), pointer + "/env", outcome),
         url=url,
         headers=_string_map(raw.get("headers"), pointer + "/headers", outcome),
         cwd=cwd if isinstance(cwd, str) else None,
         enabled=enabled and not force_disabled,
         raw=frozen_mapping(raw),
+        shielded=wrapped is not None,
     )
 
 

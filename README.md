@@ -84,7 +84,11 @@ guardia shield rules approve
 - asks for your confirmation in a small always-on-top window when a rule says `ask` (phase 2.3):
   the AI cannot answer for you, and no answer within 60 seconds means **block**.
 
-Full guide: [docs/SHIELD.md](docs/SHIELD.md). Still to come: automatic client setup (phase 2.4).
+- connects servers for you (phase 2.4): `guardia shield list`, `guardia shield enable --server NAME
+  --confirm`, `guardia shield disable`, or the **Shield** section of the app. A backup is saved
+  first, only that server's entry changes, and your own later edits are never overwritten.
+
+Full guide: [docs/SHIELD.md](docs/SHIELD.md).
 
 ### Install from source (recommended)
 
@@ -206,8 +210,11 @@ guardia scudo regole approva
   `chiedi` (fase 2.3): l'AI non può rispondere al posto tuo, e senza risposta entro 60 secondi
   **blocca**.
 
-Guida completa: [docs/SCUDO.md](docs/SCUDO.md). In arrivo: il collegamento automatico dei client
-(fase 2.4).
+- collega i server per te (fase 2.4): `guardia scudo elenco`, `guardia scudo attiva --server NOME
+  --conferma`, `guardia scudo disattiva`, oppure la sezione **Scudo** dell'app. Prima salva una
+  copia di sicurezza, cambia solo la voce di quel server e non sovrascrive mai le tue modifiche.
+
+Guida completa: [docs/SCUDO.md](docs/SCUDO.md).
 
 Vuoi capire MCP da zero? Leggi [docs/IMPARA-MCP.md](docs/IMPARA-MCP.md).
 

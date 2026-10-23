@@ -9,8 +9,11 @@ from typing import Any, TextIO
 
 from guardia.display import safe_text
 from guardia.i18n import Translator
+from guardia.model import Scope
 from guardia.safeio import SafeReadError
 from guardia.secure_store import Protector
+from guardia.shield.activation import ActivationStore, Candidate, Outcome, Support, manual_snippet
+from guardia.shield.activation import Report as ActivationReport
 from guardia.shield.engine import Context, Engine, redact
 from guardia.shield.pins import PinError, PinStore
 from guardia.shield.policy import (
@@ -23,6 +26,7 @@ from guardia.shield.policy import (
     rules_path,
 )
 from guardia.shield.rules import PHASE_NAMES, Action, Issue, Phase, RuleSet, parse_rules
+from guardia.shield.wrapping import launcher
 
 EXIT_OK = 0
 EXIT_INVALID = 1
@@ -324,3 +328,116 @@ def tools_forget(ws: Workspace, store: PinStore, server: str | None) -> int:
     key = "shield_rules.tools_forgotten" if forgotten else "shield_rules.tools_unknown"
     ws.write(ws.t(key, server=safe_text(server, 80)))
     return EXIT_OK if forgotten else EXIT_INVALID
+
+
+def _setup_line(ws: Workspace, candidate: Candidate) -> str:
+    server = candidate.server
+    return ws.t(
+        "shield_setup.line",
+        name=safe_text(server.name, 80),
+        client=ws.t(f"client.{server.source.client.value}"),
+        status=ws.t(f"shield_setup.support_{candidate.support.value}"),
+    )
+
+
+def shield_list(ws: Workspace, found: list[Candidate]) -> int:
+    servers = [c for c in found if c.server.source.scope is not Scope.SKILL]
+    if not servers:
+        ws.write(ws.t("shield_setup.no_servers"))
+        return EXIT_OK
+    for path in sorted({str(c.server.source.path) for c in servers}):
+        ws.write(ws.t("shield_setup.file", path=safe_text(path)))
+        for candidate in servers:
+            if str(candidate.server.source.path) == path:
+                ws.write(_setup_line(ws, candidate))
+    protected = sum(1 for c in servers if c.support is Support.PROTECTED)
+    ws.write(ws.t("shield_setup.summary", protected=protected, total=len(servers)))
+    return EXIT_OK
+
+
+def _selected(
+    found: list[Candidate], names: list[str], everything: bool
+) -> tuple[list[Candidate], list[str]]:
+    servers = [c for c in found if c.server.source.scope is not Scope.SKILL]
+    if everything:
+        return servers, []
+    chosen = [c for c in servers if c.server.name in names]
+    missing = sorted(set(names) - {c.server.name for c in chosen})
+    return chosen, missing
+
+
+def _report_changes(ws: Workspace, report: ActivationReport) -> int:
+    failures = 0
+    for change in report.changes:
+        key = f"shield_setup.outcome_{change.outcome.value}"
+        ws.write(ws.t(key, name=safe_text(change.server, 80), path=safe_text(str(change.file))))
+        failures += change.outcome is not Outcome.DONE
+    for backup in report.backups:
+        ws.write(ws.t("shield_setup.backup", path=safe_text(str(backup))))
+    return EXIT_OK if report.changes and not failures else EXIT_INVALID
+
+
+def shield_enable(
+    ws: Workspace,
+    found: list[Candidate],
+    selection: tuple[list[str], bool, bool],
+    store: ActivationStore,
+) -> int:
+    names, everything, confirmed = selection
+    if not names and not everything:
+        ws.write(ws.t("shield_setup.need_selection"))
+        return EXIT_USAGE
+    chosen, missing = _selected(found, names, everything)
+    for name in missing:
+        ws.write(ws.t("shield_setup.unknown", name=safe_text(name, 80)))
+    starter = launcher()
+    automatic = [c for c in chosen if c.support is Support.AUTO]
+    for candidate in chosen:
+        if candidate.support in (Support.MANUAL_COMMENTS, Support.MANUAL_TOML):
+            ws.write(_setup_line(ws, candidate))
+            ws.write(ws.t("shield_setup.manual_hint"))
+            ws.write(manual_snippet(candidate.server, starter))
+        elif candidate.support is not Support.AUTO:
+            ws.write(_setup_line(ws, candidate))
+    if not automatic:
+        ws.write(ws.t("shield_setup.nothing_to_do"))
+        return EXIT_INVALID
+    if not confirmed:
+        ws.write(ws.t("shield_setup.preview_title"))
+        for candidate in automatic:
+            ws.write(
+                ws.t(
+                    "shield_setup.preview_line",
+                    name=safe_text(candidate.server.name, 80),
+                    path=safe_text(str(candidate.server.source.path)),
+                )
+            )
+        ws.write(ws.t("shield_setup.preview_hint", flag="--conferma"))
+        return EXIT_OK
+    return _report_changes(ws, store.enable([c.server for c in automatic], starter))
+
+
+def shield_disable(
+    ws: Workspace, store: ActivationStore, selection: tuple[list[str], bool, bool]
+) -> int:
+    names, everything, confirmed = selection
+    if not names and not everything:
+        ws.write(ws.t("shield_setup.need_selection"))
+        return EXIT_USAGE
+    records = [r for r in store.records() if everything or r.get("server") in names]
+    if not records:
+        ws.write(ws.t("shield_setup.nothing_recorded"))
+        return EXIT_INVALID
+    if not confirmed:
+        ws.write(ws.t("shield_setup.preview_disable_title"))
+        for record in records:
+            ws.write(
+                ws.t(
+                    "shield_setup.preview_line",
+                    name=safe_text(str(record.get("server")), 80),
+                    path=safe_text(str(record.get("file"))),
+                )
+            )
+        ws.write(ws.t("shield_setup.preview_hint", flag="--conferma"))
+        return EXIT_OK
+    return _report_changes(ws, store.disable(None if everything else names))
