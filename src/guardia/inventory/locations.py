@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import os
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -42,6 +42,14 @@ class ConfigLocation:
         return ConfigSource(self.client, self.scope, self.path, self.project)
 
 
+def linked(path: Path) -> bool:
+    return path.is_symlink() or path.is_junction()
+
+
+def real_dirs(dirpath: str, names: Iterable[str]) -> list[str]:
+    return [name for name in names if not (Path(dirpath) / name).is_junction()]
+
+
 def child_dirs(path: Path, limit: int = MAX_DIR_ENTRIES) -> list[Path]:
     try:
         entries = sorted(path.iterdir())[:limit]
@@ -50,7 +58,7 @@ def child_dirs(path: Path, limit: int = MAX_DIR_ENTRIES) -> list[Path]:
     result = []
     for entry in entries:
         try:
-            if entry.is_dir() and not entry.is_symlink():
+            if entry.is_dir() and not linked(entry):
                 result.append(entry)
         except OSError:
             continue
@@ -67,7 +75,7 @@ def walk_limited(
             return
         current = Path(dirpath)
         depth = len(current.relative_to(base).parts)
-        dirnames[:] = sorted(d for d in dirnames if d not in PRUNED_DIRS)
+        dirnames[:] = sorted(d for d in real_dirs(dirpath, dirnames) if d not in PRUNED_DIRS)
         if depth >= max_depth:
             dirnames.clear()
         yield current, filenames

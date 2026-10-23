@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from guardia.inventory.environment import HostEnvironment
-from guardia.inventory.locations import PRUNED_DIRS, child_dirs
+from guardia.inventory.locations import PRUNED_DIRS, child_dirs, real_dirs
 from guardia.model import (
     Client,
     ConfigSource,
@@ -124,7 +124,9 @@ def _walk_skills(base: Path, depth: int = SKILL_WALK_DEPTH) -> Iterator[Path]:
         return
     for dirpath, dirnames, filenames in os.walk(base, followlinks=False):
         current = Path(dirpath)
-        dirnames[:] = sorted(d for d in dirnames if d not in PRUNED_DIRS and d != "marketplaces")
+        dirnames[:] = sorted(
+            d for d in real_dirs(dirpath, dirnames) if d not in PRUNED_DIRS and d != "marketplaces"
+        )
         if len(current.relative_to(base).parts) >= depth:
             dirnames.clear()
         if SKILL_FILE in filenames:

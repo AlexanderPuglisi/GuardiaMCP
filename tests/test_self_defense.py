@@ -8,8 +8,11 @@ from typing import Any
 import pytest
 
 from guardia.analysis import AnalysisOptions, analyze
+from guardia.extract.sources import code_files
 from guardia.inventory import HostEnvironment
+from guardia.inventory.locations import child_dirs, walk_limited
 from guardia.inventory.parsers import _resolve_inside
+from guardia.inventory.skills import _walk_skills
 from tests.conftest import WriteJson
 
 SOURCE = Path(__file__).parent.parent / "src" / "guardia"
@@ -118,3 +121,16 @@ def test_plugin_references_never_resolve_network_paths(tmp_path: Path) -> None:
     assert _resolve_inside(tmp_path, r"\\guardia-test.invalid\share\mcp.json") is None
     assert _resolve_inside(tmp_path, "//guardia-test.invalid/share/mcp.json") is None
     assert _resolve_inside(tmp_path, "a\x00b") is None
+
+
+def test_directory_walks_do_not_follow_junctions(tmp_path: Path) -> None:
+    winapi = pytest.importorskip("_winapi")
+    root = tmp_path / "root"
+    (root / "inner").mkdir(parents=True)
+    (root / "server.js").write_text("module.exports = {}\n", encoding="utf-8")
+    (root / "SKILL.md").write_text("---\nname: x\n---\n", encoding="utf-8")
+    winapi.CreateJunction(str(root), str(root / "inner" / "loop"))
+    assert [path.name for path in code_files(root)] == ["server.js"]
+    assert list(_walk_skills(root)) == [root / "SKILL.md"]
+    assert child_dirs(root / "inner") == []
+    assert [current for current, _ in walk_limited(root, 5)] == [root, root / "inner"]

@@ -13,7 +13,7 @@ from guardia.extract.js_source import analyze_javascript
 from guardia.extract.python_source import analyze_python
 from guardia.extract.skill_source import shell_script_signals, skill_definition, skill_signals
 from guardia.inventory.environment import HostEnvironment
-from guardia.inventory.locations import child_dirs
+from guardia.inventory.locations import child_dirs, real_dirs
 from guardia.inventory.skills import parse_skill
 from guardia.model import (
     CodeSignal,
@@ -159,7 +159,9 @@ def code_files(root: Path) -> Iterator[Path]:
         current = Path(dirpath)
         depth = len(current.relative_to(root).parts)
         dirnames[:] = sorted(
-            d for d in dirnames if d.lower() not in SKIPPED_DIRS and not d.startswith(".")
+            d
+            for d in real_dirs(dirpath, dirnames)
+            if d.lower() not in SKIPPED_DIRS and not d.startswith(".")
         )
         if depth >= MAX_DEPTH:
             dirnames.clear()
@@ -374,7 +376,9 @@ def skill_scripts(root: Path) -> Iterator[Path]:
     count = 0
     for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
         current = Path(dirpath)
-        dirnames[:] = sorted(d for d in dirnames if d.lower() not in SKIPPED_DIRS)
+        dirnames[:] = sorted(
+            d for d in real_dirs(dirpath, dirnames) if d.lower() not in SKIPPED_DIRS
+        )
         if len(current.relative_to(root).parts) >= SKILL_SCRIPT_DEPTH:
             dirnames.clear()
         for name in sorted(filenames):
