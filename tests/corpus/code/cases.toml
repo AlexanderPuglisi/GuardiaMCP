@@ -1,0 +1,146 @@
+[[case]]
+dir = "py_decode_exec"
+kind = "malicious"
+expected = ["G05-009"]
+severity = "critical"
+
+[[case]]
+dir = "js_decode_eval"
+kind = "malicious"
+expected = ["G05-009"]
+
+[[case]]
+dir = "py_ssh_exfil"
+kind = "malicious"
+expected = ["G07-005"]
+severity = "critical"
+
+[[case]]
+dir = "js_env_dump"
+kind = "malicious"
+expected = ["G06-008"]
+
+[[case]]
+dir = "py_env_dump"
+kind = "malicious"
+expected = ["G06-008"]
+
+[[case]]
+dir = "js_tunnel"
+kind = "malicious"
+expected = ["G09-011"]
+
+[[case]]
+dir = "py_raw_ip"
+kind = "malicious"
+expected = ["G09-012"]
+
+[[case]]
+dir = "js_secret"
+kind = "malicious"
+expected = ["G06-007"]
+
+[[case]]
+dir = "py_aws_key"
+kind = "malicious"
+expected = ["G06-007"]
+
+[[case]]
+dir = "py_shell_string"
+kind = "malicious"
+expected = ["G05-010"]
+
+[[case]]
+dir = "js_shell_template"
+kind = "malicious"
+expected = ["G05-010"]
+
+[[case]]
+dir = "py_dynamic_eval"
+kind = "malicious"
+expected = ["G05-011"]
+
+[[case]]
+dir = "js_agent_config"
+kind = "malicious"
+expected = ["G07-006"]
+
+[[case]]
+dir = "npm_install_script"
+kind = "malicious"
+expected = ["G10-006"]
+severity = "medium"
+
+[[case]]
+dir = "npm_install_download"
+kind = "malicious"
+expected = ["G10-006"]
+severity = "high"
+
+[[case]]
+dir = "npm_remote_dep"
+kind = "malicious"
+expected = ["G10-007"]
+
+[[case]]
+dir = "npm_lookalike"
+kind = "malicious"
+expected = ["G10-008"]
+
+[[case]]
+dir = "npm_unpinned"
+kind = "malicious"
+expected = ["G10-009"]
+
+[[case]]
+dir = "py_requirements_lookalike"
+kind = "malicious"
+expected = ["G10-008"]
+
+[[case]]
+dir = "py_requirements_remote"
+kind = "malicious"
+expected = ["G10-007"]
+
+[[case]]
+dir = "py_requirements_unpinned"
+kind = "malicious"
+expected = ["G10-009"]
+
+[[case]]
+dir = "setup_py_exec"
+kind = "malicious"
+expected = ["G10-010"]
+
+[[case]]
+dir = "no_lockfile"
+kind = "malicious"
+expected = ["G10-011"]
+origin = "path"
+
+[[case]]
+dir = "pyproject_remote"
+kind = "malicious"
+expected = ["G10-007"]
+
+[[case]]
+dir = "benign_py_server"
+kind = "benign"
+expected = []
+
+[[case]]
+dir = "benign_js_server"
+kind = "benign"
+expected = []
+origin = "path"
+
+[[case]]
+dir = "benign_bundle"
+kind = "benign"
+expected = []
+
+[[case]]
+dir = "benign_pyproject"
+kind = "benign"
+expected = []
+origin = "path"

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="CSP_POLICY">
+<meta name="referrer" content="no-referrer">
+<title>Guardia MCP</title>
+<style>/*STYLE*/</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <svg class="shield" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2.5 4.5 7v8.2c0 7.3 4.8 12.5 11.5 14.3 6.7-1.8 11.5-7 11.5-14.3V7z" fill="#1d1d23" stroke="#c4332b" stroke-width="1.6"/><path d="m11 16 3.6 3.6L21.5 12.7" fill="none" stroke="#ece9e6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="brand-name">Guardia <span>MCP</span></div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot"><span class="dot"></span><b id="offline"></b><br><span id="version"></span> · by Alexander Puglisi</div>
+  </aside>
+  <main class="main">
+    <header class="top">
+      <div><h1 id="title"></h1><div class="sub" id="subtitle"></div></div>
+      <div class="spacer"></div>
+      <span class="pill" id="baseline-pill"></span>
+      <div class="lang" role="group" aria-label="Lingua / Language">
+        <button type="button" data-lang="it">IT</button><button type="button" data-lang="en">EN</button>
+      </div>
+      <button type="button" class="btn primary" id="scan-button"></button>
+    </header>
+    <div class="content" id="content"></div>
+  </main>
+</div>
+<div class="busy" id="busy" hidden><div class="spinner"></div><p id="busy-text"></p></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<script>/*SCRIPT*/</script>
+</body>
+</html>

@@ -1,0 +1,179 @@
+[[case]]
+file = "invariant_add.py"
+kind = "malicious"
+expected = ["G01-002", "G01-003", "G02-004", "G07-004"]
+
+[[case]]
+file = "shadow_email.py"
+kind = "malicious"
+expected = ["G04-001", "G04-005"]
+
+[[case]]
+file = "ignore_previous.py"
+kind = "malicious"
+expected = ["G02-001"]
+
+[[case]]
+file = "fake_delimiters.py"
+kind = "malicious"
+expected = ["G02-002"]
+
+[[case]]
+file = "context_exfil.py"
+kind = "malicious"
+expected = ["G02-003"]
+
+[[case]]
+file = "secret_exfil.py"
+kind = "malicious"
+expected = ["G06-005"]
+
+[[case]]
+file = "url_exfil.py"
+kind = "malicious"
+expected = ["G09-010"]
+
+[[case]]
+file = "tag_smuggling.py"
+kind = "malicious"
+expected = ["G01-004"]
+
+[[case]]
+file = "base64_hidden.py"
+kind = "malicious"
+expected = ["G01-005"]
+
+[[case]]
+file = "padding.py"
+kind = "malicious"
+expected = ["G01-006"]
+
+[[case]]
+file = "exec_tool.py"
+kind = "malicious"
+expected = ["G05-008"]
+
+[[case]]
+file = "lying_annotations.py"
+kind = "malicious"
+expected = ["G08-006"]
+
+[[case]]
+file = "secret_param.py"
+kind = "malicious"
+expected = ["G06-006"]
+
+[[case]]
+file = "builtin_name.py"
+kind = "malicious"
+expected = ["G04-004", "G05-008"]
+
+[[case]]
+file = "zero_width.py"
+kind = "malicious"
+expected = ["G01-001"]
+
+[[case]]
+file = "constant_indirection.py"
+kind = "malicious"
+expected = ["G01-002", "G01-003", "G07-004"]
+
+[[case]]
+file = "lowlevel_tool.py"
+kind = "malicious"
+expected = ["G02-004", "G07-004"]
+
+[[case]]
+file = "instructions_injection.py"
+kind = "malicious"
+expected = ["G02-001"]
+
+[[case]]
+file = "italian_injection.py"
+kind = "malicious"
+expected = ["G01-003", "G02-001"]
+
+[[case]]
+file = "js_tool_call.ts"
+kind = "malicious"
+expected = ["G01-002", "G07-004"]
+
+[[case]]
+file = "js_register_tool.ts"
+kind = "malicious"
+expected = ["G02-003"]
+
+[[case]]
+file = "js_list_tools.js"
+kind = "malicious"
+expected = ["G04-001"]
+
+[[case]]
+file = "js_unicode_escape.js"
+kind = "malicious"
+expected = ["G01-001", "G02-001"]
+
+[[case]]
+file = "js_template.js"
+kind = "malicious"
+expected = ["G01-002", "G06-005"]
+
+[[case]]
+file = "snapshot_tools.json"
+kind = "malicious"
+expected = ["G02-002", "G04-005", "G07-004"]
+
+[[case]]
+file = "manifest_prompt.json"
+kind = "malicious"
+expected = ["G02-001"]
+
+[[case]]
+file = "benign_filesystem.py"
+kind = "benign"
+expected = []
+
+[[case]]
+file = "benign_weather.py"
+kind = "benign"
+expected = []
+
+[[case]]
+file = "benign_git.py"
+kind = "benign"
+expected = []
+
+[[case]]
+file = "benign_meshy_like.ts"
+kind = "benign"
+expected = []
+
+[[case]]
+file = "benign_email.js"
+kind = "benign"
+expected = []
+
+[[case]]
+file = "benign_docs.py"
+kind = "benign"
+expected = []
+
+[[case]]
+file = "benign_pdf.js"
+kind = "benign"
+expected = []
+
+[[case]]
+file = "benign_records.py"
+kind = "benign"
+expected = []
+
+[[case]]
+file = "benign_italiano.py"
+kind = "benign"
+expected = []
+
+[[case]]
+file = "benign_snapshot.json"
+kind = "benign"
+expected = []

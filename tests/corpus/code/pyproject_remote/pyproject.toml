@@ -1,0 +1,7 @@
+[project]
+name = "remote-lib-mcp"
+version = "1.0.0"
+dependencies = [
+    "mylib @ git+https://example.com/mylib.git",
+    "httpx>=0.27",
+]

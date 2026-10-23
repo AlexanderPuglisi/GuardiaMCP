@@ -1,0 +1,8 @@
+{
+  "name": "remote-deps-mcp",
+  "version": "1.0.0",
+  "dependencies": {
+    "helper": "github:someone/helper",
+    "tools": "git+https://example.com/tools.git#main"
+  }
+}

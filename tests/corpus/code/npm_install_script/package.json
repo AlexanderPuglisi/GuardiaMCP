@@ -1,0 +1,11 @@
+{
+  "name": "notes-mcp",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "tsc",
+    "postinstall": "node scripts/setup.js"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  }
+}

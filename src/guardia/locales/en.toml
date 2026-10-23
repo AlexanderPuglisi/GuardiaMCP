@@ -1,0 +1,808 @@
+[app]
+banner = "Guardia MCP {version} — by Alexander Puglisi"
+
+[cli]
+description = "Defensive shield for AI agents that use the Model Context Protocol (MCP). Works offline."
+lang = "message language (it or en)"
+command = "command"
+inventory = "find and list every MCP server configured on this PC"
+json = "print the result as JSON"
+output = "save the result to this file instead of printing it"
+project = "project folder to search for configurations (repeatable)"
+no_auto_projects = "do not automatically search known projects and the current folder"
+all_sources = "also show files that were searched but not found"
+scan = "analyze MCP servers and explain the problems found"
+fail_on = "exit with code 1 if problems of this level or worse are found (never to disable)"
+path = "also analyze this path: a folder or file with a server's code, or a JSON export of tools/list (repeatable)"
+no_tools = "do not analyze tools, descriptions and code (faster)"
+no_baseline = "do not use the baseline (no rug pull detection)"
+accept_changes = "accept the current state as the new baseline"
+missing_path = "Path not found: {path}"
+no_skills = "do not discover or analyze skills"
+format = "report format: text, json, html or sarif"
+no_ledger = "do not verify or update the tamper-evident ledger"
+ledger = "verify or show the tamper-evident ledger"
+ledger_action = "verify, show or anchor"
+last = "how many events to show (default 10)"
+anchor = "previously saved anchor (number:hash) to compare against"
+
+[client]
+claude-desktop = "Claude Desktop"
+claude-code = "Claude Code"
+cursor = "Cursor"
+vscode = "VS Code"
+windsurf = "Windsurf"
+gemini-cli = "Gemini CLI"
+codex = "Codex CLI"
+copilot-cli = "GitHub Copilot CLI"
+manual = "Manual analysis"
+
+[scope]
+user = "user"
+local = "local"
+project = "project"
+managed = "managed"
+plugin = "plugin"
+extension = "extension"
+path = "path"
+skill = "skill"
+
+[status]
+loaded = "read"
+missing = "not present"
+error = "error"
+
+[error]
+missing = "file not found"
+not_a_file = "not a regular file"
+too_large = "file too large, skipped for safety"
+permission = "read permission denied"
+io = "read error"
+decode = "text is not in a valid encoding (UTF-8 or UTF-16)"
+parse = "content is not in a valid format"
+too_deep = "structure nested too deeply, skipped for safety"
+
+[warning]
+duplicate_key = "duplicate key \"{detail}\": different programs may read different values"
+invalid_entry = "invalid entry at {detail}"
+invalid_args = "invalid arguments at {detail}"
+invalid_arg = "invalid argument at {detail}"
+invalid_map = "invalid key/value list at {detail}"
+invalid_map_value = "invalid value at {detail}"
+not_an_object = "unexpected structure at {detail}"
+too_deep = "entry nested too deeply at {detail}, skipped"
+missing_mcp_config = "manifest without server configuration ({detail})"
+invalid_reference = "invalid reference at {detail}"
+reference_outside_root = "plugin points to a file outside its folder: \"{detail}\" (skipped)"
+unknown = "{detail}"
+
+[inventory]
+title = "MCP server inventory"
+no_servers = "No MCP servers found."
+disabled = "disabled"
+project = "project: {path}"
+env_keys = "environment variables: {keys}"
+header_keys = "HTTP headers: {keys}"
+no_target = "(no command or address)"
+summary = "Total: {servers} servers ({enabled} enabled) in {files} files read."
+errors = "{count} files could not be read."
+legend = "Risk legend: {none} = no known problems, {unknown} = incomplete analysis."
+risk_note = "Risk covers configuration and tools. For details run: guardia scan"
+read_only = "Guardia started no server and changed no configuration file."
+saved = "Result saved to: {path}"
+
+[severity]
+critical = "CRITICAL"
+high = "HIGH"
+medium = "MEDIUM"
+low = "LOW"
+info = "INFO"
+
+[risk]
+none = "no known problems"
+incomplete = "incomplete analysis"
+
+[category]
+G01 = "Hidden instructions and invisible characters"
+G05 = "Dangerous system commands"
+G06 = "Exposed secrets"
+G07 = "Access to sensitive files"
+G08 = "Excessive permissions"
+G09 = "Suspicious network"
+G10 = "Dependencies and supply chain"
+G11 = "Network exposure"
+G12 = "Configuration hygiene"
+G14 = "Skills"
+G13 = "Tamper-evident ledger"
+G02 = "Prompt injection"
+G03 = "Hidden changes (rug pull)"
+G04 = "Cross-server interference (shadowing)"
+
+[origin]
+manifest = "manifest"
+source = "source code"
+npm-cache = "npm cache"
+uv-cache = "uv cache"
+snapshot = "JSON export"
+path = "given path"
+
+[gap]
+remote = "Tools not analyzed: this is a remote server, its tools can only be read by connecting. You can provide a JSON export with --path."
+binary = "Tools not analyzed: the server is a compiled program."
+not_found = "Tools not analyzed: the server code is not on this PC (maybe it never ran)."
+no_source = "No tools found in the given path."
+
+[gap_short]
+remote = "remote servers"
+binary = "compiled programs"
+not_found = "code not found"
+no_source = "paths without tools"
+
+[baseline]
+disabled = "Baseline disabled: hidden changes (rug pulls) are not detected."
+created = "Baseline created in {path}. From the next analysis Guardia will report every change."
+compared = "Compared against the baseline in {path}."
+accepted = "Current state accepted as the new baseline ({path})."
+damaged = "The baseline in {path} is damaged and was not changed."
+
+[scan]
+title = "MCP configuration analysis"
+scope_note = "This analysis checks configurations: commands, arguments, variables and addresses. Tool descriptions, code and dependencies come in the next steps."
+summary = "Summary: {servers} servers analyzed, {findings} problems found."
+where = "Where"
+line = "line {line}"
+found = "Found"
+why = "Why"
+fix = "How to fix"
+clean = "No problems found in {count} servers: {names}"
+not_safe = "\"No problems found\" does not mean \"safe\": it means these rules found nothing."
+incomplete = "WARNING: incomplete analysis, {count} checks failed. Results are not reliable."
+file_problems = "Problems in configuration files"
+no_servers = "No MCP servers to analyze."
+no_version = "none"
+scope_note_tools = "This analysis checks configurations, tools, descriptions, schemas, code and dependencies read from files, without running anything."
+tool_field = "tool \"{tool}\", field {field}"
+tool_only = "tool \"{tool}\""
+tools_found = "Tools analyzed: {count} (source: {origins})"
+tools_skipped = "Tools not analyzed (--no-tools option)."
+capabilities = "the code can: {names}"
+coverage = "Coverage: {tools} tools read from {servers} distinct servers."
+coverage_gaps = "Not analyzable without running them: {parts}. For remote servers you can provide a JSON export with --path."
+
+[rules.G01-001]
+title = "Invisible characters in the configuration"
+why = "The field \"{field}\" contains characters that are not visible on screen ({codes}). This is a known trick to make text look harmless while it says something else to the AI or to the program."
+fix = "Open the file with an editor that shows invisible characters and retype the value by hand. If you do not know where this configuration comes from, remove the server."
+
+[rules.G05-001]
+title = "Started through a shell with chained commands"
+why = "The server is started with {program} and a command that chains several operations (for example with &&, | or ;). Other commands you do not see may run besides the server."
+fix = "Start the server program directly (for example \"command\": \"npx\") without a shell, or reduce the command to a single clear operation."
+
+[rules.G05-002]
+title = "Encoded PowerShell command"
+why = "The server starts {program} with a base64-encoded command. Its content cannot be read at a glance: this is a typical malware trick to hide what runs."
+fix = "Do not use this server until you have decoded and understood the command. If you did not write it, remove it."
+
+[rules.G05-003]
+title = "Windows program often abused"
+why = "The server uses {program}, a legitimate Windows program often abused by attackers to download or run code covertly."
+fix = "A normal MCP server does not need {program}. Check where the configuration comes from and replace it with the server's official command."
+
+[rules.G05-004]
+title = "Downloads and runs code from the Internet"
+why = "The start command downloads something from the Internet and runs it immediately, without checks. Whoever controls that address can run anything on your PC every time the server starts."
+fix = "Remove this configuration. Install the server from an official source with an exact version."
+
+[rules.G05-005]
+title = "Destructive or system-changing command"
+why = "The start command contains a dangerous operation (\"{pattern}\"): it can delete data, change security settings or gain elevated privileges."
+fix = "Remove the operation from the start command. An MCP server must not change the system when it starts."
+
+[rules.G05-006]
+title = "Program started from a temporary or Downloads folder"
+why = "The server program lives in a temporary or Downloads folder, where unverified downloads usually end up."
+fix = "Install the server in a stable folder, or through a package manager, and update the path."
+
+[rules.G05-007]
+title = "Code hidden in the arguments"
+why = "The server starts {program} and passes code to execute directly in the arguments. This code is not in any file you can review and can do anything."
+fix = "Move the code into a file you can read and verify, or use the server's official package."
+
+[rules.G06-001]
+title = "Secret key written in plain text"
+why = "The variable \"{name}\" contains a secret value ({length} characters) written directly in the file. Any program that reads this file, including a malicious MCP server, can copy it."
+fix = "Replace the value with a reference to an environment variable (in Claude Code for example \"${{{name}}}\") or use the app's credential manager. Then rotate the key: consider it exposed."
+
+[rules.G06-002]
+title = "Secret in the command arguments"
+why = "A start argument contains what looks like a secret ({value}). Arguments are visible to every program on the PC, for example in Task Manager."
+fix = "Pass the secret through an environment variable, not as an argument. Then rotate the secret."
+
+[rules.G06-003]
+title = "Plain-text secret in HTTP headers"
+why = "The header \"{name}\" contains a secret ({length} characters) written in the configuration file."
+fix = "Use a variable reference (for example \"Bearer ${{TOKEN}}\") or the client's OAuth sign-in. Then rotate the secret."
+
+[rules.G06-004]
+title = "Credentials inside the address"
+why = "The address contains credentials or a key ({value}). Addresses often end up in server logs and history."
+fix = "Remove the key from the address and send it as a header or through OAuth. Then rotate it."
+
+[rules.G07-001]
+title = "Access to files with keys or credentials"
+why = "The server receives a path to very sensitive files ({path}): SSH keys, cloud credentials, browser data or wallets. If the server is compromised or tricked, it can read and send them out."
+fix = "Remove that path from the configuration. Give the server only the working folder it really needs."
+
+[rules.G07-002]
+title = "Access to AI agent configurations"
+why = "The server receives the path of an MCP configuration ({path}). These files hold keys and commands of other servers: they are the favourite target of tool poisoning attacks."
+fix = "An MCP server should not read other servers' configurations. Remove the path."
+
+[rules.G07-003]
+title = "Access to .env files"
+why = "The server receives a path to a .env file ({path}), which usually holds passwords and keys."
+fix = "Check that it is really needed. Otherwise remove the path or move the secrets to a credential manager."
+
+[rules.G08-001]
+title = "Access to the whole disk"
+why = "The server receives the disk root or the all-users folder as a path ({path}). It can read or change any accessible file."
+fix = "Limit the server to the project folders it has to work on."
+
+[rules.G08-002]
+title = "Access to your whole personal folder"
+why = "The server receives your whole personal folder ({path}), which includes documents, SSH keys and app configurations."
+fix = "Give only the folders it needs, for example a single project folder."
+
+[rules.G08-003]
+title = "Option that disables protections"
+why = "The server is started with the option \"{flag}\", which disables confirmations or protections."
+fix = "Remove the option unless you know exactly why it is needed and in which isolated environment it runs."
+
+[rules.G08-004]
+title = "Container with elevated privileges or host access"
+why = "The server container is started with an option ({option}) that gives it access to the host system. It practically cancels the container isolation."
+fix = "Remove the option and mount only the folders you need, read-only if possible (:ro)."
+
+[rules.G08-005]
+title = "Container on the host network"
+why = "The container uses the PC network directly, so it can reach local services that should stay private."
+fix = "Use the container's default network and publish only the ports you need."
+
+[rules.G09-001]
+title = "Remote server without encryption"
+why = "The connection to \"{host}\" uses http or ws without encryption. Anyone on the same network can read or change the messages, tokens and results included."
+fix = "Use the https:// (or wss://) address. If the server does not support it, do not use it on untrusted networks."
+
+[rules.G09-002]
+title = "Cloud metadata address"
+why = "The address points to {host}, used by cloud services to hand out internal credentials. It is a classic SSRF target."
+fix = "Remove the address. An MCP server has no reason to contact cloud metadata."
+
+[rules.G09-003]
+title = "Internal network address"
+why = "The address points to {host}, a private network. That is fine for your own service, but a malicious server can use it to explore your home or office network."
+fix = "Check that the address really is your service. Otherwise remove it."
+
+[rules.G09-004]
+title = "Raw IP address"
+why = "The address uses a numeric IP ({host}) instead of a domain name: it is harder to tell who it belongs to."
+fix = "Prefer the official address with a domain name and https."
+
+[rules.G09-005]
+title = "Local server over HTTP"
+why = "The server runs on your PC ({host}) over HTTP. Any program, or web page open on the PC, can try to contact it."
+fix = "Check that the server requires a token and accepts local connections only. Use the stdio transport if possible."
+
+[rules.G09-006]
+title = "Certificate verification disabled"
+why = "The setting \"{setting}\" disables HTTPS certificate checks: an attacker on the network can impersonate the server."
+fix = "Remove the setting. If you use a corporate certificate, install it in the system instead of disabling checks."
+
+[rules.G09-007]
+title = "Tunnel or data collection service"
+why = "The address uses {host}, a service often used for temporary tunnels or to collect data sent by others. It is typical of exfiltration."
+fix = "Use only official, stable addresses. If you do not know why this address is there, remove the server."
+
+[rules.G09-008]
+title = "Deceptively written address"
+why = "The name {host} uses international characters (punycode) or an unusual numeric form: it may imitate a well-known site or hide an internal address."
+fix = "Check the real address and replace it with the official one."
+
+[rules.G09-009]
+title = "Deprecated SSE transport"
+why = "The server uses the old HTTP+SSE transport, deprecated by the MCP specification."
+fix = "Switch to the Streamable HTTP transport if the server supports it."
+
+[rules.G10-001]
+title = "Package without a pinned version"
+why = "The package \"{package}\" is downloaded and run without an exact version (given: {version}). If the package is ever tampered with, the new version starts by itself on the next launch."
+fix = "Use an exact version you have checked (for example {package}@1.2.3) and update it when you decide."
+
+[rules.G10-002]
+title = "Code taken straight from a repository or address"
+why = "The server is installed from \"{package}\", a repository or direct address rather than a published version. Its content can change at any time."
+fix = "Use a published package with an exact version, or point to a precise commit."
+
+[rules.G10-003]
+title = "Name very similar to a well-known package"
+why = "The package \"{package}\" has a name almost identical to \"{known}\". This is typosquatting: publishing a package whose name is one letter off."
+fix = "Check the exact name on the server's official page. If it was a typo, fix it immediately."
+
+[rules.G10-004]
+title = "Unofficial package registry"
+why = "The package is downloaded from a registry other than the official one ({registry})."
+fix = "Make sure you trust that registry. Otherwise use the official one."
+
+[rules.G10-005]
+title = "Container image without a fixed version"
+why = "The image \"{image}\" has no fixed version (no tag, or latest): it may change on every start."
+fix = "Use an exact tag or, better, the digest (@sha256:...)."
+
+[rules.G11-001]
+title = "Server listening on the whole network"
+why = "The server accepts connections from the whole network (0.0.0.0), not only from your PC."
+fix = "Use 127.0.0.1 to limit access to your computer."
+
+[rules.G12-001]
+title = "Incomplete configuration"
+why = "The server \"{server}\" has no command or address. It cannot work like this: it may be a leftover or a placeholder."
+fix = "Complete the configuration or remove the entry."
+
+[rules.G12-002]
+title = "Unknown transport type"
+why = "The transport type \"{declared}\" is not one defined by MCP."
+fix = "Use stdio, http or sse."
+
+[rules.G12-003]
+title = "Same name, different definitions"
+why = "The name \"{server}\" is configured in several places with {variants} different definitions. It can be unclear which version you are really using."
+fix = "Align the configurations or give different servers different names."
+
+[rules.G12-004]
+title = "Duplicate key in the file"
+why = "The file contains the key \"{key}\" twice. Different programs may read different values: it is a way to hide a value from whoever reviews the file."
+fix = "Keep a single definition and remove the duplicate."
+
+[rules.G12-005]
+title = "Plugin pointing outside its folder"
+why = "The plugin tries to load a file outside its own folder (\"{reference}\"). Guardia ignored it."
+fix = "Review the plugin: a legitimate plugin only uses files inside it."
+
+[rules.G12-006]
+title = "Configuration file could not be analyzed"
+why = "The file was not read ({reason}), so the servers it contains were not checked."
+fix = "Fix the file format or permissions and run the analysis again."
+
+[rules.G01-002]
+title = "Hidden instructions for the AI"
+why = "The tool \"{tool}\" contains markers such as <IMPORTANT> or HTML comments that you usually do not see, but the AI reads as instructions. This is the classic form of tool poisoning."
+fix = "Do not use the server until you have read the flagged text in full. If the instruction is not justified, remove the server and tell its author."
+
+[rules.G01-003]
+title = "Asks the AI to act covertly"
+why = "The text of \"{tool}\" asks not to inform the user or to do something silently. An honest tool has no reason to hide its actions."
+fix = "Remove the server: this is a typical sign of malicious tools."
+
+[rules.G01-004]
+title = "Invisible text hidden with Unicode tag characters"
+why = "The field \"{field}\" of \"{tool}\" contains invisible characters that decode to: \"{decoded}\". The AI can read them, you cannot."
+fix = "Remove the server immediately: this technique only exists to hide instructions."
+
+[rules.G01-005]
+title = "Hidden encoded text"
+why = "The field \"{field}\" of \"{tool}\" contains an encoded block (base64 or hex) that decodes to readable text: \"{decoded}\". Text hidden this way may carry instructions for the AI."
+fix = "Check the decoded content. If there is no obvious technical reason for it, remove the server."
+
+[rules.G01-006]
+title = "Text pushed off screen"
+why = "The field \"{field}\" of \"{tool}\" contains a huge amount of spaces or blank lines, or is extremely long ({length} characters). This is a trick to hide instructions beyond the visible part."
+fix = "Read the full text (for example in the JSON report) and check what is at the end."
+
+[rules.G02-001]
+title = "Attempt to override the AI's instructions"
+why = "The text of \"{tool}\" contains a typical prompt injection phrase, such as \"ignore previous instructions\". It is meant to change how the AI behaves."
+fix = "Remove the server or have the author fix the text."
+
+[rules.G02-002]
+title = "Fake conversation delimiters"
+why = "The text of \"{tool}\" imitates the internal separators of a conversation with the AI (for example \"System:\" or result tags). It is meant to make the AI believe the text comes from you or the system."
+fix = "Remove the server: legitimate text does not need to imitate these delimiters."
+
+[rules.G02-003]
+title = "Asks to hand over the conversation"
+why = "The text of \"{tool}\" asks the AI to include the conversation, previous messages or system instructions. That way your data ends up at the server."
+fix = "Remove the server, or ask the author why they need it."
+
+[rules.G02-004]
+title = "Orders preliminary actions"
+why = "The text of \"{tool}\" tells the AI to read, run or call something before using the tool. Sometimes this is legitimate, but it is also how attacks get unrequested actions done."
+fix = "Read the text: if the requested action has nothing to do with the tool, do not use it."
+
+[rules.G03-001]
+title = "Tool changed since the last analysis"
+why = "The description or parameters of \"{tool}\" changed compared to the last approved analysis. This is the sign of a possible rug pull: an approved server that changes covertly."
+fix = "Check what changed. If the change is legitimate (for example an update), accept it with: guardia scan --accept-changes"
+
+[rules.G03-002]
+title = "New tool"
+why = "The server added the tool \"{tool}\" since the last analysis."
+fix = "Check that the new tool is expected. It has already been added to the baseline."
+
+[rules.G03-003]
+title = "Server configuration changed"
+why = "The command, arguments or variables of \"{server}\" changed compared to the last approved analysis."
+fix = "If you made the change, accept it with: guardia scan --accept-changes. Otherwise find out who changed the file."
+
+[rules.G03-004]
+title = "Tool disappeared"
+why = "The tool \"{tool}\" is no longer present compared to the last analysis."
+fix = "This is usually a normal update. Accept it with: guardia scan --accept-changes"
+
+[rules.G03-005]
+title = "Damaged baseline"
+why = "The baseline file ({path}) is unreadable or was changed outside Guardia. While this lasts, rug pulls cannot be detected."
+fix = "If you do not know why it changed, check your PC. To recreate it: guardia scan --accept-changes"
+
+[rules.G03-006]
+title = "New server"
+why = "The server \"{server}\" was not there in the last analysis."
+fix = "Check that you added it yourself. It has already been added to the baseline."
+
+[rules.G04-001]
+title = "Instructions about other tools (shadowing)"
+why = "The text of \"{tool}\" gives instructions on how to use other tools or servers. That way a malicious server can manipulate trusted servers without touching them."
+fix = "Remove the server: a tool should only describe itself."
+
+[rules.G04-002]
+title = "Mentions a tool of another server"
+why = "The text of \"{tool}\" mentions \"{mentioned}\", a tool of another server ({other}). This may be a sign of shadowing."
+fix = "Check why it mentions it. If it gives instructions about that tool, do not use the server."
+
+[rules.G04-003]
+title = "Same name as a tool of another server"
+why = "The tool \"{tool}\" has the same name as a tool of {other}. The AI might call the wrong one."
+fix = "Disable one of the two servers if you do not need both."
+
+[rules.G04-004]
+title = "Imitates a built-in client tool"
+why = "The tool is called \"{tool}\", like a built-in Claude Code tool. It can confuse the AI or whoever approves calls."
+fix = "Review the server: a legitimate tool uses its own name."
+
+[rules.G04-005]
+title = "Changes message recipients"
+why = "The text of \"{tool}\" asks to change or add recipients (email, phone, blind copy). This is how messages get diverted to an attacker."
+fix = "Remove the server."
+
+[rules.G05-008]
+title = "Tool that can run commands or code"
+why = "The tool \"{tool}\" can run commands or code on your PC. That is not a problem in itself, but it is the most powerful tool the AI has: if the AI is tricked, this is where the damage happens."
+fix = "Keep manual confirmation on for this tool and do not approve calls you do not understand."
+
+[rules.G06-005]
+title = "Asks the AI to send secrets"
+why = "The text of \"{tool}\" asks to send keys, tokens, passwords or cookies."
+fix = "Remove the server and rotate any secret it may have received."
+
+[rules.G06-006]
+title = "Asks for a secret as a parameter"
+why = "The tool \"{tool}\" has a \"{parameter}\" parameter: the AI will have to handle a secret and may show it or pass it elsewhere."
+fix = "Prefer servers that read secrets from environment variables or through OAuth."
+
+[rules.G07-004]
+title = "Asks to read or send sensitive files"
+why = "The text of \"{tool}\" asks the AI to read or send very sensitive files (SSH keys, .env, MCP configurations, wallets). This is the core of tool poisoning attacks."
+fix = "Remove the server immediately and check whether you already used it. If you did, rotate the keys involved."
+
+[rules.G08-006]
+title = "Misleading annotations"
+why = "The tool \"{tool}\" declares itself harmless ({hint}), but its name suggests it changes or deletes something. Some clients trust these annotations and skip confirmation."
+fix = "Do not trust the annotation: keep manual confirmation for this tool."
+
+[rules.G09-010]
+title = "Asks to send data to a web address"
+why = "The text of \"{tool}\" asks the AI to send data to a web address or a webhook."
+fix = "Remove the server, unless sending is the clear, declared purpose of the tool."
+
+[rules.G12-007]
+title = "Part of the server code was not analyzed"
+why = "{count} files of the server \"{server}\" were not analyzed: too large, unreadable or written so they cannot be parsed. A crafted file can be used to hide tools."
+fix = "Check the files listed in the JSON report. If the server comes from an official source, this is usually harmless."
+
+[capability]
+process = "start programs"
+network = "use the network"
+file_read = "read files"
+
+[rules.G05-009]
+title = "Runs hidden code decoded on the fly"
+why = "The code of \"{server}\" decodes a text (for example from base64) and runs it immediately ({found}). This is the typical signature of malware in packages: the real code stays invisible to whoever reads it."
+fix = "Do not use the server. If it is a public package, report it to the registry (npm or PyPI) and to the author."
+
+[rules.G05-010]
+title = "Shell command built from variable text"
+why = "The code of \"{server}\" runs shell commands built by joining variable text ({found}; {count} places). If that text comes from the AI or from a file, someone could add commands (command injection)."
+fix = "This is a hint for the server's developers: pass arguments as a list, without a shell. For you: keep manual confirmation on calls to this server."
+
+[rules.G05-011]
+title = "Dynamic code execution"
+why = "The code of \"{server}\" runs code built at runtime ({found}; {count} places). Some libraries do this, but it makes it impossible to know in advance what will run."
+fix = "In well-known libraries this is usually harmless. If the server is little known, check the location shown."
+
+[rules.G06-007]
+title = "Secret written in the code"
+why = "The code of \"{server}\" contains what looks like a secret ({found}). Anyone who has the package can read and use it."
+fix = "If the server is yours, move the secret to an environment variable and rotate it. If it is not yours, tell the author."
+
+[rules.G06-008]
+title = "The code packs all environment variables"
+why = "The code of \"{server}\" turns all environment variables into text ({found}). They usually hold keys and tokens: this is a typical step before sending them elsewhere."
+fix = "Check where that text goes. If it is sent over the network, do not use the server."
+
+[rules.G07-005]
+title = "The code uses paths of credential files"
+why = "The code of \"{server}\" contains the path of very sensitive files ({found}). If the same file also uses the network the level is CRITICAL, because it could read and send them."
+fix = "Check why the server needs it. A normal MCP server does not read SSH keys, cloud credentials or browser data."
+
+[rules.G07-006]
+title = "The code reads or changes AI agent configurations"
+why = "The code of \"{server}\" uses AI agent configuration files ({detail}) in {count} places ({files}). These are often scripts that add the server to the configuration, but the same access allows reading other servers' keys."
+fix = "Check that this is an install or uninstall script. If the server touches these configurations while working, do not use it."
+
+[rules.G09-011]
+title = "The code contacts a tunnel or data collection service"
+why = "The code of \"{server}\" contains the address of a service often used for temporary tunnels or to collect data ({detail})."
+fix = "A trustworthy server uses its own stable addresses. If you do not know why it is there, do not use the server."
+
+[rules.G09-012]
+title = "The code contacts a raw IP address"
+why = "The code of \"{server}\" contains a hard-coded public IP address ({found}): it is harder to tell who it belongs to."
+fix = "Check who owns the address."
+
+[rules.G10-006]
+title = "Scripts that run automatically at install time"
+why = "The server \"{server}\" and its dependencies contain {count} scripts that run by themselves during installation, for example: {found}. They run before you use the server, with your permissions. The level rises to HIGH if a script downloads or runs code from the Internet."
+fix = "Review the scripts shown. To install without running them: npm install --ignore-scripts (some packages may not work)."
+
+[rules.G10-007]
+title = "Dependency taken from a repository or address"
+why = "The server \"{server}\" depends on code taken straight from a repository or address ({found}) rather than a published version. Its content can change without notice."
+fix = "Ask the author to use published versions or to pin a precise commit."
+
+[rules.G10-008]
+title = "Dependency name almost identical to a famous package"
+why = "The server \"{server}\" uses the package \"{found}\", one letter away from \"{detail}\". This is typosquatting."
+fix = "Check that it really is the intended package. If it is a typo, malicious code may have been installed."
+
+[rules.G10-009]
+title = "Dependency without a version"
+why = "The server \"{server}\" declares dependencies with no version at all ({found}; {count} in total): every installation may bring different code."
+fix = "Use exact versions or a lockfile (package-lock.json, uv.lock)."
+
+[rules.G10-010]
+title = "setup.py runs code at install time"
+why = "The setup.py file of \"{server}\" uses: {detail}. This code runs while the package is installed, before you can check it."
+fix = "Review setup.py. A modern package should not start programs or use the network during installation."
+
+[rules.G10-011]
+title = "No lockfile"
+why = "The project in {found} has no lockfile (for example package-lock.json or uv.lock): dependency versions may change on every installation."
+fix = "Create and keep a lockfile: npm install creates package-lock.json, uv lock creates uv.lock."
+
+[skills]
+title = "Installed skills: {count}"
+flagged = "Skills with findings:"
+clean = "No known problems ({count}): {names}"
+none = "No skills found."
+field = "skill \"{tool}\", {field}"
+
+[rules.G14-001]
+title = "The skill contains executable scripts"
+why = "The skill \"{server}\" contains {count} scripts ({files}) that the AI can run on your PC when it uses the skill."
+fix = "Read the scripts before using the skill, especially if it comes from a source you do not know."
+
+[rules.G14-002]
+title = "The skill grants itself powerful tools without confirmation"
+why = "The header of the skill \"{server}\" allows {detail} without asking for confirmation each time (allowed-tools field). If the skill instructions are manipulated, commands run without your approval."
+fix = "Remove or narrow allowed-tools (for example Bash(git status:*)) unless you fully trust the skill."
+
+[rules.G14-003]
+title = "The skill downloads and runs code from the Internet"
+why = "The skill \"{server}\" contains a command that downloads a script from the Internet and runs it immediately ({found}). Whoever controls that address can run anything on your PC. In the skill instructions this is MEDIUM, because the AI asks for confirmation; in an attached script it is HIGH."
+fix = "Install the program from the official site after checking its origin, instead of running a script downloaded on the fly."
+
+[ledger]
+ok = "Ledger intact: {records} events, chain and signatures verified. Current anchor: {anchor}"
+tampered = "WARNING: the ledger {path} has been tampered with."
+unverified = "The ledger {path} cannot be fully verified ({records} events)."
+empty = "The ledger is empty: no scan recorded yet."
+issue = "  line {line}: {problem}"
+show_line = "{seq}. {time} · {event} · {details}"
+anchor_hint = "Keep this anchor outside this PC (for example in a message to yourself). With: guardia ledger verify --anchor <anchor> you can detect even a complete rewrite of the ledger."
+
+[ledger_problem]
+malformed = "unreadable or incomplete line"
+sequence = "broken numbering: an event is missing or was added"
+chain = "broken chain: the line does not follow the previous one"
+hash = "hash mismatch: the content was changed"
+mac = "invalid signature: the line was not written by Guardia with your key"
+head_mismatch = "the last event does not match the recorded one: lines deleted or added"
+head_missing = "the last-event check file is missing"
+key_missing = "the signing key is missing: signatures cannot be verified"
+key_unreadable = "the signing key cannot be read by this Windows user"
+anchor_mismatch = "the given anchor does not match the ledger"
+
+[html]
+title = "Security report"
+generated = "Generated on {time}"
+flagged = "Servers and skills with findings"
+clean_title = "No problems found ({count})"
+coverage_title = "Coverage and checks"
+
+[rules.G13-001]
+title = "Ledger tampered with"
+why = "The tamper-evident ledger ({path}) fails verification: {problems}. Someone or something changed, deleted or added lines outside Guardia."
+fix = "Do not delete it: it is evidence of what happened. Check your PC, then run: guardia ledger verify"
+
+[rules.G13-002]
+title = "Ledger cannot be verified"
+why = "The ledger ({path}) cannot be fully verified: {problems}."
+fix = "This is normal if you switched Windows user or restored the PC. Otherwise check who changed Guardia's folder."
+
+[ui]
+nav_overview = "Overview"
+nav_inventory = "Servers and skills"
+nav_findings = "Findings"
+nav_ledger = "Ledger"
+nav_reports = "Reports"
+nav_settings = "Settings"
+offline = "Offline · no data leaves this PC"
+scan_now = "Scan now"
+scanning = "Scanning… Guardia reads files, it runs nothing."
+scan_done = "Scan complete: {total} findings."
+last_scan = "Last scan {time} · {seconds} s"
+never = "No scan yet"
+baseline_active = "Baseline active"
+baseline_off = "Baseline off"
+need_scan = "Run a scan to see the results."
+priority_title = "Look at these first"
+priority_empty = "No medium or severe findings. Good."
+protection_title = "Protection status"
+baseline_title = "Baseline"
+ledger_title = "Tamper-evident ledger"
+coverage_title = "Analysis coverage"
+verify_now = "Verify now"
+copy_anchor = "Copy anchor"
+copy = "Copy"
+copy_path = "Copy path"
+copied = "Copied to clipboard."
+incomplete = "Incomplete analysis: {count} unreadable files. The result is not fully reliable."
+search_entries = "Search by name, client or path"
+search_findings = "Search by finding, rule or server"
+filter_all = "All"
+filter_servers = "Servers"
+filter_skills = "Skills"
+filter_problems = "Only with findings"
+filter_severe = "Severe"
+filter_medium = "Medium"
+filter_minor = "Minor"
+col_risk = "Risk"
+col_name = "Name"
+col_client = "Client"
+col_type = "Type"
+col_level = "Level"
+col_problem = "Finding"
+col_where = "Where"
+col_rule = "Rule"
+no_results = "No results."
+no_findings = "No findings for this entry."
+select_entry = "Select an entry to see its details."
+line = "line {line}"
+type_server = "Server"
+type_skill = "Skill"
+type_manual = "Path"
+accept_changes = "Accept changes"
+accept_confirm = "Do you confirm these changes are intended? The baseline will be updated and the choice will be written to the ledger."
+accepted = "Changes accepted and recorded in the ledger."
+rug_pull_note = "Some tools changed since last time. If you updated them yourself, accept the changes."
+loading = "Loading…"
+ledger_empty = "The ledger is empty."
+ledger_ok = "Ledger intact: {records} events verified."
+ledger_tampered = "The ledger was modified: the chain does not match."
+ledger_unverified = "The ledger cannot be fully verified."
+anchor_ok = "The anchor matches: no event was rewritten before that point."
+anchor_title = "Current anchor"
+anchor_hint = "Keep the anchor off this PC (photo, note, email to yourself). Later you can check that the ledger was not rewritten."
+anchor_placeholder = "Paste a saved anchor (number:hash)"
+verify_anchor = "Verify anchor"
+events_title = "Latest events"
+event_scan = "Scan"
+event_export = "Report exported"
+event_other = "Event"
+event_accepted = "changes accepted"
+export_html_title = "HTML report"
+export_html_text = "A page to open in the browser or share. No scripts, works offline."
+export_json_title = "JSON data"
+export_json_text = "All results in a format other programs can read."
+export_sarif_title = "SARIF"
+export_sarif_text = "Standard format for GitHub Code Scanning and code editors."
+export_button = "Export…"
+export_note = "Every export is recorded in the ledger with the file's SHA-256 fingerprint."
+exported = "Saved to {path} · fingerprint {hash}"
+settings_language = "Language"
+settings_language_text = "Language of the interface and reports."
+settings_skills = "Analyze skills"
+settings_skills_text = "Also check SKILL.md files and attached scripts."
+settings_tools = "Analyze tools"
+settings_tools_text = "Reads descriptions, schemas and code of installed servers, without running them."
+settings_baseline = "Baseline"
+settings_baseline_text = "Remembers tools to detect sudden changes (rug pull)."
+settings_projects = "Project folders"
+settings_projects_text = "Folders with project MCP configurations (.mcp.json, .vscode, .cursor)."
+settings_data = "Guardia data folder"
+add_folder = "Add folder…"
+remove = "Remove"
+settings_note = "Guardia uses no account, sends no data and never connects to the internet."
+settings_rescan = "Changes apply from the next scan."
+error = "Error: {message}"
+error_busy = "A scan is already running."
+error_confirmation = "An explicit confirmation is required."
+error_invalid = "Invalid value."
+error_anchor = "Invalid anchor: the format is number:hash (64 hex characters)."
+error_need_scan = "Run a scan first."
+error_too_many = "You reached the maximum number of folders."
+
+[guide]
+title = "Guardia MCP rules guide"
+intro = "This guide lists all {count} rules Guardia uses to check MCP servers and skills. For each one you find why it is a risk and how to fix it. The guide is generated by the program itself with `guardia rules --markdown`, so it always matches the code. In the texts, «…» marks a value that a real report replaces with the name of the server, file or field that was found."
+levels_title = "Severity levels"
+level = "Level"
+meaning = "What it means"
+level_critical = "Almost certainly an attack or a serious flaw. Act now: disable the server or skill until you understand it."
+level_high = "A serious, concrete risk. Fix it before you keep using the server."
+level_medium = "A weakness an attacker can exploit together with something else. Fix it when you can."
+level_low = "A bad habit or a small risk. Fix it at your own pace."
+level_info = "Not a problem: useful information, for example what a server can do or that something changed."
+read_title = "How to read a finding"
+read_text = "Every finding shows a code (for example G05-002), a level, the exact place (file, line and field), what was found, why it is a risk and how to fix it. Secrets are never shown in full: you see [REDACTED] or only their length."
+code_title = "How codes work"
+code_text = "A code has two parts: G05 is the family (for example \"dangerous system commands\"), 002 is the rule inside the family. Codes are never reused for a different meaning, so you can search, quote and filter them in tools that read SARIF."
+what_title = "What to do when you find a problem"
+what_text = """
+1. Read the rule's \"Why\" and \"How to fix\".
+2. If you do not recognize the server or skill, disable it before investigating: it is the safest choice.
+3. If the finding is a change (family G03) and you made the update yourself, accept it with `guardia scan --accept-changes` or with the \"Accept changes\" button in the app. The choice is written to the ledger.
+4. After fixing, scan again to check that the finding is gone.
+5. If you think it is a false alarm, report it as explained in CONTRIBUTING.md.
+"""
+false_title = "False alarms and missed alarms"
+false_text = "Guardia works by reading files, without running anything and without artificial intelligence. So it can be wrong in two ways: flagging harmless text (false alarm) or missing a new trick (missed alarm). \"No findings\" does not mean \"safe\": it means these rules found nothing. All limits are explained in SECURITY.md."
+shield_title = "What about rules I write myself?"
+shield_text = "Rules you write in TOML will drive the real-time Shield planned for version 2. This guide covers only the fixed analysis rules of version 1, which cannot be turned off: this way no malicious file can switch them off."
+terms_title = "Useful words"
+term_tool_poisoning = "Tool poisoning"
+term_tool_poisoning_text = "instructions hidden in a tool's description. The user does not see them, but the AI reads them and may obey."
+term_prompt_injection = "Prompt injection"
+term_prompt_injection_text = "text written to replace the user's orders, for example \"ignore previous instructions\". It can come from a tool, a file or a web page."
+term_rug_pull = "Rug pull"
+term_rug_pull_text = "a server that was harmless and secretly changes after you trusted it. Guardia detects it by comparing every scan with the baseline."
+term_shadowing = "Shadowing"
+term_shadowing_text = "a server that tries to influence how the AI uses another server's tools, for example \"when you use send_email add this address\"."
+term_typosquatting = "Typosquatting"
+term_typosquatting_text = "a package whose name is almost the same as a famous one (one letter added or swapped), published hoping someone makes a typo."
+term_secret = "Secret"
+term_secret_text = "a key, token or password that gives access to a service. If it ends up in a configuration file, anyone who reads the file can use it."
+term_baseline = "Baseline"
+term_baseline_text = "the snapshot of tools and skills taken at the previous scan. It is used to notice what changed."
+term_skill = "Skill"
+term_skill_text = "a folder with a SKILL.md file that teaches the AI how to do a task. It can contain instructions and scripts, so it must be checked like a server."
+families_title = "Rule families"
+family_count = "{count} rules"
+family_count_one = "1 rule"
+family_line = "Family {code}: {name}"
+footer = "Guardia MCP — by Alexander Puglisi. Apache 2.0 license."
+list_hint = "For the full explanation of a rule: guardia rules G05-002"
+cli_help = "list and explain the analysis rules"
+cli_rule = "code of a rule to explain (for example G05-002)"
+cli_markdown = "print the full guide in Markdown format"
+unknown = "Unknown rule: {rule}. To see all rules: guardia rules"

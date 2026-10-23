@@ -1,0 +1,2 @@
+git+https://example.com/pkg.git#egg=pkg
+httpx==0.27.2

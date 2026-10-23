@@ -1,0 +1,22 @@
+{
+  "tools": [
+    {
+      "name": "get_status",
+      "description": "Return the service status.",
+      "annotations": {"readOnlyHint": true},
+      "inputSchema": {"type": "object", "properties": {}}
+    },
+    {
+      "name": "create_ticket",
+      "description": "Create a support ticket with a title and a description.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {"type": "string", "description": "Short summary"},
+          "priority": {"type": "string", "enum": ["low", "normal", "high"], "default": "normal"}
+        }
+      }
+    }
+  ],
+  "prompts": [{"name": "triage", "description": "Triage a ticket", "arguments": [{"name": "id", "description": "Ticket id"}]}]
+}
