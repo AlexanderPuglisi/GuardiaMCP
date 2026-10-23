@@ -19,6 +19,11 @@ classifiers = [
     "Topic :: Security",
 ]
 
+[project.urls]
+Homepage = "https://alexanderpuglisiskilly.com"
+Repository = "https://github.com/AlexanderPuglisi/guardia-mcp"
+Issues = "https://github.com/AlexanderPuglisi/guardia-mcp/issues"
+
 [project.scripts]
 guardia = "guardia.cli:main"
 

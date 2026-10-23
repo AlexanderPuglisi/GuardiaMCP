@@ -1,6 +1,6 @@
 # Guardia MCP
 
-**by Alexander Puglisi**
+**by Alexander Puglisi** · [alexanderpuglisiskilly.com](https://alexanderpuglisiskilly.com) · [Download](https://github.com/AlexanderPuglisi/guardia-mcp/releases/latest)
 
 > 🇬🇧 English below · 🇮🇹 Italiano più sotto
 
@@ -94,7 +94,7 @@ Full guide: [docs/SHIELD.md](docs/SHIELD.md).
 
 ### Getting started (no programming needed)
 
-1. **Download** `GuardiaMCP-0.2.0-windows-x64.zip` from the project's **Releases** page on GitHub
+1. **Download** `GuardiaMCP-0.2.0-windows-x64.zip` from the project's [**Releases**](https://github.com/AlexanderPuglisi/guardia-mcp/releases/latest) page on GitHub
    and check it: in PowerShell, `Get-FileHash .\GuardiaMCP-0.2.0-windows-x64.zip` must print the
    same value written in `SHA256SUMS.txt` on the same page.
 2. **Extract** it to a folder that will not move, for example `C:\Users\YOUR-NAME` (the zip
@@ -132,7 +132,8 @@ Everything is also available from the command line (`guardia.exe`), described be
 Requires [uv](https://docs.astral.sh/uv/).
 
 ```powershell
-cd C:\Progetti\GuardiaMCP
+git clone https://github.com/AlexanderPuglisi/guardia-mcp.git
+cd guardia-mcp
 uv sync --extra app
 uv run guardia inventory
 uv run guardia scan
@@ -149,7 +150,7 @@ uv run guardia-app
 `SHA256SUMS.txt` file with their fingerprints. Python is not needed to run them.
 
 ```powershell
-cd C:\Progetti\GuardiaMCP
+cd guardia-mcp
 uv run --group build --extra app python scripts\build_exe.py
 .\dist\GuardiaMCP\guardia.exe scan
 .\dist\GuardiaMCP\GuardiaMCP.exe
@@ -287,7 +288,7 @@ Vuoi capire MCP da zero? Leggi [docs/IMPARA-MCP.md](docs/IMPARA-MCP.md).
 
 ### Primi passi (non serve saper programmare)
 
-1. **Scarica** `GuardiaMCP-0.2.0-windows-x64.zip` dalla pagina **Releases** del progetto su GitHub
+1. **Scarica** `GuardiaMCP-0.2.0-windows-x64.zip` dalla pagina [**Releases**](https://github.com/AlexanderPuglisi/guardia-mcp/releases/latest) del progetto su GitHub
    e controllalo: in PowerShell, `Get-FileHash .\GuardiaMCP-0.2.0-windows-x64.zip` deve stampare
    lo stesso valore scritto in `SHA256SUMS.txt` nella stessa pagina.
 2. **Estrailo** in una cartella che non sposterai, per esempio `C:\Users\TUO-NOME` (lo zip
@@ -327,7 +328,8 @@ Tutto si può fare anche da riga di comando (`guardia.exe`), come spiegato sotto
 Serve [uv](https://docs.astral.sh/uv/).
 
 ```powershell
-cd C:\Progetti\GuardiaMCP
+git clone https://github.com/AlexanderPuglisi/guardia-mcp.git
+cd guardia-mcp
 uv sync --extra app
 uv run guardia inventario
 uv run guardia scansiona
@@ -344,7 +346,7 @@ programmi — `guardia.exe` (riga di comando) e `GuardiaMCP.exe` (app desktop) �
 zip e il file `SHA256SUMS.txt` con le loro impronte. Per usarli non serve Python.
 
 ```powershell
-cd C:\Progetti\GuardiaMCP
+cd guardia-mcp
 uv run --group build --extra app python scripts\build_exe.py
 .\dist\GuardiaMCP\guardia.exe scansiona
 .\dist\GuardiaMCP\GuardiaMCP.exe

@@ -29,7 +29,8 @@ There is no contributor agreement to sign.
 You need Windows, macOS or Linux with [uv](https://docs.astral.sh/uv/) installed.
 
 ```powershell
-cd C:\Progetti\GuardiaMCP
+git clone https://github.com/AlexanderPuglisi/guardia-mcp.git
+cd guardia-mcp
 uv sync --extra app
 uv run pytest
 uv run ruff format src tests scripts packaging
@@ -133,7 +134,8 @@ Non c'è nessun accordo da firmare.
 Serve Windows, macOS o Linux con [uv](https://docs.astral.sh/uv/) installato.
 
 ```powershell
-cd C:\Progetti\GuardiaMCP
+git clone https://github.com/AlexanderPuglisi/guardia-mcp.git
+cd guardia-mcp
 uv sync --extra app
 uv run pytest
 uv run ruff format src tests scripts packaging
