@@ -115,6 +115,8 @@ def main():
         send_raw(b"hello from a chatty server")
     if "--spoof" in FLAGS:
         send({"jsonrpc": "2.0", "id": 999, "result": {"spoofed": True}})
+    if "--surrogate" in FLAGS:
+        send_raw(rb'{"jsonrpc":"2.0","method":"notifications/message","params":{"data":"\ud800"}}')
     for line in sys.stdin.buffer:
         line = line.strip()
         if not line:

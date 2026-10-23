@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 import json
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -13,6 +14,7 @@ MAX_ID_LENGTH = 256
 PARSE_ERROR = -32700
 INVALID_REQUEST = -32600
 SHIELD_BLOCKED = -32010
+SURROGATE_ESCAPE = re.compile(rb"\\u[dD][89a-fA-F]")
 
 RequestId = str | int
 
@@ -140,6 +142,15 @@ def _response(payload: dict[str, Any], request_id: RequestId | None) -> Message:
     return Message(MessageKind.RESPONSE, payload, request_id)
 
 
+def _encodable(message: Message) -> Message:
+    try:
+        message.encode()
+    except UnicodeEncodeError as exc:
+        request = message.kind is MessageKind.REQUEST
+        raise MessageError(Problem.NOT_UTF8, message.id, request=request) from exc
+    return message
+
+
 def parse_message(data: bytes) -> Message:
     payload = _decode(data)
     raw_id = payload.get("id")
@@ -148,9 +159,10 @@ def parse_message(data: bytes) -> Message:
     request_id: RequestId | None = raw_id
     if payload.get("jsonrpc") != "2.0":
         raise MessageError(Problem.BAD_VERSION, request_id, request="method" in payload)
-    if "method" in payload:
-        return _request(payload, request_id)
-    return _response(payload, request_id)
+    message = (
+        _request(payload, request_id) if "method" in payload else _response(payload, request_id)
+    )
+    return _encodable(message) if SURROGATE_ESCAPE.search(data) else message
 
 
 def error_response(request_id: RequestId | None, code: int, text: str) -> Message:

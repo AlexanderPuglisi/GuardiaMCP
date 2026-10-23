@@ -330,6 +330,17 @@ def test_invalid_client_messages() -> None:
     assert any("not_json" in line for line in shield.reports)
 
 
+def test_lone_surrogates_are_rejected_instead_of_crashing_the_shield() -> None:
+    shield = LiveShield("--surrogate")
+    shield.send(rb'{"jsonrpc":"2.0","method":"notifications/x","params":{"a":"\udc00"}}')
+    answer = shield.ask(rb'{"jsonrpc":"2.0","id":3,"method":"ping","params":{"a":"\ud800"}}')
+    assert answer["id"] == 3
+    assert answer["error"]["code"] == -32600
+    assert shield.ask(request(4, "ping"))["id"] == 4
+    shield.close()
+    assert sum("not_utf8" in line for line in shield.reports) == 3
+
+
 def test_server_request_and_client_response() -> None:
     shield = LiveShield("--server-request")
     shield.send(request(1, "initialize", {"protocolVersion": "2025-11-25"}))
