@@ -15,7 +15,7 @@ DIST = PROJECT / "dist"
 WORK = PROJECT / "build"
 FOLDER = DIST / "GuardiaMCP"
 ARCHIVE = DIST / f"GuardiaMCP-{__version__}-windows-x64.zip"
-EXTRA_FILES = ("LICENSE", "NOTICE", "README.md", "SECURITY.md")
+EXTRA_FILES = ("LICENSE", "NOTICE", "README.md", "SECURITY.md", "AUDIT.md")
 GUIDES = ("SCUDO.md", "SHIELD.md", "REGOLE.md", "RULES.md", "IMPARA-MCP.md")
 
 

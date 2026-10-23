@@ -22,6 +22,8 @@ no guaranteed response time and no bug bounty. Only the latest release is suppor
 
 ### What Guardia guarantees by design
 
+Reviewing the code? [AUDIT.md](AUDIT.md) lists where to look and which test checks each promise.
+
 Each guarantee below is enforced by an automated test, not only by a promise.
 
 | Guarantee | How it is enforced |
@@ -138,6 +140,8 @@ repository del progetto. Indica:
 senza tempi di risposta garantiti e senza ricompense. È supportata solo l'ultima versione.
 
 ### Cosa garantisce Guardia per come è costruito
+
+Stai controllando il codice? [AUDIT.md](AUDIT.md) dice dove guardare e quale test controlla ogni promessa.
 
 Ogni garanzia è verificata da un test automatico, non solo promessa.
 

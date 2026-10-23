@@ -12,6 +12,23 @@ Guardia MCP is a free, open source, fully offline defensive shield for AI agents
 (Claude Code, Claude Desktop, Cursor, VS Code and others) that use tools through the
 Model Context Protocol (MCP). No account, no telemetry, no data ever leaves your computer.
 
+### Already using Claude, Cursor or VS Code with MCP servers?
+
+Every server you install can read files, use your keys and give instructions to the AI. Guardia
+answers three questions in a minute:
+
+- **Did I leave keys or passwords in plain text?** No need to open folder after folder: Guardia
+  checks the MCP configurations, the skills and the code of the installed servers, and gives you the
+  exact file and line, with how to fix it.
+- **Is a server trying to trick the AI?** Hidden instructions in tool descriptions, invisible text,
+  prompt injection.
+- **Did something change behind my back?** A tool that was harmless yesterday and is not today.
+
+And if you want, the **Shield** checks everything while the AI works: it blocks, hides secrets or
+asks you first.
+
+**Free, open source and offline.** No account, no data ever leaves your PC.
+
 ![Guardia MCP demo: command line scan, then the desktop app with overview, servers, findings and ledger](docs/demo-en.gif)
 
 <sub>The demo runs on a fake PC made of fake servers and skills written for the purpose
@@ -200,6 +217,23 @@ License: [Apache 2.0](LICENSE).
 Guardia MCP è uno scudo difensivo gratuito, open source e completamente offline per gli agenti AI
 (Claude Code, Claude Desktop, Cursor, VS Code e altri) che usano strumenti tramite il
 Model Context Protocol (MCP). Nessun account, nessuna telemetria, nessun dato esce dal tuo computer.
+
+### Usi già Claude, Cursor o VS Code con i server MCP?
+
+Ogni server che installi può leggere file, usare le tue chiavi e dare istruzioni all'AI. Guardia
+risponde in un minuto a tre domande:
+
+- **Ho lasciato chiavi o password in chiaro?** Senza aprire cartella per cartella: Guardia controlla
+  le configurazioni MCP, le skill e il codice dei server installati, e ti dà file e riga esatti, con
+  il modo per sistemarli.
+- **Qualche server sta provando a ingannare l'AI?** Istruzioni nascoste nelle descrizioni degli
+  strumenti, testo invisibile, prompt injection.
+- **È cambiato qualcosa di nascosto?** Uno strumento innocuo ieri che oggi non lo è più.
+
+E se vuoi, lo **Scudo** controlla tutto mentre l'AI lavora: blocca, nasconde i segreti o ti chiede
+conferma.
+
+**Gratis, open source e offline.** Nessun account, nessun dato esce dal tuo PC.
 
 ![Demo di Guardia MCP: scansione da riga di comando, poi l'app desktop con panoramica, server, problemi e registro](docs/demo-it.gif)
 
