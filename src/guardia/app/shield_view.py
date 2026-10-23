@@ -63,7 +63,7 @@ def _rules(env: HostEnvironment, t: Translator, protector: Protector | None) -> 
     return base | {"state": "none", "text": t("shield.state_none")}
 
 
-def _server(candidate: Candidate, t: Translator, recorded: set[str]) -> dict[str, Any]:
+def _server(candidate: Candidate, t: Translator, recorded: set[tuple[str, str]]) -> dict[str, Any]:
     server = candidate.server
     snippet = manual_snippet(server, launcher()) if candidate.support in MANUAL else ""
     return {
@@ -74,7 +74,8 @@ def _server(candidate: Candidate, t: Translator, recorded: set[str]) -> dict[str
         "support": candidate.support.value,
         "status": t(f"shield_setup.support_{candidate.support.value}"),
         "can_enable": candidate.support is Support.AUTO,
-        "can_disable": candidate.support is Support.PROTECTED and server.name in recorded,
+        "can_disable": candidate.support is Support.PROTECTED
+        and (server.name, str(server.source.path)) in recorded,
         "snippet": safe_text(snippet, 4000),
     }
 
@@ -140,7 +141,9 @@ def shield_state(
     found: list[Candidate] | None = None,
 ) -> dict[str, Any]:
     servers = found if found is not None else server_candidates(env)
-    recorded = {str(r.get("server")) for r in ActivationStore(env.data_dir).records()}
+    recorded = {
+        (str(r.get("server")), str(r.get("file"))) for r in ActivationStore(env.data_dir).records()
+    }
     listed = [_server(c, t, recorded) for c in servers]
     return {
         "rules": _rules(env, t, protector),

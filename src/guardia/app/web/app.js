@@ -499,7 +499,7 @@
       } else if (server.can_disable) {
         action.append(el("button", {
           cls: "btn", text: t("shield_unprotect"), attrs: { type: "button" },
-          on: { click: () => shieldAction("shield_disable", [server.name], t("shield_confirm_disable", { name: server.name })) },
+          on: { click: () => shieldAction("shield_disable", [server.key], t("shield_confirm_disable", { name: server.name })) },
         }));
       } else if (server.snippet) {
         action.append(el("button", {

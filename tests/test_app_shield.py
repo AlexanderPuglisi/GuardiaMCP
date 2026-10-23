@@ -71,11 +71,31 @@ def test_protect_and_unprotect_from_the_app(configured: HostEnvironment) -> None
     assert state["events"][0]["label"] == "Server collegato allo Scudo"
     with pytest.raises(GuardiaUiError):
         api.shield_disable("other", True)
-    state = api.shield_disable("github", True)
+    state = api.shield_disable(key, True)
     assert state["ok"] is True
     servers = config(configured)["mcpServers"]
     assert isinstance(servers, dict)
     assert servers["github"]["command"] == "npx"
+
+
+def test_unprotect_touches_only_the_chosen_client(
+    configured: HostEnvironment, write_json: WriteJson
+) -> None:
+    cursor = configured.home / ".cursor" / "mcp.json"
+    write_json(cursor, {"mcpServers": {"github": {"command": "npx", "args": ["-y", "gh"]}}})
+    api = make_api(configured)
+    keys = [s["key"] for s in api.shield()["servers"] if s["name"] == "github"]
+    assert len(keys) == 2
+    for key in keys:
+        assert api.shield_enable(key, True)["ok"] is True
+    desktop = next(s for s in api.shield()["servers"] if "claude_desktop" in s["path"])
+    assert desktop["can_disable"] is True
+    assert api.shield_disable(desktop["key"], True)["ok"] is True
+    servers = config(configured)["mcpServers"]
+    assert isinstance(servers, dict)
+    assert servers["github"]["command"] == "npx"
+    other = json.loads(cursor.read_text(encoding="utf-8"))["mcpServers"]["github"]
+    assert other["command"] == sys.executable
 
 
 def test_approve_tools_and_rules_from_the_app(configured: HostEnvironment) -> None:

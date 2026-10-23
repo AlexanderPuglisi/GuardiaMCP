@@ -240,12 +240,17 @@ class ActivationStore:
                 {"file": str(path), "servers": sorted(s.name for s, _, _ in pending)},
             )
 
-    def disable(self, names: Iterable[str] | None = None) -> Report:
+    def disable(self, names: Iterable[str] | None = None, *, file: Path | None = None) -> Report:
         wanted = set(names) if names is not None else None
         report = Report()
         with exclusive(self.directory / LOCK_FILE):
             records = self._records()
-            chosen = [r for r in records if wanted is None or r.get("server") in wanted]
+            chosen = [
+                r
+                for r in records
+                if (wanted is None or r.get("server") in wanted)
+                and (file is None or r.get("file") == str(file))
+            ]
             if wanted:
                 known = {r.get("server") for r in records}
                 report.changes += [
@@ -254,8 +259,8 @@ class ActivationStore:
             grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
             for record in chosen:
                 grouped[str(record.get("file", ""))].append(record)
-            for file, group in grouped.items():
-                done = self._disable_file(Path(file), group, report)
+            for target, group in grouped.items():
+                done = self._disable_file(Path(target), group, report)
                 records = [r for r in records if r not in done]
             self._save(records)
         return report

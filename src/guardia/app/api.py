@@ -356,14 +356,21 @@ class GuardiaApi:
         lines = outcome_lines(report.changes, self._t())
         return self._shield_result("\n".join(lines), succeeded(report.changes))
 
-    def shield_disable(self, name: object, confirmed: object) -> dict[str, Any]:
+    def shield_disable(self, key: object, confirmed: object) -> dict[str, Any]:
         if confirmed is not True:
             raise self._fail("confirmation")
-        store = ActivationStore(self._env.data_dir, self._ledger())
-        recorded = {str(r.get("server")) for r in store.records()}
-        if not isinstance(name, str) or name not in recorded:
+        if not isinstance(key, str):
             raise self._fail("invalid")
-        report = store.disable([name])
+        store = ActivationStore(self._env.data_dir, self._ledger())
+        recorded = {(str(r.get("server")), str(r.get("file"))) for r in store.records()}
+        chosen = [
+            c.server
+            for c in server_candidates(self._env)
+            if c.server.key == key and (c.server.name, str(c.server.source.path)) in recorded
+        ]
+        if not chosen:
+            raise self._fail("invalid")
+        report = store.disable([chosen[0].name], file=chosen[0].source.path)
         lines = outcome_lines(report.changes, self._t())
         return self._shield_result("\n".join(lines), succeeded(report.changes))
 
