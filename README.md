@@ -41,7 +41,9 @@ Model Context Protocol (MCP). No account, no telemetry, no data ever leaves your
   The full guide is in [docs/RULES.md](docs/RULES.md) (generated from the code, always up to date).
 - **Desktop app** — a borderless window with the sections centered at the top: overview, servers
   and skills, findings, Shield, ledger, reports and settings, each explained in one line, in Italian and English. It uses the same engine as the CLI, shows only text (never HTML from
-  analyzed files), has no network access and a strict CSP.
+  analyzed files), has no network access and a strict CSP. Every settings change is written to the
+  signed ledger and listed in *Settings → History of changes*, with the value before and after and a
+  **Restore** button.
 
 The scan never runs the code it analyzes and never changes configuration files. Only the Shield
 changes a client's configuration, and only when you confirm it (with a backup first). Guardia
@@ -232,7 +234,9 @@ Model Context Protocol (MCP). Nessun account, nessuna telemetria, nessun dato es
   sempre aggiornata).
 - **App desktop** — una finestra senza bordi con le sezioni al centro in alto: panoramica, server e
   skill, problemi, Scudo, registro, rapporti e impostazioni, ognuna spiegata in una riga, in italiano e inglese. Usa lo stesso motore della CLI, mostra solo testo (mai HTML preso dai file
-  analizzati), non ha accesso alla rete e ha una CSP rigida.
+  analizzati), non ha accesso alla rete e ha una CSP rigida. Ogni modifica alle impostazioni viene
+  scritta nel registro firmato ed elencata in *Impostazioni → Cronologia delle modifiche*, con il valore
+  prima e dopo e un pulsante **Ripristina**.
 
 La scansione non esegue mai il codice che analizza e non modifica i file di configurazione. Solo lo
 Scudo modifica la configurazione di un client, e solo quando lo confermi (dopo averne salvato una

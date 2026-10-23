@@ -16,6 +16,7 @@ MIN_SIZE = (900, 600)
 BACKGROUND = "#08080a"
 DWM_CORNER_PREFERENCE = 33
 DWM_ROUND = 2
+DWM_SQUARE = 1
 HARDENED_SETTINGS: dict[str, Any] = {
     "ALLOW_DOWNLOADS": False,
     "OPEN_DEVTOOLS_IN_DEBUG": False,
@@ -31,9 +32,16 @@ def icon_path() -> str:
     return str(resources.files("guardia.app").joinpath("guardia.ico"))
 
 
+def _winforms() -> Any:
+    from webview.platforms import winforms
+
+    return winforms
+
+
 class NativeWindow:
     def __init__(self, fix_point: Any) -> None:
         self._fix_point = fix_point
+        self._restore_bounds: Any = None
         self.window: Any = None
 
     def minimize(self) -> None:
@@ -42,9 +50,34 @@ class NativeWindow:
     def close(self) -> None:
         self.window.destroy()
 
-    def place(self, x: int, y: int, width: int, height: int) -> None:
-        self.window.move(x, y)
-        self.window.resize(width, height)
+    def maximize(self) -> None:
+        if sys.platform != "win32":
+            self.window.maximize()
+            return
+        forms = _winforms()
+        form: Any = self.window.native
+
+        def fill() -> None:
+            self._restore_bounds = form.Bounds
+            form.Bounds = forms.WinForms.Screen.FromHandle(form.Handle).WorkingArea
+
+        form.Invoke(forms.Func[forms.Type](fill))
+        self._corners(DWM_SQUARE)
+
+    def restore(self) -> None:
+        if sys.platform != "win32":
+            self.window.restore()
+            return
+        forms = _winforms()
+        form: Any = self.window.native
+        saved = self._restore_bounds
+
+        def back() -> None:
+            if saved is not None:
+                form.Bounds = saved
+
+        form.Invoke(forms.Func[forms.Type](back))
+        self._corners(DWM_ROUND)
 
     def resize(self, width: int, height: int, edge: str) -> None:
         vertical = self._fix_point.SOUTH if "n" in edge else self._fix_point.NORTH
@@ -52,13 +85,16 @@ class NativeWindow:
         self.window.resize(width, height, vertical | horizontal)
 
     def round_corners(self) -> None:
+        self._corners(DWM_ROUND)
+
+    def _corners(self, preference: int) -> None:
         if sys.platform != "win32":
             return
         with contextlib.suppress(Exception):
             from webview.platforms import winforms
 
             set_attribute: Any = winforms.DwmSetWindowAttribute
-            set_attribute(self.window.native.Handle.ToInt32(), DWM_CORNER_PREFERENCE, DWM_ROUND)
+            set_attribute(self.window.native.Handle.ToInt32(), DWM_CORNER_PREFERENCE, preference)
 
 
 def main() -> int:

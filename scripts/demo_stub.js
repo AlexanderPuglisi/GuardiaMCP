@@ -55,7 +55,9 @@
       shield_rules_text: async () => ({ exists: true, text: DEMO.rules_text }),
       window_minimize: async () => null,
       window_close: async () => null,
-      window_place: async () => null,
+      window_maximize: async () => null,
+      window_restore: async () => null,
+      settings_history: async () => ({ items: [] }),
       window_resize: async () => null,
     },
   };

@@ -179,7 +179,10 @@ def test_api_exposes_only_intended_methods(env: HostEnvironment) -> None:
         "remove_project",
         "window_minimize",
         "window_close",
-        "window_place",
+        "window_maximize",
+        "window_restore",
+        "settings_history",
+        "restore_setting",
         "window_resize",
         "shield",
         "shield_enable",
@@ -382,8 +385,11 @@ class FakeWindow:
     def close(self) -> None:
         self.calls.append(("close",))
 
-    def place(self, x: int, y: int, width: int, height: int) -> None:
-        self.calls.append(("place", x, y, width, height))
+    def maximize(self) -> None:
+        self.calls.append(("maximize",))
+
+    def restore(self) -> None:
+        self.calls.append(("restore",))
 
     def resize(self, width: int, height: int, edge: str) -> None:
         self.calls.append(("resize", width, height, edge))
@@ -393,38 +399,17 @@ def test_window_controls_are_forwarded(env: HostEnvironment) -> None:
     window = FakeWindow()
     api = GuardiaApi(env, SettingsStore(env.data_dir), window=window)
     api.window_minimize()
-    api.window_place(-1920, 0, 1920.4, 1040)
+    api.window_maximize()
+    api.window_restore()
     api.window_resize(1000, 700, "nw")
     api.window_close()
     assert window.calls == [
         ("minimize",),
-        ("place", -1920, 0, 1920, 1040),
+        ("maximize",),
+        ("restore",),
         ("resize", 1000, 700, "nw"),
         ("close",),
     ]
-
-
-@pytest.mark.parametrize(
-    "geometry",
-    [
-        (0, 0, 10, 600),
-        (0, 0, 900, 99_999),
-        ("0", 0, 900, 600),
-        (True, 0, 900, 600),
-        (float("nan"), 0, 900, 600),
-        (float("inf"), 0, 900, 600),
-        (10**9, 0, 900, 600),
-        (None, 0, 900, 600),
-    ],
-)
-def test_window_place_rejects_invalid_geometry(
-    env: HostEnvironment, geometry: tuple[object, ...]
-) -> None:
-    window = FakeWindow()
-    api = GuardiaApi(env, SettingsStore(env.data_dir), window=window)
-    with pytest.raises(GuardiaUiError):
-        api.window_place(*geometry)
-    assert window.calls == []
 
 
 @pytest.mark.parametrize("edge", ["", "x", "north", "nn", None, 3, "NE"])
@@ -440,7 +425,8 @@ def test_window_controls_without_a_window_do_nothing(env: HostEnvironment) -> No
     api = make_api(env)
     api.window_minimize()
     api.window_close()
-    api.window_place(0, 0, 900, 600)
+    api.window_maximize()
+    api.window_restore()
     api.window_resize(900, 600, "se")
 
 
@@ -477,13 +463,6 @@ def test_native_resize_keeps_the_opposite_corner(edge: str, fixed: int) -> None:
     native.window = RecordingNative()
     native.resize(1000, 700, edge)
     assert native.window.calls == [("resize", 1000, 700, fixed)]
-
-
-def test_native_place_moves_then_resizes() -> None:
-    native = NativeWindow(FakePoint)
-    native.window = RecordingNative()
-    native.place(10, 20, 1200, 800)
-    assert native.window.calls == [("move", 10, 20), ("resize", 1200, 800, 3)]
 
 
 def test_window_is_frameless_but_hardened() -> None:

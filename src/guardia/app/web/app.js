@@ -15,10 +15,10 @@
   const state = {
     ui: {}, settings: {}, report: null, view: "overview", version: "", dataDir: "",
     entryId: null, entryType: "all", problemsOnly: false, entrySearch: "",
-    findingLevel: "all", findingSearch: "", ledger: null, shield: null, rulesEditor: null,
+    findingLevel: "all", findingSearch: "", ledger: null, shield: null, rulesEditor: null, settingsHistory: null,
   };
   const MIN_SIZE = [900, 600];
-  const windowState = { maximized: false, saved: null, resizing: null, target: null, pending: false };
+  const windowState = { maximized: false, resizing: null, target: null, pending: false };
 
   function t(key, values) {
     let text = state.ui[key] || key;
@@ -141,6 +141,7 @@
     state.view = view;
     if (view === "ledger") loadLedger();
     if (view === "shield") loadShield();
+    if (view === "settings") loadSettingsHistory();
     render();
   }
 
@@ -648,8 +649,49 @@
     const value = Boolean(state.settings[name]);
     return el("button", {
       cls: "switch", attrs: { type: "button", role: "switch", "aria-checked": String(value), "aria-label": t("settings_" + name) },
-      on: { click: async () => { try { apply(await call("set_option", name, !value)); render(); } catch { } } },
+      on: { click: () => changeSetting("set_option", name, !value) },
     });
+  }
+
+  async function loadSettingsHistory() {
+    try {
+      state.settingsHistory = (await call("settings_history")).items;
+    } catch {
+      state.settingsHistory = [];
+    }
+    if (state.view === "settings") render();
+  }
+
+  async function changeSetting(method, ...args) {
+    try {
+      apply(await call(method, ...args));
+      toast(t("settings_saved"));
+    } catch {
+      return;
+    }
+    render();
+    loadSettingsHistory();
+  }
+
+  async function restoreSetting(item) {
+    if (!window.confirm(t("history_confirm_restore", { setting: item.setting, change: item.change }))) return;
+    await changeSetting("restore_setting", item.seq, true);
+  }
+
+  function settingsHistory() {
+    const list = el("div", { cls: "list" });
+    const items = state.settingsHistory;
+    if (!items) list.append(el("div", { cls: "empty", text: t("loading") }));
+    else if (!items.length) list.append(el("div", { cls: "empty", text: t("settings_history_empty") }));
+    for (const item of items || []) {
+      list.append(el("div", { cls: "event history" },
+        el("span", { cls: "muted", text: localTime(item.time) }),
+        el("div", {}, el("b", { text: item.setting }), " · " + item.change),
+        item.can_restore
+          ? el("button", { cls: "btn", text: t("history_restore"), attrs: { type: "button" }, on: { click: () => restoreSetting(item) } })
+          : el("span", { cls: "muted", text: t("history_current") })));
+    }
+    return list;
   }
 
   function settingsView() {
@@ -657,7 +699,7 @@
     const language = el("select", { attrs: { "aria-label": t("settings_language") } },
       el("option", { text: "Italiano", attrs: { value: "it" } }), el("option", { text: "English", attrs: { value: "en" } }));
     language.value = state.settings.language;
-    language.addEventListener("change", () => setLanguage(language.value));
+    language.addEventListener("change", () => changeSetting("set_language", language.value));
     const card = el("div", { cls: "card card-plain" },
       settingRow(t("settings_language"), t("settings_language_text"), language),
       settingRow(t("settings_skills"), t("settings_skills_text"), toggle("skills")),
@@ -666,15 +708,20 @@
       settingRow(t("settings_glow"), t("settings_glow_text"), toggle("glow")),
       settingRow(t("settings_projects"), t("settings_projects_text"),
         el("button", { cls: "btn", text: t("add_folder"), attrs: { type: "button" },
-          on: { click: async () => { try { apply(await call("add_project")); render(); } catch { } } } })));
+          on: { click: () => changeSetting("add_project") } })));
     for (const project of state.settings.projects) {
       card.append(el("div", { cls: "project" }, el("span", { cls: "mono", text: project }),
         el("button", { cls: "btn", text: t("remove"), attrs: { type: "button" },
-          on: { click: async () => { try { apply(await call("remove_project", project)); render(); } catch { } } } })));
+          on: { click: () => changeSetting("remove_project", project) } })));
     }
     card.append(settingRow(t("settings_data"), state.dataDir,
       el("button", { cls: "btn", text: t("copy_path"), attrs: { type: "button" }, on: { click: () => copy(state.dataDir) } })));
-    root.append(card, el("div", { cls: "note-box", text: t("settings_note") }), el("div", { cls: "note-box", text: t("settings_rescan") }));
+    root.append(card,
+      el("div", { cls: "note-box", text: t("settings_rescan") }),
+      el("div", { cls: "note-box", text: t("settings_note") }),
+      el("h2", { text: t("settings_history_title") }),
+      el("p", { cls: "muted", text: t("settings_history_hint") }),
+      settingsHistory());
     return root;
   }
 
@@ -722,6 +769,7 @@
     try {
       apply(await call("set_language", language));
       render();
+      if (state.view === "settings") loadSettingsHistory();
     } catch { }
   }
 
@@ -734,14 +782,9 @@
 
   async function toggleMaximize() {
     try {
-      if (windowState.maximized) {
-        await call("window_place", ...windowState.saved);
-        setMaximized(false);
-        return;
-      }
-      windowState.saved = [window.screenX, window.screenY, window.outerWidth, window.outerHeight];
-      await call("window_place", screen.availLeft || 0, screen.availTop || 0, screen.availWidth, screen.availHeight);
-      setMaximized(true);
+      const maximized = windowState.maximized;
+      await call(maximized ? "window_restore" : "window_maximize");
+      setMaximized(!maximized);
     } catch {
       return;
     }

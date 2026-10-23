@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import math
 import re
@@ -30,7 +31,7 @@ from guardia.app.shield_view import (
 )
 from guardia.app.viewmodel import report_view, ui_strings
 from guardia.display import safe_text
-from guardia.i18n import Translator
+from guardia.i18n import SUPPORTED_LANGUAGES, Translator
 from guardia.inventory import DiscoveryOptions, HostEnvironment
 from guardia.ledger import Ledger, write_atomic
 from guardia.model import Severity, sha256_hex
@@ -39,7 +40,7 @@ from guardia.render.sarif import build_sarif
 from guardia.render.terminal import severity_label
 from guardia.safeio import SafeReadError
 from guardia.scanner import ScanReport
-from guardia.secure_store import Protector
+from guardia.secure_store import KeyStoreError, Protector
 from guardia.shield.activation import ActivationStore, Support
 from guardia.shield.commands import example_text, format_issue
 from guardia.shield.pins import PinError, PinStore
@@ -58,8 +59,10 @@ ANCHOR = re.compile(r"^\d{1,9}:[0-9a-f]{64}$")
 EXPORT_FORMATS = {"html": ".html", "json": ".json", "sarif": ".sarif"}
 MAX_LEDGER_EVENTS = 500
 MAX_NAME = 200
+MAX_HISTORY = 30
+SETTINGS_EVENT = "settings_changed"
+LANGUAGE_NAMES = {"it": "Italiano", "en": "English"}
 WINDOW_EDGES = frozenset({"n", "s", "e", "w", "ne", "nw", "se", "sw"})
-MAX_COORDINATE = 100_000
 MIN_WINDOW_SIZE = 200
 MAX_WINDOW_SIZE = 20_000
 
@@ -76,7 +79,9 @@ class WindowControls(Protocol):
 
     def close(self) -> None: ...
 
-    def place(self, x: int, y: int, width: int, height: int) -> None: ...
+    def maximize(self) -> None: ...
+
+    def restore(self) -> None: ...
 
     def resize(self, width: int, height: int, edge: str) -> None: ...
 
@@ -205,6 +210,9 @@ class GuardiaApi:
             )
         elif event in ("shield_start", "shield_stop"):
             details = str(data.get("server", ""))
+        elif event == SETTINGS_EVENT:
+            change = self._change_view(record, t)
+            details = f"{change['setting']} · {change['change']}"
         else:
             details = ""
         known = (
@@ -220,6 +228,7 @@ class GuardiaApi:
             "tools_approved",
             "tools_forgotten",
             "rules_approved",
+            SETTINGS_EVENT,
         )
         label_key = f"ui.event_{event}" if event in known else "ui.event_other"
         return {
@@ -292,18 +301,43 @@ class GuardiaApi:
         )
         return {"saved": True, "path": safe_text(str(target)), "sha256": digest}
 
+    def _record_change(self, setting: str, before: object, after: object) -> None:
+        with contextlib.suppress(OSError, KeyStoreError):
+            self._ledger().append(
+                SETTINGS_EVENT, {"setting": setting, "before": before, "after": after}
+            )
+
     def set_language(self, language: object) -> dict[str, Any]:
         try:
             value = validate_language(language)
         except ValueError as exc:
             raise self._fail("invalid") from exc
-        self._save_settings(replace(self._settings, language=value))
+        before = self._settings.language
+        if value != before:
+            self._save_settings(replace(self._settings, language=value))
+            self._record_change("language", before, value)
         return self.state()
 
     def set_option(self, name: object, value: object) -> dict[str, Any]:
         if not isinstance(name, str) or name not in BOOLEAN_OPTIONS or not isinstance(value, bool):
             raise self._fail("invalid")
-        self._save_settings(with_option(self._settings, name, value))
+        before = bool(getattr(self._settings, name))
+        if value != before:
+            self._save_settings(with_option(self._settings, name, value))
+            self._record_change(name, before, value)
+        return self.state()
+
+    def _add_project(self, chosen: object) -> dict[str, Any]:
+        if len(self._settings.projects) >= MAX_PROJECTS:
+            raise self._fail("too_many")
+        try:
+            project = validate_project(chosen)
+        except ValueError as exc:
+            raise self._fail("invalid") from exc
+        if project not in self._settings.projects:
+            projects = (*self._settings.projects, project)
+            self._save_settings(replace(self._settings, projects=projects))
+            self._record_change("project", None, project)
         return self.state()
 
     def add_project(self) -> dict[str, Any]:
@@ -312,20 +346,91 @@ class GuardiaApi:
         chosen = self._folder_dialog()
         if not chosen:
             return self.state()
-        try:
-            project = validate_project(chosen)
-        except ValueError as exc:
-            raise self._fail("invalid") from exc
-        projects = tuple(dict.fromkeys([*self._settings.projects, project]))
-        self._save_settings(replace(self._settings, projects=projects))
-        return self.state()
+        return self._add_project(chosen)
 
     def remove_project(self, path: object) -> dict[str, Any]:
         if not isinstance(path, str) or path not in self._settings.projects:
             raise self._fail("invalid")
         projects = tuple(p for p in self._settings.projects if p != path)
         self._save_settings(replace(self._settings, projects=projects))
+        self._record_change("project", path, None)
         return self.state()
+
+    def _changes(self) -> list[dict[str, Any]]:
+        records = self._ledger().records()
+        chosen = [r for r in records if r.get("event") == SETTINGS_EVENT]
+        return chosen[-MAX_HISTORY:]
+
+    def _restorable(self, setting: str, before: object, after: object) -> bool:
+        settings = self._settings
+        if setting == "language":
+            return before in SUPPORTED_LANGUAGES and before != settings.language
+        if setting in BOOLEAN_OPTIONS:
+            return isinstance(before, bool) and before != getattr(settings, setting)
+        if setting == "project" and before is None and isinstance(after, str):
+            return after in settings.projects
+        if setting == "project" and after is None and isinstance(before, str):
+            return before not in settings.projects and len(settings.projects) < MAX_PROJECTS
+        return False
+
+    def _value_text(self, setting: str, value: object, t: Translator) -> str:
+        if setting == "language" and isinstance(value, str):
+            return LANGUAGE_NAMES.get(value, value)
+        if isinstance(value, bool):
+            return t("ui.value_on" if value else "ui.value_off")
+        return safe_text(str(value), 300)
+
+    def _change_view(self, record: dict[str, Any], t: Translator) -> dict[str, Any]:
+        raw = record.get("data")
+        data: dict[str, Any] = raw if isinstance(raw, dict) else {}
+        setting = str(data.get("setting", ""))
+        before, after = data.get("before"), data.get("after")
+        if setting == "project":
+            name = t("ui.settings_projects")
+            change = (
+                t("ui.history_project_added", path=self._value_text(setting, after, t))
+                if before is None
+                else t("ui.history_project_removed", path=self._value_text(setting, before, t))
+            )
+        else:
+            known = setting == "language" or setting in BOOLEAN_OPTIONS
+            name = t(f"ui.settings_{setting}") if known else safe_text(setting, 80)
+            change = t(
+                "ui.history_change",
+                before=self._value_text(setting, before, t),
+                after=self._value_text(setting, after, t),
+            )
+        return {
+            "seq": record.get("seq"),
+            "time": safe_text(str(record.get("time", "")), 40),
+            "setting": name,
+            "change": change,
+            "can_restore": self._restorable(setting, before, after),
+        }
+
+    def settings_history(self) -> dict[str, Any]:
+        t = self._t()
+        return {"items": [self._change_view(r, t) for r in reversed(self._changes())]}
+
+    def restore_setting(self, seq: object, confirmed: object) -> dict[str, Any]:
+        if confirmed is not True:
+            raise self._fail("confirmation")
+        if not isinstance(seq, int) or isinstance(seq, bool):
+            raise self._fail("invalid")
+        record = next((r for r in self._changes() if r.get("seq") == seq), None)
+        raw = record.get("data") if record is not None else None
+        if not isinstance(raw, dict):
+            raise self._fail("invalid")
+        setting, before, after = str(raw.get("setting", "")), raw.get("before"), raw.get("after")
+        if not self._restorable(setting, before, after):
+            raise self._fail("nothing_to_restore")
+        if setting == "language":
+            return self.set_language(before)
+        if setting in BOOLEAN_OPTIONS:
+            return self.set_option(setting, before)
+        if before is None:
+            return self.remove_project(after)
+        return self._add_project(before)
 
     def _home(self) -> str:
         return str(self._env.home).replace("\\", "/").rstrip("/").lower()
@@ -473,18 +578,13 @@ class GuardiaApi:
         if self._window is not None:
             self._window.close()
 
-    def window_place(self, x: object, y: object, width: object, height: object) -> None:
-        try:
-            geometry = (
-                bounded(x, -MAX_COORDINATE, MAX_COORDINATE),
-                bounded(y, -MAX_COORDINATE, MAX_COORDINATE),
-                bounded(width, MIN_WINDOW_SIZE, MAX_WINDOW_SIZE),
-                bounded(height, MIN_WINDOW_SIZE, MAX_WINDOW_SIZE),
-            )
-        except ValueError as exc:
-            raise self._fail("invalid") from exc
+    def window_maximize(self) -> None:
         if self._window is not None:
-            self._window.place(*geometry)
+            self._window.maximize()
+
+    def window_restore(self) -> None:
+        if self._window is not None:
+            self._window.restore()
 
     def window_resize(self, width: object, height: object, edge: object) -> None:
         if not isinstance(edge, str) or edge not in WINDOW_EDGES:
