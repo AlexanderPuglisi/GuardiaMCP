@@ -29,6 +29,7 @@ class Verdict(enum.Enum):
     FORWARD = "forward"
     REJECT = "reject"
     DROP = "drop"
+    DEFER = "defer"
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,10 +38,12 @@ class Decision:
     replacement: Message | None = None
     reason: str = ""
     explanation: str = ""
+    resolve: Callable[[], Decision] | None = None
 
 
 FORWARD = Decision(Verdict.FORWARD)
 INTERNAL_FAILURE = Decision(Verdict.REJECT, reason="internal")
+MAX_DEFERRED = 8
 
 
 class Inspector(Protocol):
@@ -82,6 +85,7 @@ class Proxy:
         self._stats_lock = threading.Lock()
         self.session = Session()
         self.stats: Counter[tuple[Direction, Outcome]] = Counter()
+        self._deferred = 0
 
     def total(self, *outcomes: Outcome) -> int:
         with self._stats_lock:
@@ -161,7 +165,47 @@ class Proxy:
             return INTERNAL_FAILURE
         return decision
 
+    def _reserve(self) -> bool:
+        with self._stats_lock:
+            if self._deferred >= MAX_DEFERRED:
+                return False
+            self._deferred += 1
+            return True
+
+    def _release(self) -> None:
+        with self._stats_lock:
+            self._deferred -= 1
+
+    def _defer(self, direction: Direction, message: Message, decision: Decision) -> bool:
+        if decision.resolve is None or not self._reserve():
+            self._report("shield.too_many_waiting", direction)
+            return self._apply(direction, message, INTERNAL_FAILURE)
+        threading.Thread(
+            target=self._settle,
+            args=(direction, message, decision.resolve),
+            name="guardia-shield-confirm",
+            daemon=True,
+        ).start()
+        return True
+
+    def _settle(
+        self, direction: Direction, message: Message, resolve: Callable[[], Decision]
+    ) -> None:
+        try:
+            final = resolve()
+        except Exception:
+            self._report("shield.inspector_failed", direction)
+            final = INTERNAL_FAILURE
+        if not isinstance(final, Decision) or final.verdict is Verdict.DEFER:
+            final = INTERNAL_FAILURE
+        try:
+            self._apply(direction, message, final)
+        finally:
+            self._release()
+
     def _apply(self, direction: Direction, message: Message, decision: Decision) -> bool:
+        if decision.verdict is Verdict.DEFER:
+            return self._defer(direction, message, decision)
         target = self._writers[direction]
         if decision.verdict is Verdict.FORWARD:
             self._count(direction, Outcome.FORWARDED)

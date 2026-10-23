@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import IO
 
 GRACE_SECONDS = 5.0
+CONFIRM_OUTPUT_LIMIT = 64 * 1024
 
 
 class LaunchError(Exception):
@@ -84,3 +85,32 @@ class ServerProcess:
         with contextlib.suppress(OSError):
             self._process.kill()
         return self._process.wait()
+
+
+def run_confirmation(command: Sequence[str], payload: bytes, timeout: float) -> bytes | None:
+    try:
+        argv = resolve(command)
+    except LaunchError:
+        return None
+    flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+    try:
+        process = subprocess.Popen(
+            argv,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            shell=False,
+            creationflags=flags,
+        )
+    except OSError:
+        return None
+    try:
+        output, _ = process.communicate(payload, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        with contextlib.suppress(OSError):
+            process.kill()
+        process.communicate()
+        return None
+    if process.returncode != 0:
+        return None
+    return output[:CONFIRM_OUTPUT_LIMIT]

@@ -78,8 +78,8 @@ system, only by file permissions.
 rules you approve (phase 2.1). The tool memory trusts the first time it meets a server, result
 checking looks at the first million characters, and credential requests are recognized by
 English and Italian keywords. Rules and protections are patterns: text written to avoid them
-can succeed, and `ask` blocks until the confirmation
-window exists. The signed rules file stops hidden changes, yet anyone who can run code as your
+can succeed. The confirmation window
+shows who asks and why, but cannot know who clicks it. The signed rules file stops hidden changes, yet anyone who can run code as your
 Windows user can also use the signing key. The Shield sees only MCP messages: a malicious server is still a program
 on your PC and can read your files directly, without using MCP. On Windows, if a server does not
 stop when asked, the Shield ends the process it started, but programs that process started in turn
@@ -191,8 +191,8 @@ Su macOS e Linux la chiave non è protetta dal sistema operativo, solo dai perme
 che approvi (fase 2.1). La memoria degli strumenti si fida della prima volta che incontra un server,
 il controllo dei risultati guarda il primo milione di caratteri e le richieste di credenziali
 vengono riconosciute da parole chiave in italiano e inglese. Regole e protezioni sono schemi: un
-testo scritto per aggirarle può riuscirci, e `chiedi` blocca finché non
-esiste la finestra di conferma. Il file delle regole firmato ferma le modifiche di nascosto, ma chi
+testo scritto per aggirarle può riuscirci. La finestra di conferma
+mostra chi chiede e perché, ma non può sapere chi clicca. Il file delle regole firmato ferma le modifiche di nascosto, ma chi
 riesce a eseguire codice con il tuo utente di Windows può usare anche la chiave di firma. Lo Scudo
 vede solo i messaggi MCP: un server malevolo resta un programma sul tuo
 PC e può leggere i tuoi file direttamente, senza passare da MCP. Su Windows, se un server non si

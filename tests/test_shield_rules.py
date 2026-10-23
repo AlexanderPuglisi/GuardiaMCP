@@ -157,7 +157,6 @@ def test_errors_point_to_the_right_line(text: str, expected: tuple[str, str, int
             'nome = "a"\nazione = "blocca"\nfase = "risultato"\nargomento.percorso = "~/.ssh/**"',
             "argument_never_matches",
         ),
-        ('nome = "a"\nazione = "chiedi"\nstrumento = "x"', "ask_blocks_for_now"),
         ('nome = "a"\nazione = "registra"', "matches_everything"),
         ('nome = "a"\nazione = "oscura"\nstrumento = "x"', "redacts_everything"),
     ],
@@ -530,11 +529,12 @@ def test_live_allowlist_mode(tmp_path: Path) -> None:
     shield.close()
 
 
-def test_live_ask_blocks_until_the_window_exists(tmp_path: Path) -> None:
+def test_live_ask_without_a_window_blocks(tmp_path: Path) -> None:
     text = rules(rule('nome = "confirm"\nazione = "chiedi"\nstrumento = "echo"'))
     shield, _, _ = shield_with_rules(tmp_path, text)
     answer = shield.ask(call(1, "echo", {"text": "x"}))
-    assert "finestra di conferma non è ancora disponibile" in answer["error"]["message"]
+    assert "«confirm»" in answer["error"]["message"]
+    assert "Non è stato possibile mostrare la finestra di conferma" in answer["error"]["message"]
     shield.close()
 
 

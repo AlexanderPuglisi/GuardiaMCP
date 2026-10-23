@@ -20,6 +20,13 @@ from guardia.shield.rules import (
 )
 
 MAX_TRACKED_WINDOWS = 10_000
+NO_CONFIRMATION_PHASES = frozenset({Phase.RESULT, Phase.LIST})
+
+
+def effective(action: Action, phase: Phase) -> Action:
+    if action is Action.ASK and phase in NO_CONFIRMATION_PHASES:
+        return Action.LOG
+    return action
 
 
 @dataclass(frozen=True, slots=True)
@@ -150,9 +157,9 @@ class Engine:
         ]
         if not matched:
             default = Action.ALLOW if context.phase is Phase.RESULT else self.ruleset.default
-            return Evaluation(default, (), defaulted=True)
+            return Evaluation(effective(default, context.phase), (), defaulted=True)
         strongest = max(matched, key=lambda rule: rule.action.strength).action
-        return Evaluation(strongest, tuple(matched))
+        return Evaluation(effective(strongest, context.phase), tuple(matched))
 
 
 def _redact_text(rule: Rule, keys: tuple[str, ...], text: str, home: str) -> str:

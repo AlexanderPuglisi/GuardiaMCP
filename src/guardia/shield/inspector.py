@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -11,6 +12,7 @@ from guardia.i18n import Translator
 from guardia.ledger import Ledger
 from guardia.model import canonical_json, sha256_hex
 from guardia.secure_store import KeyStoreError
+from guardia.shield.confirm import Answer, Confirmer, ConfirmRequest
 from guardia.shield.engine import Context, Engine, Evaluation, redact
 from guardia.shield.messages import Direction, Message, MessageKind
 from guardia.shield.pins import PinError, PinStore, ToolStatus
@@ -34,6 +36,9 @@ TOOL_METHODS = frozenset({"tools/call", "prompts/get"})
 LOGGED_METHODS = frozenset({"tools/call", "resources/read", "prompts/get"})
 INSTRUCTION_METHODS = frozenset({"initialize", "server/discover"})
 MAX_LOGGED_NAMES = 50
+REMEMBER_SECONDS = 600
+MAX_DETAILS = 2000
+ALLOWED_ANSWERS = frozenset({Answer.ALLOW, Answer.ALLOW_REMEMBER})
 MAX_REPORTED_NAMES = 10
 NAME_WIDTH = 120
 INPUT_REQUIRED = "input_required"
@@ -97,8 +102,11 @@ class RulesInspector:
         t: Translator,
         report: Report,
         pins: PinStore | None = None,
+        confirm: Confirmer | None = None,
     ) -> None:
         self._server = server
+        self._confirm = confirm
+        self._remembered: dict[tuple[str, tuple[str, ...]], float] = {}
         self._policy = policy
         self._home = home
         self._ledger = ledger
@@ -404,6 +412,12 @@ class RulesInspector:
     ) -> Decision:
         verdicts = Verdicts(engine.evaluate(context), findings)
         action = verdicts.action
+        if action is Action.ASK:
+            return Decision(
+                Verdict.DEFER,
+                reason="ask",
+                resolve=lambda: self._ask(context, message, verdicts),
+            )
         logged = action is not Action.ALLOW or (
             context.phase is Phase.CALL and context.method in LOGGED_METHODS
         )
@@ -420,7 +434,7 @@ class RulesInspector:
         for finding in findings:
             if finding.note:
                 self._report(finding.note)
-        if action in (Action.ASK, Action.BLOCK):
+        if action is Action.BLOCK:
             self._report(
                 self._t(
                     "shield.decision",
@@ -434,6 +448,11 @@ class RulesInspector:
             return Decision(
                 Verdict.REJECT, reason=action.value, explanation=self._explain(verdicts)
             )
+        return self._allowed(context, message, verdicts)
+
+    def _allowed(self, context: Context, message: Message, verdicts: Verdicts) -> Decision:
+        findings = verdicts.findings
+        action = verdicts.action
         transforms = [finding.transform for finding in findings if finding.transform is not None]
         if action is not Action.REDACT and not transforms:
             return FORWARD
@@ -471,15 +490,68 @@ class RulesInspector:
             payload["params"] = apply(payload.get("params", {}))
         return Decision(Verdict.FORWARD, Message(message.kind, payload, message.id, message.method))
 
+    def _confirmation(self, context: Context, verdicts: Verdicts) -> ConfirmRequest:
+        reasons = [
+            self._t("shield.reason_rule", name=rule.name)
+            for rule in verdicts.evaluation.rules
+            if rule.action is Action.ASK
+        ]
+        if verdicts.evaluation.defaulted and verdicts.evaluation.action is Action.ASK:
+            reasons.append(self._t("shield.by_default"))
+        reasons += [check.explanation for check in verdicts.findings if check.action is Action.ASK]
+        value = context.arguments if context.phase is Phase.CALL else context.content
+        details = json.dumps(redact_secrets(value), ensure_ascii=False, indent=2) if value else ""
+        return ConfirmRequest(
+            server=self._server,
+            method=safe_text(context.method, NAME_WIDTH),
+            tool=context.tool,
+            reasons=tuple(safe_text(reason, 400) for reason in reasons[:8]),
+            details=safe_text(details[:MAX_DETAILS], MAX_DETAILS),
+            language=self._t.language,
+        )
+
+    def _ask(self, context: Context, message: Message, verdicts: Verdicts) -> Decision:
+        key = (context.tool or context.method, tuple(sorted(verdicts.labels)))
+        with self._lock:
+            remembered = self._remembered.get(key, 0.0) > time.monotonic()
+        if remembered:
+            answer = Answer.ALLOW
+        elif self._confirm is None:
+            answer = Answer.UNAVAILABLE
+        else:
+            answer = self._confirm(self._confirmation(context, verdicts))
+        if not self._log(
+            message,
+            phase=context.phase,
+            method=context.method,
+            tool=context.tool,
+            action=Action.ASK,
+            rules=verdicts.labels,
+            answer="remembered" if remembered else answer.value,
+        ):
+            return self._ledger_failure()
+        if answer is Answer.ALLOW_REMEMBER:
+            with self._lock:
+                self._remembered[key] = time.monotonic() + REMEMBER_SECONDS
+        label = "remembered" if remembered else answer.value
+        self._report(
+            self._t(
+                "shield.confirmation",
+                server=self._server,
+                tool=context.tool or context.method,
+                answer=self._t(f"shield.answer_{label}"),
+            )
+        )
+        if answer in ALLOWED_ANSWERS:
+            return self._allowed(context, message, verdicts)
+        explanation = f"{self._explain(verdicts)} {self._t(f'shield.ask_{answer.value}')}"
+        return Decision(Verdict.REJECT, reason="ask", explanation=explanation)
+
     def _explain(self, verdicts: Verdicts) -> str:
         finding = verdicts.strongest_finding()
-        ask = verdicts.action is Action.ASK
         if finding is not None:
-            suffix = " " + self._t("shield.ask_short") if ask else ""
-            return finding.explanation + suffix
+            return finding.explanation
         names = ", ".join(f"«{name}»" for name in verdicts.evaluation.names[:5])
-        if ask:
-            return self._t("shield.ask_unavailable", rules=names or self._t("shield.default_rule"))
         if verdicts.evaluation.defaulted:
             return self._t("shield.by_default")
         return self._t("shield.by_rule", rules=names)
@@ -495,6 +567,7 @@ class RulesInspector:
         rules: list[str],
         defaulted: bool = False,
         hidden: list[str] | None = None,
+        answer: str | None = None,
     ) -> bool:
         if self._ledger is None:
             return True
@@ -510,6 +583,8 @@ class RulesInspector:
         }
         if hidden:
             data["hidden"] = hidden
+        if answer is not None:
+            data["answer"] = answer
         try:
             self._ledger.append("shield_decision", data)
         except (OSError, KeyStoreError) as exc:

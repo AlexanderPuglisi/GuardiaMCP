@@ -1,0 +1,44 @@
+:root {
+  --bg: #08080a; --surface: #111115; --surface-2: #17171c; --surface-3: #1d1d23;
+  --line: #24242b; --line-2: #2e2e36; --text: #ece9e6; --muted: #9b98a0; --faint: #6d6a72;
+  --accent: #8e1b1b; --accent-hover: #a32020; --accent-strong: #c4332b;
+  --mono: "Cascadia Mono", Consolas, ui-monospace, monospace;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; overflow: hidden; user-select: none; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
+.frame { position: relative; height: 100%; display: grid; grid-template-rows: 44px 1fr 64px; border-radius: 8px; overflow: hidden; }
+.head { display: flex; align-items: center; gap: 9px; padding: 0 10px 0 14px; background: linear-gradient(180deg, #0e0e12, #0a0a0d); border-bottom: 1px solid var(--line); }
+.head > :not(.close) { pointer-events: none; }
+.shield { width: 22px; height: 22px; filter: drop-shadow(0 0 6px rgba(196, 51, 43, .4)); }
+.brand { font-weight: 650; font-size: 14px; }
+.brand b { color: var(--accent-strong); font-weight: 650; }
+.spacer { flex: 1; }
+.close { width: 14px; height: 14px; padding: 0; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .14); background: #2a2a32; display: grid; place-items: center; cursor: pointer; transition: background .18s, box-shadow .18s, transform .18s; }
+.close svg { width: 9px; height: 9px; fill: none; stroke: rgba(12, 10, 10, .85); stroke-width: 1.6; stroke-linecap: round; opacity: 0; transition: opacity .15s; }
+.close:hover, .close:focus-visible { background: #e5484d; box-shadow: 0 0 10px rgba(229, 72, 77, .5); transform: scale(1.15); }
+.close:hover svg, .close:focus-visible svg { opacity: 1; }
+.body { padding: 18px 22px 8px; overflow: auto; }
+h1 { font-size: 17px; font-weight: 650; margin: 0 0 6px; }
+.lead { margin: 0 0 14px; color: var(--muted); overflow-wrap: anywhere; }
+.lead b { color: var(--text); font-weight: 600; }
+h2 { font-size: 12px; font-weight: 600; color: var(--faint); text-transform: uppercase; letter-spacing: .6px; margin: 0 0 6px; }
+.reasons ul { margin: 0 0 12px; padding: 0; list-style: none; }
+.reasons li { padding: 8px 10px; margin-bottom: 6px; background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--accent-strong); border-radius: 0 8px 8px 0; font-size: 13px; overflow-wrap: anywhere; }
+.details { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; margin-bottom: 12px; }
+.details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+.details pre { margin: 8px 0 2px; max-height: 120px; overflow: auto; font: 12px/1.45 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; color: #cfcbc6; user-select: text; }
+.remember { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; cursor: pointer; }
+.remember input { accent-color: var(--accent-strong); width: 15px; height: 15px; }
+.foot { display: flex; align-items: center; gap: 10px; padding: 0 18px; border-top: 1px solid var(--line); background: #0a0a0d; }
+.countdown { color: var(--faint); font-size: 12.5px; }
+.btn { border-radius: 8px; padding: 8px 16px; border: 1px solid var(--line-2); background: var(--surface-2); cursor: pointer; transition: background .15s, box-shadow .15s; }
+.btn:hover { background: var(--surface-3); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.btn.primary:hover { background: var(--accent-hover); box-shadow: 0 0 16px rgba(196, 51, 43, .35); }
+.glow { position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none; overflow: hidden; -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; background: rgba(196, 51, 43, .25); }
+.glow i { position: absolute; left: 50%; top: 50%; width: 200vmax; height: 200vmax; margin: -100vmax 0 0 -100vmax; background: conic-gradient(from 0deg, transparent 0deg, rgba(196, 51, 43, .95) 40deg, rgba(255, 140, 110, .7) 60deg, transparent 110deg, transparent 200deg, rgba(142, 27, 27, .9) 240deg, transparent 290deg); animation: spin 10s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .glow i { animation: none; } * { transition: none !important; } }

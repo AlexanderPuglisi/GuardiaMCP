@@ -593,8 +593,6 @@ class _Checker:
             self.issue(Level.WARNING, "argument_never_matches", rule.line, rule.name)
         if rule.action is Action.REDACT and rule.phases == frozenset({Phase.LIST}):
             self.issue(Level.ERROR, "redact_on_list", rule.line, rule.name)
-        if rule.action is Action.ASK:
-            self.issue(Level.WARNING, "ask_blocks_for_now", rule.line, rule.name)
         has_condition = any(
             (
                 rule.servers,

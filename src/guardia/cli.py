@@ -23,6 +23,14 @@ from guardia.render.sarif import build_sarif
 from guardia.render.terminal import render_inventory, render_scan, severity_label
 from guardia.scanner import RULES, ScanReport
 from guardia.shield import commands as shield_commands
+from guardia.shield.confirm import (
+    MAX_REQUEST_BYTES,
+    Answer,
+    RequestError,
+    WindowConfirmer,
+    answer_json,
+    parse_request,
+)
 from guardia.shield.inspector import RulesInspector
 from guardia.shield.patterns import home_text
 from guardia.shield.pins import PinStore
@@ -246,6 +254,9 @@ def build_parser(t: Translator) -> argparse.ArgumentParser:
     shield_rules.add_argument(
         "--salva", "--save", dest="save", action="store_true", help=t("shield_rules.cli_save")
     )
+    shield_commands_parser.add_parser(
+        "confirm", aliases=["conferma"], help=argparse.SUPPRESS, parents=[language]
+    )
     shield_tools = shield_commands_parser.add_parser(
         "tools", aliases=["strumenti"], help=t("shield_rules.tools_help"), parents=[language]
     )
@@ -456,6 +467,7 @@ def run_shield_command(
         t=t,
         report=_report_stderr,
         pins=PinStore(env.data_dir, None, ledger),
+        confirm=WindowConfirmer(),
     )
     _report_stderr(inspector.describe())
     return run_shield(
@@ -506,6 +518,24 @@ def run_shield_tools(
     return shield_commands.tools_forget(ws, store, args.tools_server)
 
 
+def run_shield_confirm() -> int:
+    from guardia.app.confirm import show_confirmation
+
+    try:
+        request = parse_request(sys.stdin.buffer.read(MAX_REQUEST_BYTES + 1))
+    except RequestError:
+        return EXIT_USAGE
+    try:
+        answer = show_confirmation(request)
+    except ImportError:
+        return EXIT_INCOMPLETE
+    if answer not in (Answer.ALLOW, Answer.ALLOW_REMEMBER, Answer.BLOCK, Answer.TIMEOUT):
+        answer = Answer.BLOCK
+    sys.stdout.buffer.write(answer_json(answer))
+    sys.stdout.buffer.flush()
+    return EXIT_OK
+
+
 def dispatch_shield(
     args: argparse.Namespace,
     t: Translator,
@@ -513,6 +543,8 @@ def dispatch_shield(
     env: HostEnvironment,
     out: TextIO,
 ) -> int:
+    if getattr(args, "shield_command", None) in ("confirm", "conferma"):
+        return run_shield_confirm()
     if getattr(args, "shield_command", None) in ("tools", "strumenti"):
         return run_shield_tools(args, t, env, out)
     if getattr(args, "shield_command", None):

@@ -54,4 +54,4 @@ def test_cli_has_no_runtime_dependencies() -> None:
 def test_only_the_app_imports_pywebview() -> None:
     for path in SOURCE.rglob("*.py"):
         if "webview" in {m.split(".")[0] for m in imported_modules(path)}:
-            assert path.relative_to(SOURCE).as_posix() == "app/main.py", path
+            assert path.relative_to(SOURCE).as_posix() in {"app/main.py", "app/confirm.py"}, path

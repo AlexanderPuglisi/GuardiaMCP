@@ -29,10 +29,12 @@ def content_security_policy(style: str, script: str) -> str:
     )
 
 
-def build_page() -> str:
-    template = _resource("index.html")
-    style = _resource("app.css")
-    script = _resource("app.js")
+def build_page(
+    template_name: str = "index.html", style_name: str = "app.css", script_name: str = "app.js"
+) -> str:
+    template = _resource(template_name)
+    style = _resource(style_name)
+    script = _resource(script_name)
     return (
         template.replace(CSP_MARK, content_security_policy(style, script))
         .replace(STYLE_MARK, style)

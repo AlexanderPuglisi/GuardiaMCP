@@ -6,8 +6,8 @@ The Shield is the part of Guardia that works **while** the AI is using MCP serve
 reads files and tells you what is risky; the Shield sits between the messages and can **block,
 hide or redact** them following rules you write.
 
-> **Status: development preview (phase 2.2).** Rules and built-in protections work. The window for the `ask` action
-> arrives in phase 2.3; until then `ask` **blocks**. Automatic client setup arrives in phase 2.4:
+> **Status: development preview (phase 2.3).** Rules, built-in protections and the confirmation
+> window work. Automatic client setup arrives in phase 2.4:
 > for now you edit the configuration by hand (see below).
 
 ## How it works, in 30 seconds
@@ -82,6 +82,27 @@ guardia shield rules status
 
 The commands also exist in Italian: `guardia scudo regole verifica | approva | prova | esempio | stato`.
 The example file is in English when your language is English (`--lang en`).
+
+## The confirmation window
+
+When a rule or a protection says `ask`, the Shield opens a small Guardia window, always on top,
+that shows:
+
+- which server wants to do what (tool or request);
+- **why** it is asking (the rule or the protection);
+- the request details, with secrets already redacted;
+- the **Block** button (selected by default, for safety) and **Allow**, plus the box "remember the
+  choice for 10 minutes" for that tool;
+- a countdown: **if you do not answer within 60 seconds, it blocks**. `Esc` and the close circle
+  also block.
+
+While it waits for your answer, the Shield keeps passing other messages. The window is a separate
+Guardia process that talks to the Shield over a private channel: **the AI and the server cannot
+answer on your behalf**. If the window cannot be shown, the request is blocked. Every answer goes
+into the ledger.
+
+`ask` applies to **calls** and **server requests**. On results and lists asking makes no sense (the
+action already happened or has not been requested yet): there it works like `log`.
 
 ## Built-in protections
 
@@ -235,7 +256,7 @@ Without `phase`, the rule applies in every phase where its conditions make sense
 | `allow` | `consenti` | The message goes through |
 | `log` | `registra` | It goes through and is written to the ledger |
 | `redact` | `oscura` | It goes through, but the matching parts become `[REDACTED]` |
-| `ask` | `chiedi` | Your confirmation is needed (for now it **blocks**; the window arrives in phase 2.3) |
+| `ask` | `chiedi` | The confirmation window opens; without an answer in 60 seconds it **blocks** |
 | `block` | `blocca` | The message does not go through; the sender gets an error with the rule name |
 
 **When several rules trigger, the strictest wins**: block > ask > redact > log > allow. The
@@ -394,7 +415,7 @@ This way both you and the AI understand what happened and why.
   also use the signing key.
 - For now the Shield protects only local servers (stdio). Remote HTTP servers would require
   Guardia to forward network traffic: that is a separate decision.
-- `ask` blocks until the confirmation window arrives (phase 2.3).
+- Anyone using your PC can answer the confirmation window: the Shield does not know who clicks.
 - The tool memory trusts the **first time**: a server that is already malicious when first met is
   judged only by the analysis and by your rules.
 - Result checking looks at the first million characters of each result.

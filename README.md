@@ -81,8 +81,10 @@ guardia shield rules approve
   flags prompt injection in results, redacts secrets in results, and stops secrets in arguments
   and requests for passwords. Hidden tools cannot be called either.
 
-Full guide: [docs/SHIELD.md](docs/SHIELD.md). Still to come: the confirmation window for `ask`
-(phase 2.3) and automatic client setup (phase 2.4).
+- asks for your confirmation in a small always-on-top window when a rule says `ask` (phase 2.3):
+  the AI cannot answer for you, and no answer within 60 seconds means **block**.
+
+Full guide: [docs/SHIELD.md](docs/SHIELD.md). Still to come: automatic client setup (phase 2.4).
 
 ### Install from source (recommended)
 
@@ -200,8 +202,12 @@ guardia scudo regole approva
   injection nei risultati, oscura i segreti nei risultati e ferma i segreti negli argomenti e le
   richieste di password. Gli strumenti nascosti non si possono nemmeno chiamare.
 
-Guida completa: [docs/SCUDO.md](docs/SCUDO.md). In arrivo: la finestra di conferma per `chiedi`
-(fase 2.3) e il collegamento automatico dei client (fase 2.4).
+- ti chiede conferma in una piccola finestra sempre in primo piano quando una regola dice
+  `chiedi` (fase 2.3): l'AI non può rispondere al posto tuo, e senza risposta entro 60 secondi
+  **blocca**.
+
+Guida completa: [docs/SCUDO.md](docs/SCUDO.md). In arrivo: il collegamento automatico dei client
+(fase 2.4).
 
 Vuoi capire MCP da zero? Leggi [docs/IMPARA-MCP.md](docs/IMPARA-MCP.md).
 

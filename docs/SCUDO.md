@@ -6,8 +6,8 @@ Lo Scudo è la parte di Guardia che lavora **mentre** l'AI usa i server MCP. L'a
 guarda i file e ti dice cosa c'è di rischioso; lo Scudo invece si mette in mezzo ai messaggi e può
 **bloccarli, nasconderli o oscurarli** seguendo regole scritte da te.
 
-> **Stato: anteprima di sviluppo (fase 2.2).** Regole e protezioni di base funzionano. La finestra per l'azione
-> `chiedi` arriva nella fase 2.3; fino ad allora `chiedi` **blocca**. Il collegamento automatico
+> **Stato: anteprima di sviluppo (fase 2.3).** Regole, protezioni di base e finestra di conferma
+> funzionano. Il collegamento automatico
 > dei client arriva nella fase 2.4: per ora la configurazione si modifica a mano (vedi sotto).
 
 ## Come funziona, in 30 secondi
@@ -80,6 +80,27 @@ guardia scudo regole stato
 6. **stato** ti dice se le regole sono attive o se lo Scudo è in blocco totale e perché.
 
 I comandi esistono anche in inglese: `guardia shield rules verify | approve | test | example | status`.
+
+## La finestra di conferma
+
+Quando una regola o una protezione dice `chiedi`, lo Scudo apre una piccola finestra di Guardia,
+sempre in primo piano, che mostra:
+
+- quale server vuole fare cosa (strumento o richiesta);
+- **perché** te lo chiede (la regola o la protezione);
+- i dettagli della richiesta, con i segreti già oscurati;
+- i pulsanti **Blocca** (già selezionato, per sicurezza) e **Consenti**, e la casella «ricorda la
+  scelta per 10 minuti» per quello strumento;
+- un conto alla rovescia: **se non rispondi entro 60 secondi, blocca**. Anche `Esc` e il cerchietto
+  di chiusura bloccano.
+
+Mentre aspetta la tua risposta, lo Scudo continua a far passare gli altri messaggi. La finestra è
+un processo separato di Guardia che parla con lo Scudo su un canale privato: **l'AI e il server non
+possono rispondere al posto tuo**. Se la finestra non si può mostrare, la richiesta viene bloccata.
+Ogni risposta finisce nel registro.
+
+`chiedi` vale per le **chiamate** e per le **richieste del server**. Su risultati ed elenchi non ha
+senso chiedere (l'azione è già avvenuta o non è ancora stata richiesta): lì vale come `registra`.
 
 ## Le protezioni di base
 
@@ -232,7 +253,7 @@ Le condizioni su `argomento` valgono solo nella fase `chiamata`.
 | `consenti` | `allow` | Il messaggio passa |
 | `registra` | `log` | Passa e viene scritto nel registro |
 | `oscura` | `redact` | Passa, ma le parti che corrispondono diventano `[REDACTED]` |
-| `chiedi` | `ask` | Serve la tua conferma (per ora **blocca**, la finestra arriva nella fase 2.3) |
+| `chiedi` | `ask` | Si apre la finestra di conferma; senza risposta in 60 secondi **blocca** |
 | `blocca` | `block` | Il messaggio non passa; chi l'ha inviato riceve un errore con il nome della regola |
 
 **Se più regole scattano insieme, vince la più severa**: blocca > chiedi > oscura > registra >
@@ -392,7 +413,8 @@ Così sia tu sia l'AI capite cosa è successo e perché.
   il tuo utente di Windows può usare anche la chiave di firma.
 - Per ora lo Scudo protegge solo i server locali (stdio). I server remoti HTTP richiedono che
   Guardia inoltri traffico di rete: è una decisione separata.
-- `chiedi` blocca finché non arriva la finestra di conferma (fase 2.3).
+- Una persona che usa il tuo PC può rispondere alla finestra di conferma: lo Scudo non sa chi
+  clicca.
 - La memoria degli strumenti si fida della **prima volta**: un server già malevolo al primo
   incontro viene giudicato solo dall'analisi e dalle tue regole.
 - Il controllo dei risultati guarda il primo milione di caratteri di ogni risultato.

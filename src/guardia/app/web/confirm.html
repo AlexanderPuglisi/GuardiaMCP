@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="CSP_POLICY">
+<meta name="referrer" content="no-referrer">
+<title>Guardia MCP</title>
+<style>/*STYLE*/</style>
+</head>
+<body>
+<div class="frame">
+  <header class="head pywebview-drag-region" id="head">
+    <svg class="shield" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2.5 4.5 7v8.2c0 7.3 4.8 12.5 11.5 14.3 6.7-1.8 11.5-7 11.5-14.3V7z" fill="#1d1d23" stroke="#c4332b" stroke-width="2"/><path d="m11 16 3.6 3.6L21.5 12.7" fill="none" stroke="#ece9e6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span class="brand">Guardia <b>MCP</b></span>
+    <span class="spacer"></span>
+    <button type="button" class="close" id="close"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="m3.5 3.5 5 5m0-5-5 5"/></svg></button>
+  </header>
+  <main class="body">
+    <h1 id="title"></h1>
+    <p class="lead" id="lead"></p>
+    <section class="reasons">
+      <h2 id="reasons-title"></h2>
+      <ul id="reasons"></ul>
+    </section>
+    <details class="details" id="details-box">
+      <summary id="details-title"></summary>
+      <pre id="details"></pre>
+    </details>
+    <label class="remember"><input type="checkbox" id="remember"> <span id="remember-label"></span></label>
+  </main>
+  <footer class="foot">
+    <span class="countdown" id="countdown"></span>
+    <span class="spacer"></span>
+    <button type="button" class="btn" id="allow"></button>
+    <button type="button" class="btn primary" id="block"></button>
+  </footer>
+  <div class="glow" aria-hidden="true"><i></i></div>
+</div>
+<script>/*SCRIPT*/</script>
+</body>
+</html>

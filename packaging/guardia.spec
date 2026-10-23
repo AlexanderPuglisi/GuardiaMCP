@@ -46,17 +46,18 @@ def version_info(description, internal_name):
     )
 
 
-def analysis(script):
+def analysis(script, hidden=()):
     return Analysis(
         [str(PACKAGING / script)],
         pathex=[str(PROJECT / "src")],
         datas=collect_data_files("guardia"),
+        hiddenimports=list(hidden),
         excludes=EXCLUDES,
         noarchive=False,
     )
 
 
-cli = analysis("guardia_cli.py")
+cli = analysis("guardia_cli.py", ("webview", "guardia.app.confirm"))
 app = analysis("guardia_app.py")
 
 cli_exe = EXE(
