@@ -90,6 +90,13 @@ stop when asked, the Shield ends the process it started, but programs that proce
 (such as `npx` on Windows) pass their arguments through `cmd.exe`, exactly as when your client runs
 them: the Shield does not add this risk, but it does not remove it either.
 
+**Claude Desktop from the Microsoft Store.** Windows gives Store apps a private copy of
+`AppData`. If the Shield, started by Claude, is the first to create Guardia's data folder,
+Windows puts it in Claude's private folder (`%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Local`),
+where the app and the command line do not see it: the rules you approve and the ledger they
+show would not be the ones the Shield uses. Open Guardia once from its own icon before
+protecting servers; once the real folder exists, Claude's programs use it too.
+
 **A compromised PC cannot check itself.** If malware already runs with your privileges or as
 administrator, it can alter Guardia, its data or its output. No local tool can fix that.
 
@@ -207,6 +214,14 @@ loro volta da quel processo (per esempio `node` avviato da `npx`) possono restar
 che sono file `.cmd` o `.bat` (come `npx` su Windows) passano i loro argomenti attraverso `cmd.exe`,
 esattamente come quando li avvia il tuo client: lo Scudo non aggiunge questo rischio, ma nemmeno
 lo toglie.
+
+**Claude Desktop installato dal Microsoft Store.** Windows dà alle app dello Store una copia
+privata di `AppData`. Se il primo a creare la cartella dei dati di Guardia è lo Scudo avviato da
+Claude, Windows la mette nella cartella privata di Claude
+(`%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Local`), dove l'app e la riga di comando non la
+vedono: le regole che approvi e il registro che vedi non sarebbero quelli usati dallo Scudo.
+Apri Guardia una volta dalla sua icona prima di proteggere i server; quando la cartella vera
+esiste, la usano anche i programmi di Claude.
 
 **Un PC già compromesso non può controllare se stesso.** Se un malware gira già con i tuoi permessi
 o come amministratore, può alterare Guardia, i suoi dati o i suoi risultati. Nessuno strumento

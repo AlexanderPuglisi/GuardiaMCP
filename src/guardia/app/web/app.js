@@ -15,7 +15,7 @@
   const state = {
     ui: {}, settings: {}, report: null, view: "overview", version: "", dataDir: "",
     entryId: null, entryType: "all", problemsOnly: false, entrySearch: "",
-    findingLevel: "all", findingSearch: "", ledger: null, shield: null,
+    findingLevel: "all", findingSearch: "", ledger: null, shield: null, rulesEditor: null,
   };
   const MIN_SIZE = [900, 600];
   const windowState = { maximized: false, saved: null, resizing: null, target: null, pending: false };
@@ -403,22 +403,88 @@
     }
   }
 
+  async function openRulesEditor() {
+    try {
+      const loaded = await call("shield_rules_text");
+      state.rulesEditor = { text: loaded.text, original: loaded.text, issues: [], message: "", ok: true };
+    } catch {
+      return;
+    }
+    render();
+  }
+
+  function closeRulesEditor() {
+    const editor = state.rulesEditor;
+    if (editor && editor.text !== editor.original && !window.confirm(t("shield_discard_changes"))) return;
+    state.rulesEditor = null;
+    render();
+  }
+
+  async function saveRules() {
+    const editor = state.rulesEditor;
+    if (!window.confirm(t("shield_confirm_save"))) return;
+    busy(true, t("shield_working"));
+    try {
+      const next = await call("shield_rules_save", editor.text, true);
+      state.shield = next;
+      editor.issues = next.issues || [];
+      editor.message = next.message || "";
+      editor.ok = Boolean(next.ok);
+      if (next.ok) editor.original = editor.text;
+      if (next.message) toast(next.message);
+    } catch { } finally {
+      busy(false);
+      render();
+    }
+  }
+
+  function rulesEditor() {
+    const editor = state.rulesEditor;
+    const area = el("textarea", {
+      cls: "rules-editor",
+      attrs: { spellcheck: "false", wrap: "off", "aria-label": t("shield_editor_label") },
+    });
+    area.value = editor.text;
+    area.addEventListener("input", () => { editor.text = area.value; });
+    const notes = el("div", { cls: "editor-notes" });
+    if (editor.message) notes.append(el("p", { cls: editor.ok ? "ok-note" : "issue", text: editor.message }));
+    for (const line of editor.issues) notes.append(el("p", { cls: "issue mono", text: line }));
+    return el("div", { cls: "rules-box" },
+      el("p", { cls: "muted", text: t("shield_editor_hint") }),
+      area,
+      notes,
+      el("div", { cls: "row" },
+        el("button", { cls: "btn primary", text: t("shield_save_rules"), attrs: { type: "button" }, on: { click: saveRules } }),
+        el("button", { cls: "btn", text: t("shield_close_editor"), attrs: { type: "button" }, on: { click: closeRulesEditor } })));
+  }
+
   function shieldRules(shield) {
     const rules = shield.rules;
     const level = rules.state === "locked" ? "bad" : rules.state === "active" ? "" : "off";
-    const actions = el("div", { cls: "row" },
-      el("button", { cls: "btn", text: t("shield_copy_rules_path"), attrs: { type: "button" }, on: { click: () => copy(rules.path) } }));
-    if (rules.state === "locked") {
+    const actions = el("div", { cls: "row" });
+    if (!rules.exists) {
+      actions.append(el("button", {
+        cls: "btn primary", text: t("shield_create_example"), attrs: { type: "button" },
+        on: { click: () => shieldAction("shield_rules_example", [], t("shield_confirm_example")) },
+      }));
+    } else if (!state.rulesEditor) {
+      actions.append(el("button", { cls: "btn primary", text: t("shield_edit_rules"), attrs: { type: "button" }, on: { click: openRulesEditor } }));
+    }
+    if (rules.state === "locked" && rules.exists && !state.rulesEditor) {
       actions.append(el("button", {
         cls: "btn danger", text: t("shield_approve_rules"), attrs: { type: "button" },
         on: { click: () => shieldAction("shield_approve_rules", [], t("shield_confirm_rules")) },
       }));
     }
+    if (rules.exists) {
+      actions.append(el("button", { cls: "btn", text: t("shield_copy_rules_path"), attrs: { type: "button" }, on: { click: () => copy(rules.path) } }));
+    }
     return el("div", { cls: "card status-card" },
       el("h3", {}, el("span", { cls: "led " + level }), t("shield_rules_title")),
       el("p", { text: rules.text }),
-      el("p", { cls: "muted", text: t("shield_rules_hint") }),
-      actions);
+      el("p", { cls: "muted", text: t(rules.exists ? "shield_rules_hint" : "shield_rules_start") }),
+      actions,
+      state.rulesEditor ? rulesEditor() : null);
   }
 
   function shieldServers(shield) {

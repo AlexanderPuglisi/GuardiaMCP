@@ -49,6 +49,10 @@ class ApprovalError(Exception):
     pass
 
 
+class RulesChangedError(ApprovalError):
+    pass
+
+
 def rules_mac(key: bytes, digest: str) -> str:
     return hmac.new(key, f"rules:{digest}".encode(), hashlib.sha256).hexdigest()
 
@@ -131,10 +135,16 @@ def approved_text(directory: Path) -> str | None:
 
 
 def approve_rules(
-    directory: Path, home: str, protector: Protector | None = None
+    directory: Path,
+    home: str,
+    protector: Protector | None = None,
+    *,
+    expected: bytes | None = None,
 ) -> tuple[ParseResult, str]:
     path = rules_path(directory)
     data = read_bytes(path, MAX_RULES_BYTES)
+    if expected is not None and data != expected:
+        raise RulesChangedError(str(path))
     text = decode_text(data)
     result = parse_rules(text, home)
     if result.ruleset is None:

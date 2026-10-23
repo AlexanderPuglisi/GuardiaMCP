@@ -48,18 +48,19 @@ def server_candidates(env: HostEnvironment) -> list[Candidate]:
 
 def _rules(env: HostEnvironment, t: Translator, protector: Protector | None) -> dict[str, Any]:
     policy = load_policy(env.data_dir, _home(env), protector)
-    path = safe_text(str(rules_path(env.data_dir)))
+    file = rules_path(env.data_dir)
+    base = {"path": safe_text(str(file)), "exists": file.exists()}
     if policy.state is PolicyState.LOCKED and policy.reason is not None:
         reason = t(f"shield.locked_{policy.reason.value}")
-        return {"state": "locked", "text": t("shield.state_locked", reason=reason), "path": path}
+        return base | {"state": "locked", "text": t("shield.state_locked", reason=reason)}
     if policy.ruleset is not None:
         text = t(
             "shield.state_active",
             count=len(policy.ruleset.rules),
             default=t(f"shield_rules.action_{policy.ruleset.default.value}"),
         )
-        return {"state": "active", "text": text, "path": path}
-    return {"state": "none", "text": t("shield.state_none"), "path": path}
+        return base | {"state": "active", "text": text}
+    return base | {"state": "none", "text": t("shield.state_none")}
 
 
 def _server(candidate: Candidate, t: Translator, recorded: set[str]) -> dict[str, Any]:

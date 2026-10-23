@@ -603,7 +603,7 @@ def run_cli(env: HostEnvironment, *argv: str) -> tuple[int, str]:
 
 def test_cli_rules_workflow(env: HostEnvironment) -> None:
     code, output = run_cli(env, "scudo", "regole", "stato", "--lingua", "it")
-    assert (code, "Nessuna regola approvata" in output) == (0, True)
+    assert (code, "Nessuna regola tua" in output) == (0, True)
     assert run_cli(env, "scudo", "regole", "esempio", "--salva", "--lingua", "it")[0] == 0
     assert run_cli(env, "scudo", "regole", "esempio", "--salva", "--lingua", "it")[0] == 3
     code, output = run_cli(env, "scudo", "regole", "stato", "--lingua", "it")

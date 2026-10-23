@@ -92,6 +92,12 @@ originale**: la protezione non nasconde nulla all'analisi.
 
 ## Le regole in cinque minuti
 
+**Dall'app**, senza terminale: sezione **Scudo** → **Crea le regole d'esempio** →
+**Modifica le regole** → cambia il testo → **Salva e approva**. Guardia controlla il testo
+prima di salvarlo: se c'è un errore ti mostra la riga e non salva niente.
+
+**Da riga di comando:**
+
 ```powershell
 guardia scudo regole esempio --salva
 guardia scudo regole verifica
@@ -452,6 +458,10 @@ Così sia tu sia l'AI capite cosa è successo e perché.
 - Le richieste di credenziali vengono riconosciute da parole chiave in italiano e inglese: una
   richiesta formulata in modo diverso può sfuggire.
 - Dopo che approvi uno strumento, il client lo vede solo quando richiede di nuovo l'elenco.
+- Con Claude Desktop installato dal Microsoft Store, se il primo a creare la cartella dei dati
+  di Guardia è lo Scudo avviato da Claude, Windows la mette nella cartella privata di Claude
+  (`%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Local\GuardiaMCP`) e l'app non la vede.
+  Apri Guardia una volta dalla sua icona prima di proteggere i server.
 - Un'app AI che riscrive il proprio file di configurazione può togliere il collegamento allo
   Scudo: `guardia scudo elenco` mostra sempre lo stato attuale.
 - Su Windows, i programmi avviati a loro volta da un server (per esempio `node` avviato da `npx`)

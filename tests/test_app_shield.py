@@ -9,7 +9,7 @@ import pytest
 from guardia.app.api import GuardiaApi, GuardiaUiError
 from guardia.app.settings import SettingsStore
 from guardia.inventory import HostEnvironment
-from guardia.ledger import Ledger
+from guardia.ledger import Ledger, write_atomic
 from guardia.secure_store import RAW_PROTECTOR
 from guardia.shield.commands import example_text
 from guardia.shield.pins import PinStore
@@ -112,3 +112,61 @@ def test_manual_servers_offer_a_snippet(env: HostEnvironment) -> None:
     assert server["can_enable"] is False
     assert '"scudo"' in server["snippet"]
     assert Path(path).read_text(encoding="utf-8").count("// c") == 1
+
+
+def test_create_example_edit_save_and_approve_from_the_app(env: HostEnvironment) -> None:
+    api = make_api(env)
+    assert api.shield()["rules"]["exists"] is False
+    assert api.shield_rules_text() == {"exists": False, "text": ""}
+    with pytest.raises(GuardiaUiError):
+        api.shield_rules_example(False)
+    created = api.shield_rules_example(True)
+    assert created["ok"] is True
+    assert created["rules"]["exists"] is True
+    assert created["rules"]["state"] == "locked"
+    loaded = api.shield_rules_text()
+    assert loaded["text"] == example_text("it")
+    again = api.shield_rules_example(True)
+    assert again["ok"] is False
+    assert rules_path(env.data_dir).read_text(encoding="utf-8") == example_text("it")
+    edited = loaded["text"].replace("\n", "\r\n").replace("al minuto", "al minuto (modificata)")
+    with pytest.raises(GuardiaUiError):
+        api.shield_rules_save(edited, False)
+    saved = api.shield_rules_save(edited, True)
+    assert saved["ok"] is True, saved["message"]
+    assert saved["rules"]["state"] == "active"
+    assert "(modificata)" in rules_path(env.data_dir).read_text(encoding="utf-8")
+    assert b"\r\n" not in rules_path(env.data_dir).read_bytes()
+    events = [r["event"] for r in Ledger(env.data_dir, RAW_PROTECTOR).records()]
+    assert events.count("rules_approved") == 1
+
+
+def test_invalid_rules_are_not_saved_and_errors_name_the_line(env: HostEnvironment) -> None:
+    api = make_api(env)
+    good = example_text("it")
+    api.shield_rules_save(good, True)
+    broken = good + '\n[[regola]]\nnome = "Rotta"\nazione = "esplodi"\n'
+    result = api.shield_rules_save(broken, True)
+    assert result["ok"] is False
+    assert any("riga" in line for line in result["issues"])
+    assert rules_path(env.data_dir).read_text(encoding="utf-8") == good
+    assert result["rules"]["state"] == "active"
+    for bad in (None, 42, "x" * (1024 * 1024 + 1), "\ud800"):
+        with pytest.raises(GuardiaUiError):
+            api.shield_rules_save(bad, True)
+
+
+def test_rules_changed_during_save_are_not_approved(
+    env: HostEnvironment, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    api = make_api(env)
+    original = write_atomic
+
+    def tampered(path: Path, data: bytes) -> None:
+        original(path, data + b'\n[[regola]]\nnome = "Intrusa"\nazione = "consenti"\n')
+
+    monkeypatch.setattr("guardia.app.api.write_atomic", tampered)
+    result = api.shield_rules_save(example_text("it"), True)
+    assert result["ok"] is False
+    assert "è cambiato" in result["message"]
+    assert result["rules"]["state"] == "locked"

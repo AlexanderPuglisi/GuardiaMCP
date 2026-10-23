@@ -165,6 +165,12 @@ dd { margin: 0; overflow-wrap: anywhere; }
 .anchor { display: flex; gap: 10px; align-items: center; background: var(--surface-2); border: 1px dashed var(--line-2); border-radius: 8px; padding: 10px 12px; margin-top: 10px; flex-wrap: wrap; }
 .anchor .mono { flex: 1; min-width: 200px; }
 .issue { color: #f0b4ae; font-size: 13px; margin: 4px 0 0; }
+.rules-box { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.rules-editor { display: block; box-sizing: border-box; width: 100%; min-height: 340px; margin: 10px 0 4px; padding: 12px 14px; resize: vertical; background: var(--bg); color: var(--text); border: 1px solid var(--line-2); border-radius: 8px; font: 12.5px/1.55 var(--mono); white-space: pre; overflow: auto; tab-size: 2; }
+.rules-editor:focus { outline: none; border-color: var(--accent-strong); box-shadow: 0 0 0 3px var(--accent-soft); }
+.status-card .editor-notes p { margin: 4px 0 0; }
+.status-card .ok-note { color: var(--ok); }
+.status-card .issue { color: #f0b4ae; }
 
 .export-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .export-card h3 { margin: 0 0 6px; font-size: 14px; }

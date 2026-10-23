@@ -30,6 +30,7 @@
     const index = VIEWS.indexOf(view);
     if (index > 0) document.querySelectorAll("#nav button")[index].click();
     if (detail === "hover") showControls();
+    else if (detail === "editor") setTimeout(() => document.querySelector(".status-card .btn.primary").click(), 200);
     else if (detail) setTimeout(pickEntry, 50);
     document.getElementById("toast").hidden = view !== "overview";
   }
@@ -51,6 +52,7 @@
       add_project: async () => DEMO.state,
       remove_project: async () => DEMO.state,
       shield: async () => DEMO.shield,
+      shield_rules_text: async () => ({ exists: true, text: DEMO.rules_text }),
       window_minimize: async () => null,
       window_close: async () => null,
       window_place: async () => null,

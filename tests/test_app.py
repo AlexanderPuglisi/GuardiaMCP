@@ -186,6 +186,9 @@ def test_api_exposes_only_intended_methods(env: HostEnvironment) -> None:
         "shield_disable",
         "shield_approve_tools",
         "shield_approve_rules",
+        "shield_rules_text",
+        "shield_rules_example",
+        "shield_rules_save",
     }
 
 

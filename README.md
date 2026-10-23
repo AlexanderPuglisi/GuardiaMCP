@@ -91,7 +91,40 @@ guardia shield rules approve
 
 Full guide: [docs/SHIELD.md](docs/SHIELD.md).
 
-### Install from source (recommended)
+### Getting started (no programming needed)
+
+1. **Download** `GuardiaMCP-0.2.0-windows-x64.zip` from the project's **Releases** page on GitHub
+   and check it: in PowerShell, `Get-FileHash .\GuardiaMCP-0.2.0-windows-x64.zip` must print the
+   same value written in `SHA256SUMS.txt` on the same page.
+2. **Extract** it to a folder that will not move, for example `C:\Users\YOUR-NAME\GuardiaMCP`.
+   Protected servers start Guardia from this folder: if you want to move or delete it later, first
+   remove the protection (see *Uninstall*).
+3. **Open `GuardiaMCP.exe`.** The first time Windows SmartScreen may warn you, because the program
+   is not code-signed yet: choose *More info* → *Run anyway*. The first scan starts by itself.
+4. **Read the results.** *Overview* sums everything up; *Findings* lists the problems from the most
+   serious, each with the exact file and line (the small icon next to a path copies it), why it
+   matters and how to fix it. The scan changes nothing on your PC.
+5. **Protect a server (optional).** Close the AI app (Claude, Cursor, VS Code…). In *Shield*, press
+   **Protect** next to a server and confirm: Guardia saves a backup and changes only that entry.
+   Reopen the AI app: from now on every message of that server passes through the Shield. Tools
+   that appear or change later stay hidden until you approve them in the same section.
+6. **Your own rules (optional).** In *Shield* → *Shield rules*: **Create the example rules**,
+   then **Edit rules**, change what you want and press **Save and approve**. If something is wrong
+   Guardia shows the line and saves nothing. When a rule says `ask`, a small Guardia window asks
+   you; no answer within 60 seconds means **block**.
+7. **Undo** any time with **Remove protection** next to the server.
+
+Everything is also available from the command line (`guardia.exe`), described below and in
+[docs/SHIELD.md](docs/SHIELD.md). The guides are also inside the zip, in the `docs` folder.
+
+> **Claude Desktop from the Microsoft Store.** Windows gives Store apps a private copy of the
+> `AppData` folder. If a program started by Claude (such as the Shield) is the first to create
+> Guardia's data folder, Windows puts it in Claude's private folder
+> (`%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Local\GuardiaMCP`), where the app and the command
+> line do not see it. **Open Guardia once from its own icon before protecting servers**: once the
+> real folder exists, everything uses it.
+
+### Install from source (for developers, the most transparent option)
 
 Requires [uv](https://docs.astral.sh/uv/).
 
@@ -122,6 +155,33 @@ uv run --group build --extra app python scripts\build_exe.py
 The executables are **not code-signed yet**: Windows SmartScreen may warn the first time.
 Before running a copy you did not build yourself, compare its SHA-256 with `SHA256SUMS.txt`
 (`Get-FileHash .\GuardiaMCP.exe`).
+
+### Uninstall
+
+Guardia has no installer and leaves nothing hidden in the system: no services, no registry keys, no
+automatic start. Remove it in this order:
+
+1. Close the AI apps and **remove the Shield from every server**, otherwise the AI apps can no
+   longer start those servers. From the Guardia folder:
+
+   ```powershell
+   .\guardia.exe shield disable --all --confirm
+   .\guardia.exe shield list
+   ```
+
+   The list must show 0 protected servers. If Guardia reports that you changed an entry yourself,
+   fix that entry by hand: the original file is in the `backup` folder of Guardia's data.
+2. Close Guardia.
+3. Delete Guardia's data (ledger, rules, tool memory, backups, settings). **This cannot be
+   undone**: copy the folder elsewhere first if you want to keep the history.
+
+   ```powershell
+   Remove-Item -Recurse -Force "$env:LOCALAPPDATA\GuardiaMCP"
+   ```
+
+   With Claude Desktop from the Microsoft Store, also check
+   `%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Local\GuardiaMCP`.
+4. Delete the folder you extracted and any shortcut you created.
 
 License: [Apache 2.0](LICENSE).
 
@@ -219,7 +279,42 @@ Guida completa: [docs/SCUDO.md](docs/SCUDO.md).
 
 Vuoi capire MCP da zero? Leggi [docs/IMPARA-MCP.md](docs/IMPARA-MCP.md).
 
-### Installare dal codice sorgente (consigliato)
+### Primi passi (non serve saper programmare)
+
+1. **Scarica** `GuardiaMCP-0.2.0-windows-x64.zip` dalla pagina **Releases** del progetto su GitHub
+   e controllalo: in PowerShell, `Get-FileHash .\GuardiaMCP-0.2.0-windows-x64.zip` deve stampare
+   lo stesso valore scritto in `SHA256SUMS.txt` nella stessa pagina.
+2. **Estrailo** in una cartella che non sposterai, per esempio `C:\Users\TUO-NOME\GuardiaMCP`.
+   I server protetti avviano Guardia da questa cartella: se un giorno vuoi spostarla o cancellarla,
+   prima togli la protezione (vedi *Disinstallare*).
+3. **Apri `GuardiaMCP.exe`.** La prima volta Windows SmartScreen può mostrare un avviso, perché il
+   programma non è ancora firmato digitalmente: scegli *Ulteriori informazioni* → *Esegui comunque*.
+   La prima scansione parte da sola.
+4. **Leggi i risultati.** *Panoramica* riassume tutto; *Problemi* elenca i problemi dal più grave,
+   ognuno con file e riga esatti (la piccola icona accanto a un percorso lo copia), perché è un
+   rischio e come correggerlo. La scansione non cambia niente sul PC.
+5. **Proteggi un server (facoltativo).** Chiudi l'app AI (Claude, Cursor, VS Code…). In *Scudo*
+   premi **Proteggi** accanto a un server e conferma: Guardia salva una copia di sicurezza e cambia
+   solo quella voce. Riapri l'app AI: da quel momento ogni messaggio di quel server passa dallo
+   Scudo. Gli strumenti che compaiono o cambiano dopo restano nascosti finché non li approvi nella
+   stessa sezione.
+6. **Le tue regole (facoltativo).** In *Scudo* → *Regole dello Scudo*: **Crea le regole d'esempio**,
+   poi **Modifica le regole**, cambia quello che vuoi e premi **Salva e approva**. Se c'è un errore
+   Guardia ti mostra la riga e non salva niente. Quando una regola dice `chiedi`, una piccola
+   finestra di Guardia ti chiede conferma; senza risposta entro 60 secondi **blocca**.
+7. **Torna indietro** quando vuoi con **Togli protezione** accanto al server.
+
+Tutto si può fare anche da riga di comando (`guardia.exe`), come spiegato sotto e in
+[docs/SCUDO.md](docs/SCUDO.md). Le guide sono anche dentro lo zip, nella cartella `docs`.
+
+> **Claude Desktop installato dal Microsoft Store.** Windows dà alle app dello Store una copia
+> privata della cartella `AppData`. Se il primo a creare la cartella dei dati di Guardia è un
+> programma avviato da Claude (per esempio lo Scudo), Windows la mette nella cartella privata di
+> Claude (`%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Local\GuardiaMCP`), dove l'app e la riga
+> di comando non la vedono. **Apri Guardia una volta dalla sua icona prima di proteggere i
+> server**: quando la cartella vera esiste, tutti usano quella.
+
+### Installare dal codice sorgente (per sviluppatori, la scelta più trasparente)
 
 Serve [uv](https://docs.astral.sh/uv/).
 
@@ -250,5 +345,33 @@ uv run --group build --extra app python scripts\build_exe.py
 Gli eseguibili **non sono ancora firmati digitalmente**: la prima volta Windows SmartScreen
 potrebbe mostrare un avviso. Prima di avviare una copia che non hai costruito tu, confronta la sua
 impronta SHA-256 con `SHA256SUMS.txt` (`Get-FileHash .\GuardiaMCP.exe`).
+
+### Disinstallare
+
+Guardia non ha un programma di installazione e non lascia nulla di nascosto nel sistema: niente
+servizi, niente chiavi di registro, niente avvio automatico. Toglila in quest'ordine:
+
+1. Chiudi le app AI e **togli lo Scudo da tutti i server**, altrimenti le app AI non riescono più
+   ad avviarli. Dalla cartella di Guardia:
+
+   ```powershell
+   .\guardia.exe scudo disattiva --tutti --conferma
+   .\guardia.exe scudo elenco
+   ```
+
+   L'elenco deve mostrare 0 server protetti. Se Guardia ti dice che una voce l'hai cambiata tu,
+   sistemala a mano: il file originale è nella cartella `backup` dei dati di Guardia.
+2. Chiudi Guardia.
+3. Cancella i dati di Guardia (registro, regole, memoria degli strumenti, copie di sicurezza,
+   impostazioni). **Non si può annullare**: se vuoi tenere lo storico, copia prima la cartella
+   altrove.
+
+   ```powershell
+   Remove-Item -Recurse -Force "$env:LOCALAPPDATA\GuardiaMCP"
+   ```
+
+   Con Claude Desktop installato dal Microsoft Store controlla anche
+   `%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Local\GuardiaMCP`.
+4. Cancella la cartella che avevi estratto e gli eventuali collegamenti.
 
 Licenza: [Apache 2.0](LICENSE).

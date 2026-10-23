@@ -93,6 +93,12 @@ nothing from the analysis.
 
 ## Rules in five minutes
 
+**From the app**, without a terminal: **Shield** section → **Create the example rules** →
+**Edit rules** → change the text → **Save and approve**. Guardia checks the text before saving
+it: if something is wrong it shows the line and saves nothing.
+
+**From the command line:**
+
 ```powershell
 guardia shield rules example --save
 guardia shield rules verify
@@ -453,6 +459,10 @@ This way both you and the AI understand what happened and why.
 - Credential requests are recognized by keywords in English and Italian: a request worded
   differently can slip through.
 - After you approve a tool, the client sees it only when it asks for the list again.
+- With Claude Desktop from the Microsoft Store, if the Shield started by Claude is the first to
+  create Guardia's data folder, Windows puts it in Claude's private folder
+  (`%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Local\GuardiaMCP`) and the app does not see
+  it. Open Guardia once from its own icon before protecting servers.
 - An AI app that rewrites its own configuration file can remove the Shield connection:
   `guardia shield list` always shows the current state.
 - On Windows, programs started in turn by a server (for example `node` started by `npx`) may keep

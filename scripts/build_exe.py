@@ -16,6 +16,7 @@ WORK = PROJECT / "build"
 FOLDER = DIST / "GuardiaMCP"
 ARCHIVE = DIST / f"GuardiaMCP-{__version__}-windows-x64.zip"
 EXTRA_FILES = ("LICENSE", "NOTICE", "README.md", "SECURITY.md")
+GUIDES = ("SCUDO.md", "SHIELD.md", "REGOLE.md", "RULES.md", "IMPARA-MCP.md")
 
 
 def sha256(path: Path) -> str:
@@ -29,6 +30,9 @@ def sha256(path: Path) -> str:
 def package() -> None:
     for name in EXTRA_FILES:
         shutil.copy2(PROJECT / name, FOLDER / name)
+    (FOLDER / "docs").mkdir(exist_ok=True)
+    for name in GUIDES:
+        shutil.copy2(PROJECT / "docs" / name, FOLDER / "docs" / name)
     with zipfile.ZipFile(ARCHIVE, "w", zipfile.ZIP_DEFLATED) as archive:
         for path in sorted(FOLDER.rglob("*")):
             if path.is_file():

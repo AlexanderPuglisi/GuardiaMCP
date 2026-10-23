@@ -20,6 +20,7 @@ from guardia.cli import main as cli_main
 from guardia.inventory import DiscoveryOptions, HostEnvironment, discover
 from guardia.ledger import Ledger
 from guardia.shield.activation import ActivationStore
+from guardia.shield.commands import example_text
 from guardia.shield.pins import PinStore
 
 PROJECT = Path(__file__).resolve().parent.parent
@@ -191,6 +192,7 @@ def record(env: HostEnvironment, language: str, scrub: Callable[[Any], Any]) -> 
             "report": report,
             "ledger": api.ledger(50),
             "shield": api.shield(),
+            "rules_text": example_text(language),
         }
     )
     return data

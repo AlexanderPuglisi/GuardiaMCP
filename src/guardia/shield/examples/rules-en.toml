@@ -1,7 +1,7 @@
 # Guardia MCP Shield rules.
 # Each [[rule]] says what to do when a message matches its conditions.
 # When several rules match, the strictest wins: block > ask > redact > log > allow.
-# After every change run:  guardia shield rules approve
+# After every change: "Save and approve" in the Shield section of the app, or  guardia shield rules approve
 # Full guide: docs/SHIELD.md
 
 version = 1

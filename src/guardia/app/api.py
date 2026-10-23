@@ -32,7 +32,7 @@ from guardia.app.viewmodel import report_view, ui_strings
 from guardia.display import safe_text
 from guardia.i18n import Translator
 from guardia.inventory import DiscoveryOptions, HostEnvironment
-from guardia.ledger import Ledger
+from guardia.ledger import Ledger, write_atomic
 from guardia.model import Severity, sha256_hex
 from guardia.render.html import render_html
 from guardia.render.sarif import build_sarif
@@ -41,8 +41,17 @@ from guardia.safeio import SafeReadError
 from guardia.scanner import ScanReport
 from guardia.secure_store import Protector
 from guardia.shield.activation import ActivationStore, Support
+from guardia.shield.commands import example_text, format_issue
 from guardia.shield.pins import PinError, PinStore
-from guardia.shield.policy import ApprovalError, approve_rules
+from guardia.shield.policy import (
+    MAX_RULES_BYTES,
+    ApprovalError,
+    RulesChangedError,
+    approve_rules,
+    read_rules_text,
+    rules_path,
+)
+from guardia.shield.rules import parse_rules
 from guardia.shield.wrapping import launcher
 
 ANCHOR = re.compile(r"^\d{1,9}:[0-9a-f]{64}$")
@@ -376,26 +385,78 @@ class GuardiaApi:
             t("shield_rules.tools_approved", server=server, tools=tools), True
         )
 
-    def shield_approve_rules(self, confirmed: object) -> dict[str, Any]:
-        if confirmed is not True:
-            raise self._fail("confirmation")
-        t = self._t()
+    def _approve(self, t: Translator, expected: bytes | None = None) -> dict[str, Any]:
         try:
-            result, _ = approve_rules(self._env.data_dir, self._home(), self._protector)
+            result, _ = approve_rules(
+                self._env.data_dir, self._home(), self._protector, expected=expected
+            )
         except SafeReadError:
             return self._shield_result(t("ui.shield_no_rules_file"), False)
+        except RulesChangedError:
+            return self._shield_result(t("ui.shield_rules_changed"), False)
         except ApprovalError as exc:
             message = t("shield_rules.approval_failed", error=safe_text(str(exc), 200))
             return self._shield_result(message, False)
+        issues = [format_issue(issue, t) for issue in result.issues]
         if result.ruleset is None:
             message = t("shield_rules.invalid", count=len(result.errors))
-            return self._shield_result(message, False)
+            return self._shield_result(message, False) | {"issues": issues}
         message = t(
             "shield_rules.approved",
             count=len(result.ruleset.rules),
             sha=result.ruleset.sha256[:16],
         )
-        return self._shield_result(message, True)
+        return self._shield_result(message, True) | {"issues": issues}
+
+    def shield_approve_rules(self, confirmed: object) -> dict[str, Any]:
+        if confirmed is not True:
+            raise self._fail("confirmation")
+        return self._approve(self._t())
+
+    def shield_rules_text(self) -> dict[str, Any]:
+        path = rules_path(self._env.data_dir)
+        if not path.exists():
+            return {"exists": False, "text": ""}
+        try:
+            return {"exists": True, "text": read_rules_text(path)}
+        except SafeReadError as exc:
+            raise self._fail("rules_unreadable") from exc
+
+    def shield_rules_example(self, confirmed: object) -> dict[str, Any]:
+        if confirmed is not True:
+            raise self._fail("confirmation")
+        t = self._t()
+        path = rules_path(self._env.data_dir)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with path.open("xb") as handle:
+                handle.write(example_text(t.language).encode("utf-8"))
+        except FileExistsError:
+            return self._shield_result(t("ui.shield_rules_exist"), False)
+        return self._shield_result(t("ui.shield_example_created"), True)
+
+    def shield_rules_save(self, text: object, confirmed: object) -> dict[str, Any]:
+        if confirmed is not True:
+            raise self._fail("confirmation")
+        if not isinstance(text, str):
+            raise self._fail("invalid")
+        content = text.replace("\r\n", "\n")
+        try:
+            data = content.encode("utf-8")
+        except UnicodeEncodeError as exc:
+            raise self._fail("invalid") from exc
+        if len(data) > MAX_RULES_BYTES:
+            raise self._fail("invalid")
+        t = self._t()
+        result = parse_rules(content, self._home())
+        if result.ruleset is None:
+            message = t("shield_rules.not_approved")
+            issues = [format_issue(issue, t) for issue in result.issues]
+            return self._shield_result(message, False) | {"issues": issues}
+        path = rules_path(self._env.data_dir)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        write_atomic(path, data)
+        return self._approve(t, expected=data)
 
     def window_minimize(self) -> None:
         if self._window is not None:

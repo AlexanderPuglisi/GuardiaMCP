@@ -1,7 +1,7 @@
 # Regole dello Scudo di Guardia MCP.
 # Ogni [[regola]] dice cosa fare quando un messaggio corrisponde alle sue condizioni.
 # Se più regole corrispondono, vince la più severa: blocca > chiedi > oscura > registra > consenti.
-# Dopo ogni modifica esegui:  guardia scudo regole approva
+# Dopo ogni modifica: «Salva e approva» nella sezione Scudo dell'app, oppure  guardia scudo regole approva
 # Guida completa: docs/SCUDO.md
 
 versione = 1
