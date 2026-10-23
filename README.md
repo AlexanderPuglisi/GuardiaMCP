@@ -2,7 +2,7 @@
   <img src="docs/banner.svg" alt="Guardia MCP: free, offline security shield for AI agents that use MCP, by Alexander Puglisi" width="100%">
 </p>
 
-**by Alexander Puglisi** · [alexanderpuglisiskilly.com](https://alexanderpuglisiskilly.com) · [Download](https://github.com/AlexanderPuglisi/guardia-mcp/releases/latest)
+**by Alexander Puglisi** · [alexanderpuglisiskilly.com](https://alexanderpuglisiskilly.com) · [Download](https://github.com/AlexanderPuglisi/guardia-mcp/releases/latest) · [✓ Claude Academy: Introduction to MCP](https://academy.claude.com/verify/5a6125d6ee0ea408559c3679d0ff2657)
 
 [How it was tested](TESTING.md) · [Security](SECURITY.md) · [For reviewers](AUDIT.md) · [Guide (EN)](docs/SHIELD.md) · [Guida (IT)](docs/SCUDO.md)
 
@@ -212,26 +212,29 @@ automatic start. Remove it in this order:
    `%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Local\GuardiaMCP`.
 4. Delete the folder you extracted and any shortcut you created.
 
-### How it was built
+### How I built it
 
-Guardia MCP was designed, directed and verified by **Alexander Puglisi**. The code was written with
-**Claude Code**, Anthropic's AI coding agent, under his direction. Every commit carries a
-`Co-Authored-By: Claude` line, so the history shows exactly who did what.
+I created Guardia MCP on my own: there is no team or company behind it. I decided what to build, how
+it should work and what it must never do. To write the code I worked with **Claude Code**,
+Anthropic's AI coding agent, which is listed as a contributor: every commit carries a
+`Co-Authored-By: Claude` line, so the project history shows openly who did what.
 
-- **Alexander** decided what to build and the principles it follows: free for everyone, offline, no
-  account, block when in doubt, rules in plain TOML, Italian and English. He approved every phase
-  before it was built, tested the app on his own PC and found real problems along the way (a path
-  that would not paste into File Explorer, gaps around the maximized window, unclear texts), which
-  were then fixed.
-- **Claude** wrote the code, the tests and the documentation, one phase at a time, explaining each
-  step.
-- **A separate Claude session** reviewed the finished project from scratch and found 11 bugs, all
-  fixed with a test each: see [TESTING.md](TESTING.md).
+- **My work**: I chose the principles (free for everyone, offline, no account, block when in doubt,
+  rules in plain TOML, Italian and English), approved every phase before it was built, tested the
+  app on my own PC and found real problems along the way (a path that would not paste into File
+  Explorer, gaps around the maximized window, unclear texts), which we then fixed.
+- **Claude's contribution**: it wrote the code, the tests and the documentation under my direction,
+  one phase at a time, explaining every step to me.
+- **The review**: before publishing, I had a separate Claude session review the whole project from
+  scratch. It found 11 bugs, and we fixed every one of them, each with its own test
+  ([TESTING.md](TESTING.md)).
 
-Before any code, Alexander studied the protocol with Anthropic's official course
-([Claude Academy badge: Introduction to Model Context Protocol](https://academy.claude.com/verify/5a6125d6ee0ea408559c3679d0ff2657)). The software was then
-built in one intensive day, 23 October 2026: the static scanner (v1), the real-time Shield
-(v2.0 to v2.5), then the independent review.
+Before writing any code I studied the protocol with Anthropic's official course
+([Claude Academy badge: Introduction to Model Context Protocol](https://academy.claude.com/verify/5a6125d6ee0ea408559c3679d0ff2657)). Then I built Guardia in
+one intensive day, 23 October 2026: the static scanner (v1), the real-time Shield (v2.0 to v2.5) and
+finally the independent review.
+
+— Alexander Puglisi
 
 License: [Apache 2.0](LICENSE).
 
@@ -449,26 +452,30 @@ servizi, niente chiavi di registro, niente avvio automatico. Toglila in quest'or
    `%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Local\GuardiaMCP`.
 4. Cancella la cartella che avevi estratto e gli eventuali collegamenti.
 
-### Come è stato costruito
+### Come l'ho costruito
 
-Guardia MCP è stato progettato, diretto e verificato da **Alexander Puglisi**. Il codice è stato
-scritto con **Claude Code**, l'agente di programmazione AI di Anthropic, sotto la sua guida. Ogni
-commit porta la riga `Co-Authored-By: Claude`, così la storia del progetto mostra esattamente chi
-ha fatto cosa.
+Guardia MCP l'ho creato io, da solo: non c'è un team né un'azienda dietro. Ho deciso cosa costruire,
+come doveva funzionare e cosa non doveva mai fare. Per scrivere il codice ho lavorato con
+**Claude Code**, l'agente di programmazione AI di Anthropic, che compare tra i contributori: ogni
+commit porta la riga `Co-Authored-By: Claude`, così la storia del progetto mostra con trasparenza
+chi ha fatto cosa.
 
-- **Alexander** ha deciso cosa costruire e i principi da seguire: gratis per tutti, offline,
-  nessun account, nel dubbio blocca, regole in TOML semplice, italiano e inglese. Ha approvato
-  ogni fase prima che venisse costruita, ha provato l'app sul suo PC e ha trovato problemi veri
-  lungo la strada (un percorso che non si incollava in Esplora risorse, spifferi intorno alla
-  finestra ingrandita, testi poco chiari), poi corretti.
-- **Claude** ha scritto il codice, i test e la documentazione, una fase alla volta, spiegando ogni
-  passo.
-- **Una sessione separata di Claude** ha rivisto il progetto finito da zero e ha trovato 11 bug,
-  tutti corretti con un test ciascuno: vedi [TESTING.md](TESTING.md).
+- **Il mio lavoro**: ho scelto i principi (gratis per tutti, offline, nessun account, nel dubbio
+  blocca, regole in TOML semplice, italiano e inglese), ho approvato ogni fase prima che venisse
+  costruita, ho provato l'app sul mio PC e ho trovato problemi veri lungo la strada (un percorso che
+  non si incollava in Esplora risorse, spifferi intorno alla finestra ingrandita, testi poco
+  chiari), che abbiamo poi corretto.
+- **Il contributo di Claude**: ha scritto il codice, i test e la documentazione sotto la mia guida,
+  una fase alla volta, spiegandomi ogni passo.
+- **La revisione**: prima di pubblicare ho fatto rivedere tutto il progetto da zero a una sessione
+  separata di Claude. Ha trovato 11 bug, e li abbiamo corretti tutti, ciascuno con il suo test
+  ([TESTING.md](TESTING.md)).
 
-Prima di scrivere codice, Alexander ha studiato il protocollo con il corso ufficiale di Anthropic
-([badge Claude Academy: Introduction to Model Context Protocol](https://academy.claude.com/verify/5a6125d6ee0ea408559c3679d0ff2657)). Il software è stato poi
-costruito in una giornata intensa, il 23 ottobre 2026: lo scanner statico (v1), lo Scudo in tempo
-reale (dalla v2.0 alla v2.5), poi la revisione indipendente.
+Prima di scrivere codice ho studiato il protocollo con il corso ufficiale di Anthropic
+([badge Claude Academy: Introduction to Model Context Protocol](https://academy.claude.com/verify/5a6125d6ee0ea408559c3679d0ff2657)). Poi ho costruito Guardia
+in una giornata intensa, il 23 ottobre 2026: lo scanner statico (v1), lo Scudo in tempo reale
+(dalla v2.0 alla v2.5) e infine la revisione indipendente.
+
+— Alexander Puglisi
 
 Licenza: [Apache 2.0](LICENSE).
