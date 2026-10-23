@@ -14,7 +14,7 @@ from urllib.parse import urlsplit
 
 from guardia.inventory.parsers import URL_KEYS
 from guardia.model import Finding, ServerEntry, Severity, Transport, frozen_mapping, json_pointer
-from guardia.redact import SECRET_VALUE, is_secret_name, redact_args, redact_url
+from guardia.redact import SECRET_VALUE, is_secret_name, redact_args, redact_free_text, redact_url
 from guardia.scanner.commandline import (
     damerau_levenshtein,
     parse_docker_run,
@@ -45,8 +45,10 @@ def emit(
         rule_id=rule_id,
         severity=severity if severity is not None else rule.severity,
         location=server.locate(pointer),
-        evidence=evidence,
-        params=frozen_mapping({"server": server.name, **params}),
+        evidence=redact_free_text(evidence),
+        params=frozen_mapping(
+            {"server": server.name, **{k: redact_free_text(v) for k, v in params.items()}}
+        ),
     )
 
 

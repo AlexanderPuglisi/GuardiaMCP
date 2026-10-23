@@ -25,7 +25,16 @@ SECRET_VALUE = re.compile(
     r")"
 )
 
-_ASSIGNMENT = re.compile(r"^(?P<prefix>-{0,2})(?P<name>[A-Za-z0-9_.-]+)(?P<sep>[=:])(?P<value>.*)$")
+_ASSIGNMENT = re.compile(
+    r"^(?P<prefix>-{0,2}|/)(?P<name>[A-Za-z0-9_.-]+)(?P<sep>[=:])(?P<value>.*)$"
+)
+_URL = re.compile(r"[a-z][a-z0-9+.-]*://[^\s'\"<>`]+", re.IGNORECASE)
+_AUTH_SCHEME = re.compile(r"(?i)\b(?P<scheme>bearer|basic)(?P<space>\s+)[A-Za-z0-9._~+/=-]{6,}")
+_INLINE_ASSIGNMENT = re.compile(
+    r"(?i)(?P<name>[A-Za-z0-9_.-]*(?:token|secret|passw(?:or)?d|pwd|api[_-]?key|apikey|"
+    r"credential|private[_-]?key|access[_-]?key|cookie|session|signature)[A-Za-z0-9_.-]*)"
+    r"(?P<sep>\s*[=:]\s*)(?P<value>\"[^\"]*\"|'[^']*'|[^\s'\"&;|,)}]+)"
+)
 
 
 def is_secret_name(name: str) -> bool:
@@ -34,6 +43,13 @@ def is_secret_name(name: str) -> bool:
 
 def redact_text(value: str) -> str:
     return SECRET_VALUE.sub(REDACTED, value)
+
+
+def redact_free_text(value: str) -> str:
+    value = _URL.sub(lambda m: redact_url(m.group(0)), value)
+    value = _AUTH_SCHEME.sub(lambda m: f"{m['scheme']}{m['space']}{REDACTED}", value)
+    value = _INLINE_ASSIGNMENT.sub(lambda m: f"{m['name']}{m['sep']}{REDACTED}", value)
+    return redact_text(value)
 
 
 def redact_url(url: str) -> str:
@@ -78,12 +94,9 @@ def redact_args(args: Sequence[str]) -> tuple[str, ...]:
         if match and is_secret_name(match["name"]):
             result.append(f"{match['prefix']}{match['name']}{match['sep']}{REDACTED}")
             continue
-        if arg.startswith("-") and is_secret_name(arg.lstrip("-")):
+        if match is None and arg.startswith("-") and is_secret_name(arg.lstrip("-")):
             result.append(arg)
             redact_next = True
             continue
-        if "://" in arg:
-            result.append(redact_url(arg))
-            continue
-        result.append(redact_text(arg))
+        result.append(redact_free_text(arg))
     return tuple(result)
