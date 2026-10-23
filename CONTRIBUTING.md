@@ -37,7 +37,7 @@ uv run ruff check src tests scripts packaging
 uv run mypy
 ```
 
-All four checks must be green before a pull request.
+All four checks must be green before a pull request. `tests/test_shield_sdk.py` runs the Shield between a client and a fake server made with the official MCP Python SDK (`mcp`, a development-only dependency pinned in `uv.lock`): the published Guardia has no runtime dependency on it.
 
 ### Where things are
 
@@ -48,7 +48,7 @@ All four checks must be green before a pull request.
 | `src/guardia/scanner/` | the rules (`rules.py`) and the checks |
 | `src/guardia/render/` | terminal, HTML, SARIF output and the rules guide |
 | `src/guardia/app/` | desktop app (pywebview bridge, page, settings) |
-| `src/guardia/shield/` | the real-time Shield: message checks, session, server process, proxy, TOML rules, engine, signed policy |
+| `src/guardia/shield/` | the real-time Shield: message checks, session, server process, proxy, TOML rules, engine, signed policy, built-in protections, tool memory, confirmation window, client setup |
 | `src/guardia/locales/` | every user-visible text, in `it.toml` and `en.toml` |
 | `tests/corpus/` | fake samples: configurations, tool servers, code, skills |
 | `scripts/` | build of the executables, demo GIF, icon |
@@ -141,7 +141,7 @@ uv run ruff check src tests scripts packaging
 uv run mypy
 ```
 
-Tutti e quattro i controlli devono essere verdi prima di una pull request.
+Tutti e quattro i controlli devono essere verdi prima di una pull request. `tests/test_shield_sdk.py` fa passare dallo Scudo un client e un server finto costruiti con l'SDK Python ufficiale di MCP (`mcp`, dipendenza solo di sviluppo bloccata in `uv.lock`): Guardia pubblicato non dipende da lui.
 
 ### Dove si trovano le cose
 
@@ -152,7 +152,7 @@ Tutti e quattro i controlli devono essere verdi prima di una pull request.
 | `src/guardia/scanner/` | le regole (`rules.py`) e i controlli |
 | `src/guardia/render/` | output per terminale, HTML, SARIF e la guida alle regole |
 | `src/guardia/app/` | app desktop (ponte pywebview, pagina, impostazioni) |
-| `src/guardia/shield/` | lo Scudo in tempo reale: controllo dei messaggi, sessione, processo del server, proxy, regole TOML, motore, regole firmate |
+| `src/guardia/shield/` | lo Scudo in tempo reale: controllo dei messaggi, sessione, processo del server, proxy, regole TOML, motore, regole firmate, protezioni di base, memoria degli strumenti, finestra di conferma, collegamento dei client |
 | `src/guardia/locales/` | tutti i testi visibili, in `it.toml` e `en.toml` |
 | `tests/corpus/` | esempi finti: configurazioni, server con strumenti, codice, skill |
 | `scripts/` | build degli eseguibili, GIF dimostrativa, icona |

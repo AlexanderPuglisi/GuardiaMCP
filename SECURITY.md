@@ -27,9 +27,9 @@ Each guarantee below is enforced by an automated test, not only by a promise.
 | Guarantee | How it is enforced |
 |---|---|
 | Never runs the code it analyzes | No `eval`/`exec`, dynamic import or pickle anywhere in the source (`tests/test_tool_corpus.py`). The only `ctypes` use is the Windows DPAPI call in `secure_store.py`. |
-| Starts a process only for the Shield, and only the one you configured | `subprocess` is allowed in exactly one module, `shield/process.py`, which starts the server command written in your configuration, never through a shell (`tests/test_tool_corpus.py`). The scanner and the app never start processes. |
+| Starts a process only for the Shield, and only the one you configured | `subprocess` is allowed in exactly one module, `shield/process.py`, which starts the server command written in your configuration and Guardia's own confirmation window, never through a shell (`tests/test_tool_corpus.py`). The scanner and the app never start processes. |
 | Never connects to the network | No network module is imported; `urllib.parse` is used only to read text (`tests/test_self_defense.py`). The desktop app page has `connect-src 'none'`. |
-| Never changes your configuration files | Guardia writes only to `%LOCALAPPDATA%\GuardiaMCP` (baseline, ledger, app settings) and to the report files you choose. |
+| Changes a configuration file only when you confirm it | The scanner writes only to `%LOCALAPPDATA%\GuardiaMCP` (baseline, ledger, app settings) and to the report files you choose. Only `guardia shield enable/disable --confirm` (or the button in the app, after a confirmation) changes a client file: it saves a backup first, changes only that server's entry, and writes nothing if the file changed meanwhile (`tests/test_shield_activation.py`). |
 | Text from analyzed files can never become code | Terminal output escapes control and bidirectional characters; the HTML report has no scripts and a strict CSP; the desktop app builds the page with `textContent` only and refuses `innerHTML` (`tests/test_app.py`). |
 | Secrets are not copied into reports | Known secret formats are replaced with `[REDACTED]`; secrets in environment variables are shown only as name and length. |
 | Defensive file reading | Size limit (64 MB per file), nesting limit, duplicate-key detection, rejection of `NaN`/`Infinity` in JSON. Unreadable files are reported and the scan is marked incomplete (exit code 3) instead of silently passing. |
@@ -53,8 +53,8 @@ Guardia MCP is a useful layer, not a guarantee. Please read these limits before 
 - **Only Python and JavaScript/TypeScript code is analyzed.** Other languages are checked only at
   the configuration and manifest level.
 - **Runtime behavior is invisible.** A server can show harmless descriptions on disk and different
-  ones when running, or misbehave only on some inputs. The real-time shield planned for version 2
-  addresses part of this.
+  ones when running, or misbehave only on some inputs. The real-time Shield (version 2) addresses
+  part of this, for the servers you connect to it.
 
 **Rules are patterns, not understanding.** There is no AI by design. Rules can produce false alarms
 and can miss new tricks. Because the project is open source, an attacker can read the rules and try
@@ -72,10 +72,13 @@ defense is an **anchor saved outside the PC** (`guardia ledger anchor`), checked
 `guardia ledger verify --anchor`. On macOS and Linux the key is not protected by the operating
 system, only by file permissions.
 
-**Version 1 does not block anything.** It reports. It does not stop an agent while it is running.
+**The scan does not block anything.** It reports. Only servers connected to the Shield are
+checked while the agent is running.
 
-**The Shield (v2) is a development preview.** It applies built-in protections (phase 2.2) and the
-rules you approve (phase 2.1). The tool memory trusts the first time it meets a server, result
+**The Shield (v2) protects only what passes through it.** Only local (stdio) servers that you
+connect to it are protected: remote (HTTP) servers, Claude Desktop extensions, plugins and
+servers you start some other way are not. An AI app that rewrites its own configuration can
+remove the connection: `guardia shield list` shows the current state. The tool memory trusts the first time it meets a server, result
 checking looks at the first million characters, and credential requests are recognized by
 English and Italian keywords. Rules and protections are patterns: text written to avoid them
 can succeed. The confirmation window
@@ -134,9 +137,9 @@ Ogni garanzia è verificata da un test automatico, non solo promessa.
 | Garanzia | Come viene verificata |
 |---|---|
 | Non esegue mai il codice che analizza | Nel sorgente non c'è nessun `eval`/`exec`, import dinamico o pickle (`tests/test_tool_corpus.py`). L'unico uso di `ctypes` è la chiamata a DPAPI di Windows in `secure_store.py`. |
-| Avvia un processo solo per lo Scudo, e solo quello che hai configurato tu | `subprocess` è permesso in un solo modulo, `shield/process.py`, che avvia il comando del server scritto nella tua configurazione, mai tramite una shell (`tests/test_tool_corpus.py`). Lo scanner e l'app non avviano mai processi. |
+| Avvia un processo solo per lo Scudo, e solo quello che hai configurato tu | `subprocess` è permesso in un solo modulo, `shield/process.py`, che avvia il comando del server scritto nella tua configurazione e la finestra di conferma di Guardia, mai tramite una shell (`tests/test_tool_corpus.py`). Lo scanner e l'app non avviano mai processi. |
 | Non si collega mai alla rete | Nessun modulo di rete viene importato; `urllib.parse` serve solo a leggere testo (`tests/test_self_defense.py`). La pagina dell'app desktop ha `connect-src 'none'`. |
-| Non modifica i tuoi file di configurazione | Guardia scrive solo in `%LOCALAPPDATA%\GuardiaMCP` (base di confronto, registro, impostazioni dell'app) e nei file di rapporto che scegli tu. |
+| Modifica un file di configurazione solo quando lo confermi | La scansione scrive solo in `%LOCALAPPDATA%\GuardiaMCP` (base di confronto, registro, impostazioni dell'app) e nei file di rapporto che scegli tu. Solo `guardia scudo attiva/disattiva --conferma` (o il pulsante nell'app, dopo una conferma) cambia un file di un client: prima salva una copia, cambia solo la voce di quel server e non scrive nulla se nel frattempo il file è cambiato (`tests/test_shield_activation.py`). |
 | Il testo dei file analizzati non diventa mai codice | L'output nel terminale neutralizza i caratteri di controllo e bidirezionali; il rapporto HTML non ha script e ha una CSP rigida; l'app desktop costruisce la pagina solo con `textContent` e rifiuta `innerHTML` (`tests/test_app.py`). |
 | I segreti non finiscono nei rapporti | I formati di segreto noti diventano `[REDACTED]`; i segreti nelle variabili d'ambiente compaiono solo come nome e lunghezza. |
 | Lettura difensiva dei file | Limite di dimensione (64 MB per file), limite di annidamento, controllo delle chiavi duplicate, rifiuto di `NaN`/`Infinity` nel JSON. I file illeggibili vengono segnalati e l'analisi risulta incompleta (codice di uscita 3) invece di passare in silenzio. |
@@ -165,7 +168,7 @@ trovato nulla.
   controllati solo a livello di configurazione e manifest.
 - **Il comportamento durante l'esecuzione non si vede.** Un server può avere descrizioni innocue sul
   disco e diverse quando è in funzione, o comportarsi male solo con certi input. Lo Scudo in tempo
-  reale previsto nella versione 2 copre una parte di questo problema.
+  reale (versione 2) copre una parte di questo problema, per i server collegati a lui.
 
 **Le regole sono schemi, non comprensione.** Non c'è intelligenza artificiale, per scelta. Le
 regole possono dare falsi allarmi e non accorgersi di trucchi nuovi. Il progetto è open source,
@@ -185,10 +188,13 @@ oppure cancellare tutta la cartella. L'unica difesa è un'**ancora salvata fuori
 (`guardia registro ancora`), da controllare più avanti con `guardia registro verifica --ancora`.
 Su macOS e Linux la chiave non è protetta dal sistema operativo, solo dai permessi dei file.
 
-**La versione 1 non blocca nulla.** Segnala. Non ferma un agente mentre lavora.
+**La scansione non blocca nulla.** Segnala. Solo i server collegati allo Scudo vengono
+controllati mentre l'agente lavora.
 
-**Lo Scudo (v2) è un'anteprima di sviluppo.** Applica le protezioni di base (fase 2.2) e le regole
-che approvi (fase 2.1). La memoria degli strumenti si fida della prima volta che incontra un server,
+**Lo Scudo (v2) protegge solo quello che passa da lui.** Sono protetti solo i server locali (stdio)
+che colleghi: i server remoti (HTTP), le estensioni di Claude Desktop, i plugin e i server avviati
+in altro modo no. Un'app AI che riscrive la propria configurazione può togliere il collegamento:
+`guardia scudo elenco` mostra lo stato attuale. La memoria degli strumenti si fida della prima volta che incontra un server,
 il controllo dei risultati guarda il primo milione di caratteri e le richieste di credenziali
 vengono riconosciute da parole chiave in italiano e inglese. Regole e protezioni sono schemi: un
 testo scritto per aggirarle può riuscirci. La finestra di conferma

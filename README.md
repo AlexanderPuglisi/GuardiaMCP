@@ -17,7 +17,7 @@ Model Context Protocol (MCP). No account, no telemetry, no data ever leaves your
 <sub>The demo runs on a fake PC made of fake servers and skills written for the purpose
 (`scripts/demo.py`): no real data, no real secrets.</sub>
 
-**Status: version 0.1.0 (v1, static analysis).**
+**Status: version 0.2.0 — v1 (static analysis) and v2 (real-time Shield for local stdio servers).**
 
 - `guardia inventory` — finds every MCP server and skill on this PC (Claude Desktop, Claude Code,
   Cursor, VS Code, Windsurf, Gemini CLI, Codex, Copilot CLI) and lists them with a risk level.
@@ -40,11 +40,13 @@ Model Context Protocol (MCP). No account, no telemetry, no data ever leaves your
 - **Rules guide** — `guardia rules` lists all 88 rules, `guardia rules G05-002` explains one.
   The full guide is in [docs/RULES.md](docs/RULES.md) (generated from the code, always up to date).
 - **Desktop app** — a borderless window with the sections centered at the top: overview, servers
-  and skills, findings, ledger, reports and settings, each explained in one line, in Italian and English. It uses the same engine as the CLI, shows only text (never HTML from
+  and skills, findings, Shield, ledger, reports and settings, each explained in one line, in Italian and English. It uses the same engine as the CLI, shows only text (never HTML from
   analyzed files), has no network access and a strict CSP.
 
-Guardia never runs the code it analyzes and never changes configuration files. It keeps its own
-data (baseline, ledger, app settings) in `%LOCALAPPDATA%\GuardiaMCP`.
+The scan never runs the code it analyzes and never changes configuration files. Only the Shield
+changes a client's configuration, and only when you confirm it (with a backup first). Guardia
+keeps its own data (baseline, ledger, rules, tool memory, backups, app settings) in
+`%LOCALAPPDATA%\GuardiaMCP`.
 
 Exit codes of `guardia scan`: `0` nothing at or above `--fail-on` (default `high`),
 `1` problems found, `2` usage error, `3` incomplete analysis.
@@ -52,41 +54,40 @@ Exit codes of `guardia scan`: `0` nothing at or above `--fail-on` (default `high
 Read [SECURITY.md](SECURITY.md) for what Guardia guarantees and its honest limits, and
 [CONTRIBUTING.md](CONTRIBUTING.md) to help.
 
-### Shield (v2, development preview)
+### Shield (v2)
 
-`guardia shield --server NAME -- command arguments` starts a local MCP server behind Guardia: the
-client talks to Guardia, Guardia talks to the server. Today (phase 2.0) the Shield already:
-
-- accepts only valid JSON-RPC messages and forwards exactly what it checked (duplicate keys,
-  batches, wrong ids and oversized messages are dropped);
-- drops responses the server sends for requests nobody made;
-- blocks a message, instead of letting it through, if its own check fails;
-- refuses to start the server if it cannot write to the ledger, and records every session;
-- supports MCP 2025-11-25 and 2026-07-28 over stdio and adds about 0.06 ms per message.
-
-- applies **your rules** written in TOML (phase 2.1): block, hide tools, redact secrets, limit the
-  call rate, with English or Italian keys. Rules must be approved and are signed: if they are
-  changed behind your back, the Shield goes into full lockdown.
+The Shield sits between an AI app and a local MCP server: the client talks to Guardia, Guardia
+talks to the server, and every message is checked before it passes.
 
 ```powershell
+guardia shield list
+guardia shield enable --server NAME --confirm
 guardia shield rules example --save
-guardia shield rules verify
-guardia shield rules test --tool read_file --arguments '{"path": "~/.ssh/id_rsa"}'
 guardia shield rules approve
 ```
 
-- protects you even without rules (phase 2.2): it remembers each server's tools and **hides tools
-  that change or appear suddenly** until you approve them (`guardia shield tools approve`), applies
-  the 88 v1 rules in real time to hide poisoned tools and remove dangerous server instructions,
-  flags prompt injection in results, redacts secrets in results, and stops secrets in arguments
-  and requests for passwords. Hidden tools cannot be called either.
-
-- asks for your confirmation in a small always-on-top window when a rule says `ask` (phase 2.3):
-  the AI cannot answer for you, and no answer within 60 seconds means **block**.
-
-- connects servers for you (phase 2.4): `guardia shield list`, `guardia shield enable --server NAME
-  --confirm`, `guardia shield disable`, or the **Shield** section of the app. A backup is saved
-  first, only that server's entry changes, and your own later edits are never overwritten.
+- **Connects servers for you**: `guardia shield list` shows every server and whether it can be
+  protected; `enable` saves a backup, changes only that server's entry and records the original;
+  `disable` puts it back, never overwriting your own later edits. The same actions are in the
+  **Shield** section of the app.
+- **Your rules in TOML**, with English or Italian keys: allow, log, redact, ask or block a tool
+  call, a result or a server request; match tools, paths, hosts and text; limit the call rate.
+  Rules must be approved and are signed: if they are changed behind your back, the Shield blocks
+  everything until you approve them again. `guardia shield rules test` tries a rule without a
+  server.
+- **Protection even without rules**: it remembers each server's tools and **hides tools that change
+  or appear suddenly** until you approve them (`guardia shield tools approve`); it applies the 88
+  v1 rules in real time to hide poisoned tools and remove dangerous server instructions; it flags
+  prompt injection in results, redacts secrets in results, and stops secrets in arguments and
+  requests for passwords. Hidden tools cannot be called either.
+- **Asks you** in a small always-on-top window when a rule says `ask`: the AI cannot answer for you,
+  and no answer within 60 seconds means **block**.
+- **Fails closed**: only valid JSON-RPC messages pass, exactly as checked (duplicate keys, batches,
+  unsolicited responses and oversized messages are dropped); if a check fails or the ledger cannot
+  be written, the message is blocked or the server is not started. Every decision is recorded in
+  the ledger.
+- Supports MCP 2025-11-25 and 2026-07-28 over stdio, tested with the official MCP Python SDK, and
+  adds about 0.06 ms per message. Remote (HTTP) servers are not protected yet.
 
 Full guide: [docs/SHIELD.md](docs/SHIELD.md).
 
@@ -137,7 +138,7 @@ Model Context Protocol (MCP). Nessun account, nessuna telemetria, nessun dato es
 <sub>La demo gira su un PC finto, fatto di server e skill finti scritti apposta
 (`scripts/demo.py`): nessun dato vero, nessun segreto vero.</sub>
 
-**Stato: versione 0.1.0 (v1, analisi statica).**
+**Stato: versione 0.2.0 — v1 (analisi statica) e v2 (Scudo in tempo reale per i server locali stdio).**
 
 - `guardia inventario` — trova tutti i server MCP e le skill del PC (Claude Desktop, Claude Code,
   Cursor, VS Code, Windsurf, Gemini CLI, Codex, Copilot CLI) e li elenca con il livello di rischio.
@@ -164,11 +165,13 @@ Model Context Protocol (MCP). Nessun account, nessuna telemetria, nessun dato es
   spiega una. La guida completa è in [docs/REGOLE.md](docs/REGOLE.md) (generata dal codice,
   sempre aggiornata).
 - **App desktop** — una finestra senza bordi con le sezioni al centro in alto: panoramica, server e
-  skill, problemi, registro, rapporti e impostazioni, ognuna spiegata in una riga, in italiano e inglese. Usa lo stesso motore della CLI, mostra solo testo (mai HTML preso dai file
+  skill, problemi, Scudo, registro, rapporti e impostazioni, ognuna spiegata in una riga, in italiano e inglese. Usa lo stesso motore della CLI, mostra solo testo (mai HTML preso dai file
   analizzati), non ha accesso alla rete e ha una CSP rigida.
 
-Guardia non esegue mai il codice che analizza e non modifica i file di configurazione. Tiene i propri
-dati (base di confronto, registro, impostazioni dell'app) in `%LOCALAPPDATA%\GuardiaMCP`.
+La scansione non esegue mai il codice che analizza e non modifica i file di configurazione. Solo lo
+Scudo modifica la configurazione di un client, e solo quando lo confermi (dopo averne salvato una
+copia). Guardia tiene i propri dati (base di confronto, registro, regole, memoria degli strumenti,
+copie di sicurezza, impostazioni dell'app) in `%LOCALAPPDATA%\GuardiaMCP`.
 
 Codici di uscita di `guardia scansiona`: `0` nessun problema dal livello `--fallisci-da` in su
 (predefinito `high`), `1` problemi trovati, `2` errore d'uso, `3` analisi incompleta.
@@ -176,43 +179,41 @@ Codici di uscita di `guardia scansiona`: `0` nessun problema dal livello `--fall
 Leggi [SECURITY.md](SECURITY.md) per sapere cosa garantisce Guardia e quali sono i suoi limiti, e
 [CONTRIBUTING.md](CONTRIBUTING.md) per contribuire.
 
-### Scudo (v2, anteprima di sviluppo)
+### Scudo (v2)
 
-`guardia scudo --server NOME -- comando argomenti` avvia un server MCP locale dietro Guardia: il
-client parla con Guardia, Guardia parla con il server. Oggi (fase 2.0) lo Scudo già:
-
-- accetta solo messaggi JSON-RPC validi e inoltra esattamente quello che ha controllato (chiavi
-  duplicate, lotti di messaggi, id sbagliati e messaggi troppo grandi vengono scartati);
-- scarta le risposte che il server invia a richieste che nessuno ha fatto;
-- blocca un messaggio, invece di lasciarlo passare, se il suo stesso controllo va in errore;
-- non avvia il server se non riesce a scrivere nel registro, e registra ogni sessione;
-- supporta MCP 2025-11-25 e 2026-07-28 su stdio e aggiunge circa 0,06 ms per messaggio.
-
-- applica **le tue regole** scritte in TOML (fase 2.1): blocca, nasconde strumenti, oscura i
-  segreti, limita la frequenza delle chiamate, con chiavi in italiano o in inglese. Le regole vanno
-  approvate e vengono firmate: se qualcuno le cambia di nascosto, lo Scudo va in blocco totale.
+Lo Scudo si mette tra un'app AI e un server MCP locale: il client parla con Guardia, Guardia parla
+con il server, e ogni messaggio viene controllato prima di passare.
 
 ```powershell
+guardia scudo elenco
+guardia scudo attiva --server NOME --conferma
 guardia scudo regole esempio --salva
-guardia scudo regole verifica
-guardia scudo regole prova --strumento read_file --argomenti '{"path": "~/.ssh/id_rsa"}'
 guardia scudo regole approva
 ```
 
-- ti protegge anche senza regole (fase 2.2): ricorda gli strumenti di ogni server e **nasconde
-  quelli che cambiano o compaiono all'improvviso** finché non li approvi
-  (`guardia scudo strumenti approva`), applica in tempo reale le 88 regole della v1 per nascondere
-  gli strumenti avvelenati e togliere le istruzioni pericolose del server, segnala la prompt
-  injection nei risultati, oscura i segreti nei risultati e ferma i segreti negli argomenti e le
-  richieste di password. Gli strumenti nascosti non si possono nemmeno chiamare.
-
-- ti chiede conferma in una piccola finestra sempre in primo piano quando una regola dice
-  `chiedi` (fase 2.3): l'AI non può rispondere al posto tuo, e senza risposta entro 60 secondi
-  **blocca**.
-
-- collega i server per te (fase 2.4): `guardia scudo elenco`, `guardia scudo attiva --server NOME
-  --conferma`, `guardia scudo disattiva`, oppure la sezione **Scudo** dell'app. Prima salva una
-  copia di sicurezza, cambia solo la voce di quel server e non sovrascrive mai le tue modifiche.
+- **Collega i server per te**: `guardia scudo elenco` mostra tutti i server e se si possono
+  proteggere; `attiva` salva una copia di sicurezza, cambia solo la voce di quel server e annota
+  quella originale; `disattiva` la rimette, senza mai sovrascrivere le tue modifiche successive. Le
+  stesse azioni sono nella sezione **Scudo** dell'app.
+- **Le tue regole in TOML**, con chiavi in italiano o in inglese: consenti, registra, oscura, chiedi
+  o blocca una chiamata, un risultato o una richiesta del server; riconosce strumenti, percorsi,
+  indirizzi e testo; limita la frequenza delle chiamate. Le regole vanno approvate e vengono
+  firmate: se qualcuno le cambia di nascosto, lo Scudo blocca tutto finché non le riapprovi.
+  `guardia scudo regole prova` prova una regola senza server.
+- **Protezione anche senza regole**: ricorda gli strumenti di ogni server e **nasconde quelli che
+  cambiano o compaiono all'improvviso** finché non li approvi (`guardia scudo strumenti approva`);
+  applica in tempo reale le 88 regole della v1 per nascondere gli strumenti avvelenati e togliere
+  le istruzioni pericolose del server; segnala la prompt injection nei risultati, oscura i segreti
+  nei risultati e ferma i segreti negli argomenti e le richieste di password. Gli strumenti nascosti
+  non si possono nemmeno chiamare.
+- **Ti chiede conferma** in una piccola finestra sempre in primo piano quando una regola dice
+  `chiedi`: l'AI non può rispondere al posto tuo, e senza risposta entro 60 secondi **blocca**.
+- **Nel dubbio blocca**: passano solo messaggi JSON-RPC validi, esattamente come sono stati
+  controllati (chiavi duplicate, lotti, risposte non richieste e messaggi troppo grandi vengono
+  scartati); se un controllo va in errore o il registro non è scrivibile, il messaggio viene
+  bloccato o il server non parte. Ogni decisione finisce nel registro.
+- Supporta MCP 2025-11-25 e 2026-07-28 su stdio, è provato con l'SDK Python ufficiale di MCP e
+  aggiunge circa 0,06 ms per messaggio. I server remoti (HTTP) non sono ancora protetti.
 
 Guida completa: [docs/SCUDO.md](docs/SCUDO.md).
 

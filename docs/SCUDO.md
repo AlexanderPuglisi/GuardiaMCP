@@ -6,8 +6,9 @@ Lo Scudo è la parte di Guardia che lavora **mentre** l'AI usa i server MCP. L'a
 guarda i file e ti dice cosa c'è di rischioso; lo Scudo invece si mette in mezzo ai messaggi e può
 **bloccarli, nasconderli o oscurarli** seguendo regole scritte da te.
 
-> **Stato: anteprima di sviluppo (fase 2.4).** Regole, protezioni di base, finestra di conferma,
-> collegamento automatico dei client e vista «Scudo» nell'app funzionano.
+> **Stato: versione 0.2.0.** Regole, protezioni di base, finestra di conferma, collegamento
+> automatico dei client e vista «Scudo» nell'app. Provato con l'SDK Python ufficiale di MCP
+> (protocolli 2025-11-25 e 2026-07-28).
 
 ## Come funziona, in 30 secondi
 
@@ -451,6 +452,8 @@ Così sia tu sia l'AI capite cosa è successo e perché.
 - Le richieste di credenziali vengono riconosciute da parole chiave in italiano e inglese: una
   richiesta formulata in modo diverso può sfuggire.
 - Dopo che approvi uno strumento, il client lo vede solo quando richiede di nuovo l'elenco.
+- Un'app AI che riscrive il proprio file di configurazione può togliere il collegamento allo
+  Scudo: `guardia scudo elenco` mostra sempre lo stato attuale.
 - Su Windows, i programmi avviati a loro volta da un server (per esempio `node` avviato da `npx`)
   possono restare attivi se il server viene chiuso a forza.
 

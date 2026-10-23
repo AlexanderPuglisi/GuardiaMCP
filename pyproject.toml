@@ -1,6 +1,6 @@
 [project]
 name = "guardia-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "Defensive shield for AI agents that use the Model Context Protocol (MCP). By Alexander Puglisi."
 readme = "README.md"
 license = "Apache-2.0"
@@ -46,6 +46,7 @@ dev = [
     "pytest>=8.3",
     "ruff>=0.8",
     "mypy>=1.13",
+    "mcp==2.3.0",
 ]
 
 [tool.ruff]

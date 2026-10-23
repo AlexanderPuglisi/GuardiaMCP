@@ -6,8 +6,9 @@ The Shield is the part of Guardia that works **while** the AI is using MCP serve
 reads files and tells you what is risky; the Shield sits between the messages and can **block,
 hide or redact** them following rules you write.
 
-> **Status: development preview (phase 2.4).** Rules, built-in protections, the confirmation
-> window, automatic client setup and the "Shield" view in the app work.
+> **Status: version 0.2.0.** Rules, built-in protections, the confirmation window, automatic
+> client setup and the "Shield" view in the app. Tested with the official MCP Python SDK
+> (protocols 2025-11-25 and 2026-07-28).
 
 ## How it works, in 30 seconds
 
@@ -452,6 +453,8 @@ This way both you and the AI understand what happened and why.
 - Credential requests are recognized by keywords in English and Italian: a request worded
   differently can slip through.
 - After you approve a tool, the client sees it only when it asks for the list again.
+- An AI app that rewrites its own configuration file can remove the Shield connection:
+  `guardia shield list` always shows the current state.
 - On Windows, programs started in turn by a server (for example `node` started by `npx`) may keep
   running if the server is closed by force.
 
