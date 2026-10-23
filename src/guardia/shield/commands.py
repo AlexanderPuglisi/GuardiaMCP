@@ -225,11 +225,14 @@ def _context(simulation: Simulation, phase: Phase, arguments: Any) -> Context:
 
 def simulate(ws: Workspace, file: Path | None, simulation: Simulation) -> int:
     phase = PHASE_NAMES.get(simulation.phase.lower())
+    if phase is None:
+        ws.write(ws.t("shield_rules.bad_phase", value=safe_text(simulation.phase, 40)))
+        return EXIT_USAGE
     try:
         arguments = json.loads(simulation.arguments) if simulation.arguments else {}
     except ValueError:
         arguments = None
-    if phase is None or not isinstance(arguments, dict):
+    if not isinstance(arguments, dict):
         ws.write(ws.t("shield_rules.bad_arguments"))
         return EXIT_USAGE
     ruleset = _ruleset(ws, file)
@@ -366,6 +369,10 @@ def _selected(
     return chosen, missing
 
 
+def _confirm_flag(ws: Workspace) -> str:
+    return "--conferma" if ws.t.language == "it" else "--confirm"
+
+
 def _report_changes(ws: Workspace, report: ActivationReport) -> int:
     failures = 0
     for change in report.changes:
@@ -412,7 +419,7 @@ def shield_enable(
                     path=safe_text(str(candidate.server.source.path)),
                 )
             )
-        ws.write(ws.t("shield_setup.preview_hint", flag="--conferma"))
+        ws.write(ws.t("shield_setup.preview_hint", flag=_confirm_flag(ws)))
         return EXIT_OK
     return _report_changes(ws, store.enable([c.server for c in automatic], starter))
 
@@ -438,6 +445,6 @@ def shield_disable(
                     path=safe_text(str(record.get("file"))),
                 )
             )
-        ws.write(ws.t("shield_setup.preview_hint", flag="--conferma"))
+        ws.write(ws.t("shield_setup.preview_hint", flag=_confirm_flag(ws)))
         return EXIT_OK
     return _report_changes(ws, store.disable(None if everything else names))

@@ -34,7 +34,7 @@ Guardia works by reading files, without running anything and without artificial 
 
 ## What about rules I write myself?
 
-Rules you write in TOML will drive the real-time Shield planned for version 2. This guide covers only the fixed analysis rules of version 1, which cannot be turned off: this way no malicious file can switch them off.
+Rules you write in TOML drive the real-time Shield (see docs/SHIELD.md). This guide covers only the fixed analysis rules of version 1, which cannot be turned off: this way no malicious file can switch them off.
 
 ## Useful words
 

@@ -283,6 +283,10 @@ def test_cli_setup_commands(
     code, output = run_cli(env, "scudo", "attiva", "--server", "github", "--lingua", "it")
     assert code == 0
     assert "Nessuna modifica fatta" in output
+    assert "--conferma" in output
+    code, output = run_cli(env, "shield", "enable", "--server", "github", "--lang", "en")
+    assert "--confirm " in output
+    assert "--conferma" not in output
     assert desktop_config(env).read_bytes() == before
     code, output = run_cli(
         env, "scudo", "attiva", "--server", "vscode-one", "--server", "nope", "--lingua", "it"

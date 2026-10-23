@@ -51,7 +51,7 @@ a:
 
 ```json
 {
-  "command": "C:\\Programmi\\GuardiaMCP\\guardia.exe",
+  "command": "C:\\Users\\TUO-NOME\\GuardiaMCP\\guardia.exe",
   "args": ["scudo", "--server", "github", "--", "npx", "-y", "@modelcontextprotocol/server-github"]
 }
 ```
@@ -107,16 +107,21 @@ guardia scudo regole stato
 ```
 
 1. **esempio --salva** crea il file delle regole con cinque regole utili per tutti.
+   Finché non lo approvi, i server protetti sono in **blocco totale** (il file non è ancora
+   firmato): chiudi l'app AI mentre lo modifichi.
 2. Apri il file con un editor di testo e adattalo.
 3. **verifica** controlla il file e ti dice riga per riga cosa non va, con un suggerimento
    quando sbagli a scrivere una chiave.
-4. **prova** simula un messaggio e ti mostra quale decisione prenderebbe lo Scudo, senza
-   avviare nessun server.
+4. **prova** simula un messaggio e ti mostra quale decisione prenderebbero **le tue regole**,
+   senza avviare nessun server. Le protezioni di base non vengono simulate. In Windows PowerShell
+   5.1 metti la barra davanti alle virgolette interne:
+   `--argomenti '{\"path\": \"~/.ssh/id_rsa\"}'` (PowerShell 7 accetta la forma sopra).
 5. **approva** controlla il file, ti mostra le differenze rispetto all'ultima versione e lo
    **firma**. Gli Scudi già attivi usano le nuove regole entro un secondo.
 6. **stato** ti dice se le regole sono attive o se lo Scudo è in blocco totale e perché.
 
 I comandi esistono anche in inglese: `guardia shield rules verify | approve | test | example | status`.
+Il file d'esempio è in italiano quando la lingua è l'italiano (`--lingua it`).
 
 ## La finestra di conferma
 
@@ -141,8 +146,9 @@ senso chiedere (l'azione è già avvenuta o non è ancora stata richiesta): lì 
 
 ## Le protezioni di base
 
-Lo Scudo protegge anche **senza nessuna regola scritta da te**. Queste protezioni usano le stesse
-88 regole dell'analisi della v1, applicate in tempo reale.
+Lo Scudo protegge anche **senza nessuna regola scritta da te**. Queste protezioni applicano in
+tempo reale le regole della v1 che controllano descrizioni e schemi degli strumenti e istruzioni
+del server.
 
 | Protezione | Cosa fa | Predefinito | Valori |
 |---|---|---|---|
@@ -431,7 +437,7 @@ era senza conservarne il contenuto.
 Gli argomenti e i risultati **non** vengono mai scritti nel registro. Ci sono anche gli eventi
 `shield_start` e `shield_stop` per ogni sessione, `rules_approved` per ogni approvazione delle
 regole, e `tools_pinned`, `tools_pending`, `tools_approved`, `tools_forgotten` per la memoria degli
-strumenti.
+strumenti, e `shield_enabled`, `shield_disabled` quando Guardia collega o scollega un server.
 
 ## Cosa vede l'AI quando un messaggio è bloccato
 

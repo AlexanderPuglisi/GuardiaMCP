@@ -52,7 +52,7 @@ to:
 
 ```json
 {
-  "command": "C:\\Program Files\\GuardiaMCP\\guardia.exe",
+  "command": "C:\\Users\\YOUR-NAME\\GuardiaMCP\\guardia.exe",
   "args": ["shield", "--server", "github", "--", "npx", "-y", "@modelcontextprotocol/server-github"]
 }
 ```
@@ -108,11 +108,15 @@ guardia shield rules status
 ```
 
 1. **example --save** creates the rules file with five rules that are useful for everyone.
+   Until you approve it, protected servers are in **full lockdown** (the file is not signed yet):
+   close the AI app while you edit.
 2. Open the file with a text editor and adapt it.
 3. **verify** checks the file and tells you line by line what is wrong, with a suggestion when
    you misspell a key.
-4. **test** simulates a message and shows which decision the Shield would take, without starting
-   any server.
+4. **test** simulates a message and shows which decision **your rules** would take, without
+   starting any server. The built-in protections are not simulated. In Windows PowerShell 5.1
+   escape the inner quotes: `--arguments '{\"path\": \"~/.ssh/id_rsa\"}'` (PowerShell 7 accepts
+   the form above).
 5. **approve** checks the file, shows the differences from the last version and **signs** it.
    Running Shields use the new rules within one second.
 6. **status** tells you whether the rules are active or the Shield is in full lockdown, and why.
@@ -143,8 +147,8 @@ action already happened or has not been requested yet): there it works like `log
 
 ## Built-in protections
 
-The Shield protects you even **without any rule written by you**. These protections use the same
-88 rules as the v1 scanner, applied in real time.
+The Shield protects you even **without any rule written by you**. These protections apply in
+real time the v1 rules that check tool descriptions, schemas and server instructions.
 
 | Protection | What it does | Default | Values |
 |---|---|---|---|
@@ -433,7 +437,8 @@ without keeping its content.
 
 Arguments and results are **never** written to the ledger. There are also `shield_start` and
 `shield_stop` events for every session, `rules_approved` for every rules approval, and
-`tools_pinned`, `tools_pending`, `tools_approved`, `tools_forgotten` for the tool memory.
+`tools_pinned`, `tools_pending`, `tools_approved`, `tools_forgotten` for the tool memory, and
+`shield_enabled`, `shield_disabled` when Guardia connects or disconnects a server.
 
 ## What the AI sees when a message is blocked
 

@@ -76,8 +76,9 @@ guardia shield rules approve
   everything until you approve them again. `guardia shield rules test` tries a rule without a
   server.
 - **Protection even without rules**: it remembers each server's tools and **hides tools that change
-  or appear suddenly** until you approve them (`guardia shield tools approve`); it applies the 88
-  v1 rules in real time to hide poisoned tools and remove dangerous server instructions; it flags
+  or appear suddenly** until you approve them (`guardia shield tools approve --server NAME`); it
+  applies in real time the v1 rules for tool descriptions and server instructions to hide poisoned
+  tools and remove dangerous server instructions; it flags
   prompt injection in results, redacts secrets in results, and stops secrets in arguments and
   requests for passwords. Hidden tools cannot be called either.
 - **Asks you** in a small always-on-top window when a rule says `ask`: the AI cannot answer for you,
@@ -96,7 +97,8 @@ Full guide: [docs/SHIELD.md](docs/SHIELD.md).
 1. **Download** `GuardiaMCP-0.2.0-windows-x64.zip` from the project's **Releases** page on GitHub
    and check it: in PowerShell, `Get-FileHash .\GuardiaMCP-0.2.0-windows-x64.zip` must print the
    same value written in `SHA256SUMS.txt` on the same page.
-2. **Extract** it to a folder that will not move, for example `C:\Users\YOUR-NAME\GuardiaMCP`.
+2. **Extract** it to a folder that will not move, for example `C:\Users\YOUR-NAME` (the zip
+   already contains the `GuardiaMCP` folder, so you get `C:\Users\YOUR-NAME\GuardiaMCP`).
    Protected servers start Guardia from this folder: if you want to move or delete it later, first
    remove the protection (see *Uninstall*).
 3. **Open `GuardiaMCP.exe`.** The first time Windows SmartScreen may warn you, because the program
@@ -109,7 +111,8 @@ Full guide: [docs/SHIELD.md](docs/SHIELD.md).
    Reopen the AI app: from now on every message of that server passes through the Shield. Tools
    that appear or change later stay hidden until you approve them in the same section.
 6. **Your own rules (optional).** In *Shield* → *Shield rules*: **Create the example rules**,
-   then **Edit rules**, change what you want and press **Save and approve**. If something is wrong
+   then **Edit rules**, change what you want and press **Save and approve**. Until you approve,
+   protected servers are blocked: do this with the AI app closed. If something is wrong
    Guardia shows the line and saves nothing. When a rule says `ask`, a small Guardia window asks
    you; no answer within 60 seconds means **block**.
 7. **Undo** any time with **Remove protection** next to the server.
@@ -170,7 +173,9 @@ automatic start. Remove it in this order:
    ```
 
    The list must show 0 protected servers. If Guardia reports that you changed an entry yourself,
-   fix that entry by hand: the original file is in the `backup` folder of Guardia's data.
+   fix that entry by hand: the original file is in the `backup` folder of Guardia's data (for each
+   file, the oldest copy is the original). Entries you protected by hand (TOML files or files with
+   comments) must also be restored by hand.
 2. Close Guardia.
 3. Delete Guardia's data (ledger, rules, tool memory, backups, settings). **This cannot be
    undone**: copy the folder elsewhere first if you want to keep the history.
@@ -261,9 +266,10 @@ guardia scudo regole approva
   firmate: se qualcuno le cambia di nascosto, lo Scudo blocca tutto finché non le riapprovi.
   `guardia scudo regole prova` prova una regola senza server.
 - **Protezione anche senza regole**: ricorda gli strumenti di ogni server e **nasconde quelli che
-  cambiano o compaiono all'improvviso** finché non li approvi (`guardia scudo strumenti approva`);
-  applica in tempo reale le 88 regole della v1 per nascondere gli strumenti avvelenati e togliere
-  le istruzioni pericolose del server; segnala la prompt injection nei risultati, oscura i segreti
+  cambiano o compaiono all'improvviso** finché non li approvi
+  (`guardia scudo strumenti approva --server NOME`); applica in tempo reale le regole della v1 su
+  descrizioni degli strumenti e istruzioni del server per nascondere gli strumenti avvelenati e
+  togliere le istruzioni pericolose; segnala la prompt injection nei risultati, oscura i segreti
   nei risultati e ferma i segreti negli argomenti e le richieste di password. Gli strumenti nascosti
   non si possono nemmeno chiamare.
 - **Ti chiede conferma** in una piccola finestra sempre in primo piano quando una regola dice
@@ -284,7 +290,8 @@ Vuoi capire MCP da zero? Leggi [docs/IMPARA-MCP.md](docs/IMPARA-MCP.md).
 1. **Scarica** `GuardiaMCP-0.2.0-windows-x64.zip` dalla pagina **Releases** del progetto su GitHub
    e controllalo: in PowerShell, `Get-FileHash .\GuardiaMCP-0.2.0-windows-x64.zip` deve stampare
    lo stesso valore scritto in `SHA256SUMS.txt` nella stessa pagina.
-2. **Estrailo** in una cartella che non sposterai, per esempio `C:\Users\TUO-NOME\GuardiaMCP`.
+2. **Estrailo** in una cartella che non sposterai, per esempio `C:\Users\TUO-NOME` (lo zip
+   contiene già la cartella `GuardiaMCP`, quindi ottieni `C:\Users\TUO-NOME\GuardiaMCP`).
    I server protetti avviano Guardia da questa cartella: se un giorno vuoi spostarla o cancellarla,
    prima togli la protezione (vedi *Disinstallare*).
 3. **Apri `GuardiaMCP.exe`.** La prima volta Windows SmartScreen può mostrare un avviso, perché il
@@ -299,7 +306,8 @@ Vuoi capire MCP da zero? Leggi [docs/IMPARA-MCP.md](docs/IMPARA-MCP.md).
    Scudo. Gli strumenti che compaiono o cambiano dopo restano nascosti finché non li approvi nella
    stessa sezione.
 6. **Le tue regole (facoltativo).** In *Scudo* → *Regole dello Scudo*: **Crea le regole d'esempio**,
-   poi **Modifica le regole**, cambia quello che vuoi e premi **Salva e approva**. Se c'è un errore
+   poi **Modifica le regole**, cambia quello che vuoi e premi **Salva e approva**. Finché non
+   approvi, i server protetti sono bloccati: fallo con l'app AI chiusa. Se c'è un errore
    Guardia ti mostra la riga e non salva niente. Quando una regola dice `chiedi`, una piccola
    finestra di Guardia ti chiede conferma; senza risposta entro 60 secondi **blocca**.
 7. **Torna indietro** quando vuoi con **Togli protezione** accanto al server.
@@ -360,7 +368,9 @@ servizi, niente chiavi di registro, niente avvio automatico. Toglila in quest'or
    ```
 
    L'elenco deve mostrare 0 server protetti. Se Guardia ti dice che una voce l'hai cambiata tu,
-   sistemala a mano: il file originale è nella cartella `backup` dei dati di Guardia.
+   sistemala a mano: il file originale è nella cartella `backup` dei dati di Guardia (per ogni file
+   la copia più vecchia è l'originale). Anche le voci protette a mano (file TOML o con commenti)
+   vanno ripristinate a mano.
 2. Chiudi Guardia.
 3. Cancella i dati di Guardia (registro, regole, memoria degli strumenti, copie di sicurezza,
    impostazioni). **Non si può annullare**: se vuoi tenere lo storico, copia prima la cartella

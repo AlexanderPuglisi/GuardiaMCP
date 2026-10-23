@@ -34,7 +34,7 @@ Guardia lavora leggendo i file, senza eseguire nulla e senza intelligenza artifi
 
 ## E le regole che scrivo io?
 
-Le regole scritte da te in formato TOML serviranno allo Scudo in tempo reale, previsto nella versione 2. Questa guida riguarda solo le regole fisse dell'analisi della versione 1, che non si possono disattivare: così nessun file malevolo può spegnerle.
+Le regole scritte da te in formato TOML guidano lo Scudo in tempo reale (vedi docs/SCUDO.md). Questa guida riguarda solo le regole fisse dell'analisi della versione 1, che non si possono disattivare: così nessun file malevolo può spegnerle.
 
 ## Parole utili
 

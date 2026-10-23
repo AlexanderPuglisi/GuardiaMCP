@@ -765,3 +765,10 @@ def test_cli_shield_applies_approved_rules_end_to_end(tmp_path: Path) -> None:
     errors = shielded.stderr.decode("utf-8")
     assert "Regole attive: 5" in errors
     assert "«demo»: blocca tools/call echo" in errors
+
+
+def test_rule_test_names_a_wrong_phase(env: HostEnvironment) -> None:
+    code, output = run_cli(env, "scudo", "regole", "prova", "--fase", "boh", "--lingua", "it")
+    assert code == 2
+    assert "Fase «boh» non valida" in output
+    assert "--argomenti" not in output
