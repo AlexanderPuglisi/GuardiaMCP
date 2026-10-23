@@ -3,9 +3,10 @@ from __future__ import annotations
 import enum
 import hashlib
 import json
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
@@ -73,7 +74,30 @@ def _json_default(value: object) -> object:
     raise TypeError(f"not JSON serializable: {type(value).__name__}")
 
 
-def canonical_json(value: object) -> bytes:
+def _plain_key(key: object) -> str:
+    if isinstance(key, str):
+        return key
+    if isinstance(key, bool | int | float) or key is None:
+        return json.dumps(key)
+    return repr(key)
+
+
+def _plain(value: object) -> object:
+    if isinstance(value, dict | MappingProxyType):
+        return {_plain_key(key): _plain(item) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [_plain(item) for item in value]
+    if isinstance(value, date | time):
+        return value.isoformat()
+    if isinstance(value, bytes):
+        return value.hex()
+    finite = not isinstance(value, float) or math.isfinite(value)
+    if finite and (value is None or isinstance(value, str | int | float)):
+        return value
+    return repr(value)
+
+
+def _dumps(value: object) -> bytes:
     return json.dumps(
         value,
         sort_keys=True,
@@ -82,6 +106,17 @@ def canonical_json(value: object) -> bytes:
         allow_nan=False,
         default=_json_default,
     ).encode("utf-8")
+
+
+def canonical_json(value: object) -> bytes:
+    return _dumps(value)
+
+
+def stable_json(value: object) -> bytes:
+    try:
+        return _dumps(value)
+    except (TypeError, ValueError):
+        return _dumps(_plain(value))
 
 
 def sha256_hex(data: bytes) -> str:
@@ -157,7 +192,7 @@ class ServerEntry:
 
     @property
     def fingerprint(self) -> str:
-        return sha256_hex(canonical_json(self.raw))
+        return sha256_hex(stable_json(self.raw))
 
     def display_target(self) -> str:
         if self.command is not None:
@@ -290,7 +325,7 @@ class ToolDefinition:
     @property
     def fingerprint(self) -> str:
         return sha256_hex(
-            canonical_json(
+            stable_json(
                 {
                     "kind": self.kind.value,
                     "name": self.name,

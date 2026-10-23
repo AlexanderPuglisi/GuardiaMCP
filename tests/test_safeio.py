@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 import pytest
 
+from guardia.model import canonical_json, sha256_hex, stable_json
 from guardia.safeio import (
     ReadErrorCode,
     SafeReadError,
@@ -110,3 +112,25 @@ def test_depth_exceeds() -> None:
         nested = {"k": nested}
     assert depth_exceeds(nested, limit=5)
     assert not depth_exceeds(nested, limit=20)
+
+
+@pytest.mark.parametrize("number", ["9" * 5000, "1e999", "-1e999"], ids=["long", "big", "small"])
+def test_numbers_python_cannot_handle_are_parse_errors(number: str) -> None:
+    with pytest.raises(SafeReadError) as caught:
+        parse_json('{"a": ' + number + "}")
+    assert caught.value.code is ReadErrorCode.PARSE
+
+
+@pytest.mark.parametrize(
+    "number", ["9" * 5000, "inf", "-inf", "nan"], ids=["long", "inf", "-inf", "nan"]
+)
+def test_toml_numbers_python_cannot_handle_are_parse_errors(number: str) -> None:
+    with pytest.raises(SafeReadError) as caught:
+        parse_toml("a = " + number + "\n")
+    assert caught.value.code is ReadErrorCode.PARSE
+
+
+def test_stable_json_never_fails_on_unusual_values() -> None:
+    value = {"when": date(2024, 1, 1), 1: "a", "b": b"x", "c": float("inf")}
+    assert sha256_hex(stable_json(value)) == sha256_hex(stable_json(dict(value)))
+    assert stable_json({"a": [1, "x"]}) == canonical_json({"a": [1, "x"]})

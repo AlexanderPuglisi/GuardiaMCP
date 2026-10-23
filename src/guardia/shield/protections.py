@@ -14,8 +14,8 @@ from guardia.model import (
     ServerEntry,
     Severity,
     Transport,
-    canonical_json,
     sha256_hex,
+    stable_json,
 )
 from guardia.redact import REDACTED, SECRET_VALUE
 from guardia.scanner.tool_checks import TOOL_CHECKS, ToolContext, check_text_fields
@@ -52,7 +52,7 @@ def _server(name: str) -> ServerEntry:
 
 
 def tool_fingerprint(tool: Mapping[str, Any]) -> str:
-    return sha256_hex(canonical_json({key: value for key, value in tool.items() if key != "_meta"}))
+    return sha256_hex(stable_json({key: value for key, value in tool.items() if key != "_meta"}))
 
 
 def tool_findings(server: str, tool: Mapping[str, Any]) -> list[Finding]:

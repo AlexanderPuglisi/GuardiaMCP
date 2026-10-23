@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from guardia.analysis import analyze
 from guardia.inventory import DiscoveryOptions, HostEnvironment, discover
 from guardia.inventory.parsers import infer_transport
 from guardia.model import Client, Inventory, Scope, ServerEntry, SourceStatus, Transport
@@ -229,6 +230,22 @@ def test_codex_toml(env: HostEnvironment, write_text: WriteText) -> None:
     assert servers["docs"].args == ("-y", "docs-mcp")
     assert servers["docs"].pointer == "/mcp_servers/docs"
     assert servers["off"].enabled is False
+
+
+def test_hostile_values_in_configs_do_not_stop_the_scan(
+    env: HostEnvironment, write_text: WriteText
+) -> None:
+    write_text(
+        env.home / ".codex" / "config.toml",
+        '[mcp_servers.dated]\ncommand = "npx"\nupdated = 2024-01-01\n',
+    )
+    write_text(
+        env.cwd / ".mcp.json",
+        '{"mcpServers": {"huge": {"command": "node", "args": [' + "9" * 5000 + "]}}}",
+    )
+    report = analyze(env)
+    assert "dated" in {server.name for server in report.inventory.servers}
+    assert "G12-006" in {finding.rule_id for finding in report.findings}
 
 
 def test_claude_code_plugins(env: HostEnvironment, write_json: WriteJson) -> None:

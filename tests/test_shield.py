@@ -197,6 +197,8 @@ def test_parse_valid_messages() -> None:
         ),
         (b'{"jsonrpc":"2.0","id":1,"error":{"code":"x","message":"x"}}', Problem.BAD_RESPONSE),
         (b'{"jsonrpc":"2.0","id":1,"result":NaN}', Problem.NOT_JSON),
+        (b'{"jsonrpc":"2.0","id":1,"result":' + b"9" * 5000 + b"}", Problem.NOT_JSON),
+        (b'{"jsonrpc":"2.0","method":"a","params":{"x":1e999}}', Problem.NOT_JSON),
         (b'{"jsonrpc":"2.0","result":{}}', Problem.BAD_RESPONSE),
     ],
 )

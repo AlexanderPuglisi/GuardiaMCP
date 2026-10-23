@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 import json
+import math
 import stat
 import tomllib
 from collections.abc import Iterable
@@ -77,6 +78,13 @@ def read_text(path: Path, max_bytes: int = MAX_FILE_BYTES) -> str:
     return decode_text(read_bytes(path, max_bytes))
 
 
+def _finite(text: str) -> float:
+    value = float(text)
+    if not math.isfinite(value):
+        raise ValueError(f"number out of range: {text[:20]}")
+    return value
+
+
 def _reject_constant(name: str) -> Any:
     raise SafeReadError(ReadErrorCode.PARSE, f"non-standard constant {name}")
 
@@ -94,23 +102,32 @@ def parse_json(text: str, *, jsonc: bool = False) -> ParsedDocument:
 
     source = strip_jsonc(text) if jsonc else text
     try:
-        value = json.loads(source, object_pairs_hook=collect_pairs, parse_constant=_reject_constant)
+        value = json.loads(
+            source,
+            object_pairs_hook=collect_pairs,
+            parse_constant=_reject_constant,
+            parse_float=_finite,
+        )
     except RecursionError as exc:
         raise SafeReadError(ReadErrorCode.TOO_DEEP) from exc
     except json.JSONDecodeError as exc:
         raise SafeReadError(
             ReadErrorCode.PARSE, f"line {exc.lineno}, column {exc.colno}: {exc.msg}"
         ) from exc
+    except ValueError as exc:
+        raise SafeReadError(ReadErrorCode.PARSE, str(exc)[:200]) from exc
     return ParsedDocument(value, duplicates, source)
 
 
 def parse_toml(text: str) -> ParsedDocument:
     try:
-        return ParsedDocument(tomllib.loads(text), text=text)
+        return ParsedDocument(tomllib.loads(text, parse_float=_finite), text=text)
     except RecursionError as exc:
         raise SafeReadError(ReadErrorCode.TOO_DEEP) from exc
     except tomllib.TOMLDecodeError as exc:
         raise SafeReadError(ReadErrorCode.PARSE, str(exc)) from exc
+    except ValueError as exc:
+        raise SafeReadError(ReadErrorCode.PARSE, str(exc)[:200]) from exc
 
 
 def strip_jsonc(text: str) -> str:
