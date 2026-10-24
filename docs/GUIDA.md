@@ -12,7 +12,7 @@ Non serve saper programmare. Ti servono Windows (provato su Windows 11) e cinque
 
 ## 1. Scarica e controlla
 
-1. Apri la pagina [**Releases**](https://github.com/AlexanderPuglisi/guardia-mcp/releases/latest) e
+1. Apri la pagina [**Releases**](https://github.com/AlexanderPuglisi/GuardiaMCP/releases/latest) e
    scarica due file: `GuardiaMCP-0.2.3-windows-x64.zip` e `SHA256SUMS.txt`.
 2. Controlla che lo zip sia quello giusto. Apri **PowerShell** (menu Start → scrivi `PowerShell` →
    Invio), incolla queste due righe e premi Invio:

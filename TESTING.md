@@ -15,7 +15,7 @@ anyone else's systems: every "attack" is a fake server or fake file written for 
 | | |
 |---|---|
 | Automated tests | **846**, all passing (`uv run pytest`) |
-| Automatic check on GitHub | lint, types and all tests on a clean Windows machine, for every change ([Tests](https://github.com/AlexanderPuglisi/guardia-mcp/actions/workflows/tests.yml)) |
+| Automatic check on GitHub | lint, types and all tests on a clean Windows machine, for every change ([Tests](https://github.com/AlexanderPuglisi/GuardiaMCP/actions/workflows/tests.yml)) |
 | Test files | 35 |
 | Fake samples (configurations, servers, code, skills) | 84 files in `tests/corpus/` |
 | Static rules, each with at least one malicious and one harmless fake case | 90 |
@@ -152,7 +152,7 @@ uv run mypy
 ```
 
 GitHub runs the same checks on a clean Windows machine for every change
-([`.github/workflows/tests.yml`](https://github.com/AlexanderPuglisi/guardia-mcp/blob/main/.github/workflows/tests.yml)). The result is the **Tests** badge at
+([`.github/workflows/tests.yml`](https://github.com/AlexanderPuglisi/GuardiaMCP/blob/main/.github/workflows/tests.yml)). The result is the **Tests** badge at
 the top of the README.
 
 ---
@@ -168,7 +168,7 @@ vero o su sistemi di altri: ogni «attacco» è un server finto o un file finto 
 | | |
 |---|---|
 | Test automatici | **846**, tutti passati (`uv run pytest`) |
-| Controllo automatico su GitHub | stile, tipi e tutti i test su un Windows pulito, a ogni modifica ([Tests](https://github.com/AlexanderPuglisi/guardia-mcp/actions/workflows/tests.yml)) |
+| Controllo automatico su GitHub | stile, tipi e tutti i test su un Windows pulito, a ogni modifica ([Tests](https://github.com/AlexanderPuglisi/GuardiaMCP/actions/workflows/tests.yml)) |
 | File di test | 35 |
 | Esempi finti (configurazioni, server, codice, skill) | 84 file in `tests/corpus/` |
 | Regole statiche, ognuna con almeno un caso finto malevolo e uno innocuo | 90 |
@@ -317,5 +317,5 @@ uv run mypy
 ```
 
 GitHub esegue gli stessi controlli su un Windows pulito a ogni modifica
-([`.github/workflows/tests.yml`](https://github.com/AlexanderPuglisi/guardia-mcp/blob/main/.github/workflows/tests.yml)). Il risultato è il badge **Tests** in
+([`.github/workflows/tests.yml`](https://github.com/AlexanderPuglisi/GuardiaMCP/blob/main/.github/workflows/tests.yml)). Il risultato è il badge **Tests** in
 cima al README.

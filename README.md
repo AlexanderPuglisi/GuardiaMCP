@@ -2,11 +2,11 @@
   <img src="docs/banner.svg" alt="Guardia MCP: free, offline security shield for AI agents that use MCP, by Alexander Puglisi" width="100%">
 </p>
 
-**by Alexander Puglisi** · [alexanderpuglisiskilly.com](https://alexanderpuglisiskilly.com) · [Download](https://github.com/AlexanderPuglisi/guardia-mcp/releases/latest) · [✓ Claude Academy: Introduction to MCP](https://academy.claude.com/verify/5a6125d6ee0ea408559c3679d0ff2657) · [✓ Claude Academy: MCP Advanced Topics](https://academy.claude.com/verify/d3957736dde1f145d365218c130d52fa)
+**by Alexander Puglisi** · [alexanderpuglisiskilly.com](https://alexanderpuglisiskilly.com) · [Download](https://github.com/AlexanderPuglisi/GuardiaMCP/releases/latest) · [✓ Claude Academy: Introduction to MCP](https://academy.claude.com/verify/5a6125d6ee0ea408559c3679d0ff2657) · [✓ Claude Academy: MCP Advanced Topics](https://academy.claude.com/verify/d3957736dde1f145d365218c130d52fa)
 
 **[Step-by-step guide with screenshots](docs/GUIDE.md)** · **[Guida passo passo con foto](docs/GUIDA.md)**
 
-[![Tests](https://github.com/AlexanderPuglisi/guardia-mcp/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/AlexanderPuglisi/guardia-mcp/actions/workflows/tests.yml) · [How it was tested](TESTING.md) · [Security](SECURITY.md) · [For reviewers](AUDIT.md) · [Guide (EN)](docs/SHIELD.md) · [Guida (IT)](docs/SCUDO.md)
+[![Tests](https://github.com/AlexanderPuglisi/GuardiaMCP/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/AlexanderPuglisi/GuardiaMCP/actions/workflows/tests.yml) · [How it was tested](TESTING.md) · [Security](SECURITY.md) · [For reviewers](AUDIT.md) · [Guide (EN)](docs/SHIELD.md) · [Guida (IT)](docs/SCUDO.md)
 
 > 🇬🇧 English below · 🇮🇹 Italiano più sotto
 
@@ -123,7 +123,7 @@ Full guide: [docs/SHIELD.md](docs/SHIELD.md).
 Prefer pictures? Follow the [step-by-step guide with screenshots](docs/GUIDE.md).
 
 1. **Download** `GuardiaMCP-0.2.3-windows-x64.zip` and `SHA256SUMS.txt` from the project's
-   [**Releases**](https://github.com/AlexanderPuglisi/guardia-mcp/releases/latest) page on GitHub
+   [**Releases**](https://github.com/AlexanderPuglisi/GuardiaMCP/releases/latest) page on GitHub
    and check the zip: the [guide](docs/GUIDE.md#1-download-and-check) has two PowerShell lines to
    paste, which must print `True`.
 2. **Extract** it to a folder that will not move, for example `C:\Users\YOUR-NAME` (the zip
@@ -167,8 +167,8 @@ Everything is also available from the command line (`guardia.exe`), described be
 Requires [uv](https://docs.astral.sh/uv/).
 
 ```powershell
-git clone https://github.com/AlexanderPuglisi/guardia-mcp.git
-cd guardia-mcp
+git clone https://github.com/AlexanderPuglisi/GuardiaMCP.git
+cd GuardiaMCP
 uv sync --extra app
 uv run guardia inventory
 uv run guardia scan
@@ -185,7 +185,7 @@ uv run guardia-app
 `SHA256SUMS.txt` file with their fingerprints. Python is not needed to run them.
 
 ```powershell
-cd guardia-mcp
+cd GuardiaMCP
 uv run --exact --no-dev --group build --extra app python scripts\build_exe.py
 .\dist\GuardiaMCP\guardia.exe scan
 .\dist\GuardiaMCP\GuardiaMCP.exe
@@ -381,7 +381,7 @@ Vuoi capire MCP da zero? Leggi [docs/IMPARA-MCP.md](docs/IMPARA-MCP.md).
 Preferisci le foto? Segui la [guida passo passo con le schermate](docs/GUIDA.md).
 
 1. **Scarica** `GuardiaMCP-0.2.3-windows-x64.zip` e `SHA256SUMS.txt` dalla pagina
-   [**Releases**](https://github.com/AlexanderPuglisi/guardia-mcp/releases/latest) del progetto su
+   [**Releases**](https://github.com/AlexanderPuglisi/GuardiaMCP/releases/latest) del progetto su
    GitHub e controlla lo zip: nella [guida](docs/GUIDA.md#1-scarica-e-controlla) ci sono due righe
    da incollare in PowerShell, che devono stampare `True`.
 2. **Estrailo** in una cartella che non sposterai, per esempio `C:\Users\TUO-NOME` (lo zip
@@ -427,8 +427,8 @@ Tutto si può fare anche da riga di comando (`guardia.exe`), come spiegato sotto
 Serve [uv](https://docs.astral.sh/uv/).
 
 ```powershell
-git clone https://github.com/AlexanderPuglisi/guardia-mcp.git
-cd guardia-mcp
+git clone https://github.com/AlexanderPuglisi/GuardiaMCP.git
+cd GuardiaMCP
 uv sync --extra app
 uv run guardia inventario
 uv run guardia scansiona
@@ -445,7 +445,7 @@ programmi — `guardia.exe` (riga di comando) e `GuardiaMCP.exe` (app desktop) �
 zip e il file `SHA256SUMS.txt` con le loro impronte. Per usarli non serve Python.
 
 ```powershell
-cd guardia-mcp
+cd GuardiaMCP
 uv run --exact --no-dev --group build --extra app python scripts\build_exe.py
 .\dist\GuardiaMCP\guardia.exe scansiona
 .\dist\GuardiaMCP\GuardiaMCP.exe

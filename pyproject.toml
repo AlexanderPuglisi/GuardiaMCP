@@ -21,8 +21,8 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://alexanderpuglisiskilly.com"
-Repository = "https://github.com/AlexanderPuglisi/guardia-mcp"
-Issues = "https://github.com/AlexanderPuglisi/guardia-mcp/issues"
+Repository = "https://github.com/AlexanderPuglisi/GuardiaMCP"
+Issues = "https://github.com/AlexanderPuglisi/GuardiaMCP/issues"
 
 [project.scripts]
 guardia = "guardia.cli:main"
