@@ -16,14 +16,10 @@
   }
 
   function showControls() {
-    const colors = { minimize: "#e0a43a", maximize: "#3fbf7f", close: "#e5484d" };
-    for (const button of document.querySelectorAll("#winctl .wc")) {
-      const glyph = button.querySelector("svg");
-      button.style.transition = "none";
-      glyph.style.transition = "none";
-      button.style.background = colors[button.dataset.win];
-      glyph.style.opacity = "1";
-    }
+    const close = document.querySelector("#winctl .wc-close");
+    close.style.transition = "none";
+    close.style.background = "#c42b1c";
+    close.style.color = "#fff";
   }
 
   function navigate() {
@@ -53,6 +49,7 @@
       remove_project: async () => DEMO.state,
       shield: async () => DEMO.shield,
       shield_rules_text: async () => ({ exists: true, text: DEMO.rules_text }),
+      shield_rules_template: async () => ({ text: DEMO.rules_text }),
       window_minimize: async () => null,
       window_close: async () => null,
       window_state: async () => ({ maximized: false }),

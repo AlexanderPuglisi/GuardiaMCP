@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import codecs
+import contextlib
 import enum
 import json
 import re
-from collections import defaultdict
-from collections.abc import Iterable, Sequence
+from collections import Counter, defaultdict
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -14,6 +16,7 @@ from guardia.filelock import exclusive
 from guardia.ledger import Ledger, write_atomic
 from guardia.model import Inventory, Scope, ServerEntry, sha256_hex
 from guardia.safeio import SafeReadError, decode_text, parse_json, read_bytes
+from guardia.secure_store import KeyStoreError
 from guardia.shield.wrapping import unwrap, wrap
 
 ACTIVATIONS_FILE = "scudo-attivazioni.json"
@@ -37,10 +40,15 @@ class Support(enum.StrEnum):
 
 class Outcome(enum.StrEnum):
     DONE = "done"
+    ALREADY = "already"
     CHANGED = "changed"
     MISSING = "missing"
     NOT_RECORDED = "not_recorded"
     FAILED = "failed"
+    UNWRITABLE = "unwritable"
+
+
+SUCCESSFUL = frozenset({Outcome.DONE, Outcome.ALREADY})
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,8 +137,42 @@ def _backup_name(path: Path) -> str:
     return f"{stamp}-{UNSAFE_NAME.sub('_', path.parent.name)}-{UNSAFE_NAME.sub('_', path.name)}"
 
 
-def _serialize(document: Any) -> bytes:
-    return (json.dumps(document, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+def _style(data: bytes) -> tuple[str, str, bytes]:
+    bom = codecs.BOM_UTF8 if data.startswith(codecs.BOM_UTF8) else b""
+    text = data[len(bom) :].decode("utf-8", errors="replace")
+    newline = "\r\n" if "\r\n" in text else "\n"
+    indent = "  "
+    for line in text.splitlines():
+        stripped = line.lstrip(" \t")
+        if stripped and len(stripped) < len(line):
+            indent = line[: len(line) - len(stripped)]
+            break
+    return indent, newline, bom
+
+
+def _serialize(document: Any, like: bytes = b"") -> bytes:
+    indent, newline, bom = _style(like)
+    text = json.dumps(document, indent=indent, ensure_ascii=False).replace("\n", newline)
+    return bom + (text + newline).encode("utf-8", "backslashreplace")
+
+
+def _client_label(server: ServerEntry) -> str:
+    return f"{server.name} ({server.source.client.value})"
+
+
+def shield_names(chosen: Sequence[ServerEntry], everyone: Sequence[ServerEntry]) -> dict[str, str]:
+    names = Counter(server.name.casefold() for server in everyone)
+    labels = Counter(_client_label(server).casefold() for server in everyone)
+    result: dict[str, str] = {}
+    for server in chosen:
+        if names[server.name.casefold()] <= 1:
+            result[server.key] = server.name
+        elif labels[_client_label(server).casefold()] <= 1:
+            result[server.key] = _client_label(server)
+        else:
+            digest = sha256_hex(server.key.encode("utf-8", "backslashreplace"))[:6]
+            result[server.key] = f"{server.name} ({server.source.client.value}, {digest})"
+    return result
 
 
 class ActivationStore:
@@ -157,7 +199,8 @@ class ActivationStore:
         if self._ledger is None:
             return
         for event, data in report.events:
-            self._ledger.append(event, data)
+            with contextlib.suppress(OSError, KeyStoreError):
+                self._ledger.append(event, data)
 
     def records(self) -> list[dict[str, Any]]:
         with exclusive(self.directory / LOCK_FILE):
@@ -174,20 +217,31 @@ class ActivationStore:
         current = read_bytes(path, MAX_CONFIG_BYTES)
         if sha256_hex(current) != sha256_hex(data):
             return False
-        report.backups.append(self._backup(path, data))
-        write_atomic(path, _serialize(document))
+        backup = self._backup(path, data)
+        write_atomic(path, _serialize(document, data))
+        report.backups.append(backup)
         return True
 
-    def enable(self, servers: Sequence[ServerEntry], starter: Sequence[str]) -> Report:
+    def enable(
+        self,
+        servers: Sequence[ServerEntry],
+        starter: Sequence[str],
+        names: Mapping[str, str] | None = None,
+    ) -> Report:
         report = Report()
         grouped: dict[Path, list[ServerEntry]] = defaultdict(list)
         for server in servers:
             grouped[server.source.path].append(server)
         with exclusive(self.directory / LOCK_FILE):
             records = self._records()
-            for path, group in grouped.items():
-                self._enable_file(path, group, starter, records, report)
-            self._save(records)
+            try:
+                for path, group in grouped.items():
+                    try:
+                        self._enable_file(path, group, starter, records, report, names=names or {})
+                    except (OSError, SafeReadError) as exc:
+                        _failed(report, path, [s.name for s in group], exc)
+            finally:
+                self._save(records)
         self._log(report)
         return report
 
@@ -198,6 +252,8 @@ class ActivationStore:
         starter: Sequence[str],
         records: list[dict[str, Any]],
         report: Report,
+        *,
+        names: Mapping[str, str],
     ) -> None:
         loaded = _strict_document(path)
         if isinstance(loaded, Support):
@@ -218,7 +274,8 @@ class ActivationStore:
             if original.get("command") != server.command:
                 report.changes.append(Change(server.name, path, Outcome.CHANGED))
                 continue
-            command, args = wrap(starter, server.name, server.command or "", list(server.args))
+            name = names.get(server.key, server.name)
+            command, args = wrap(starter, name, server.command or "", list(server.args))
             wrapped = {**original, "command": command, "args": args}
             parent[key] = wrapped
             pending.append((server, original, wrapped))
@@ -268,10 +325,16 @@ class ActivationStore:
             grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
             for record in chosen:
                 grouped[str(record.get("file", ""))].append(record)
-            for target, group in grouped.items():
-                done = self._disable_file(Path(target), group, report)
-                records = [r for r in records if r not in done]
-            self._save(records)
+            try:
+                for target, group in grouped.items():
+                    try:
+                        done = self._disable_file(Path(target), group, report)
+                    except (OSError, SafeReadError) as exc:
+                        _failed(report, Path(target), [str(r.get("server")) for r in group], exc)
+                        continue
+                    records = [r for r in records if r not in done]
+            finally:
+                self._save(records)
         self._log(report)
         return report
 
@@ -286,24 +349,35 @@ class ActivationStore:
             return []
         data, document = loaded
         restored: list[dict[str, Any]] = []
+        stale: list[dict[str, Any]] = []
         for record in group:
+            name = str(record.get("server"))
             found = _locate(document, str(record.get("pointer", "")))
             if found is None:
-                report.changes.append(Change(str(record.get("server")), path, Outcome.MISSING))
+                report.changes.append(Change(name, path, Outcome.MISSING))
+                stale.append(record)
                 continue
             parent, key = found
-            if parent[key] != record.get("wrapped"):
-                report.changes.append(Change(str(record.get("server")), path, Outcome.CHANGED))
+            current = parent[key]
+            original = record.get("original")
+            if current == record.get("wrapped") and isinstance(original, dict):
+                parent[key] = original
+                restored.append(record)
                 continue
-            parent[key] = record.get("original")
+            inner = unwrap(current.get("command"), current.get("args") or [])
+            if inner is None:
+                report.changes.append(Change(name, path, Outcome.ALREADY))
+                stale.append(record)
+                continue
+            parent[key] = {**current, "command": inner.command, "args": list(inner.args)}
             restored.append(record)
         if not restored:
-            return []
+            return stale
         if not self._rewrite(path, data, document, report):
             report.changes += [
                 Change(str(r.get("server")), path, Outcome.CHANGED, "file") for r in restored
             ]
-            return []
+            return stale
         report.changes += [Change(str(r.get("server")), path, Outcome.DONE) for r in restored]
         report.events.append(
             (
@@ -311,7 +385,7 @@ class ActivationStore:
                 {"file": str(path), "servers": sorted(str(r.get("server")) for r in restored)},
             )
         )
-        return restored
+        return restored + stale
 
     def _known(self, records: list[dict[str, Any]], name: str, path: Path) -> dict[str, Any] | None:
         for record in records:
@@ -376,9 +450,14 @@ class ActivationStore:
             grouped[server.source.path].append(server)
         with exclusive(self.directory / LOCK_FILE):
             records = self._records()
-            for path, group in grouped.items():
-                self._relink_file(path, group, starter, records, report)
-            self._save(records)
+            try:
+                for path, group in grouped.items():
+                    try:
+                        self._relink_file(path, group, starter, records, report)
+                    except (OSError, SafeReadError) as exc:
+                        _failed(report, path, [s.name for s in group], exc)
+            finally:
+                self._save(records)
         self._log(report)
         return report
 
@@ -439,10 +518,18 @@ class ActivationStore:
         )
 
 
+def _failed(report: Report, path: Path, names: Iterable[str], exc: Exception) -> None:
+    outcome = Outcome.FAILED if isinstance(exc, SafeReadError) else Outcome.UNWRITABLE
+    report.changes += [Change(name, path, outcome, type(exc).__name__) for name in names]
+
+
 def editable(path: Path) -> bool:
     return not isinstance(_strict_document(path), Support)
 
 
-def manual_snippet(server: ServerEntry, starter: Sequence[str]) -> str:
-    command, args = wrap(starter, server.name, server.command or "", list(server.args))
+def manual_snippet(server: ServerEntry, starter: Sequence[str], name: str | None = None) -> str:
+    command, args = wrap(starter, name or server.name, server.command or "", list(server.args))
+    if server.source.path.suffix.lower() == ".toml":
+        listed = ", ".join(json.dumps(arg, ensure_ascii=False) for arg in args)
+        return f"command = {json.dumps(command, ensure_ascii=False)}\nargs = [{listed}]"
     return json.dumps({"command": command, "args": args}, ensure_ascii=False, indent=2)

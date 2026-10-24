@@ -195,7 +195,7 @@ def test_ledger_command(env: HostEnvironment, write_json: WriteJson) -> None:
     assert main(["--lingua", "it", "registro", "mostra"], env=env, stdout=out) == 0
     text = out.getvalue()
     assert "1. " in text and "2. " in text
-    assert "Registro integro: 2 eventi" in text
+    assert "Registro integro (eventi: 2)" in text
     out = io.StringIO()
     main(["--lang", "en", "ledger", "anchor"], env=env, stdout=out)
     anchor = re.search(r"^2:[0-9a-f]{64}$", out.getvalue(), re.MULTILINE)

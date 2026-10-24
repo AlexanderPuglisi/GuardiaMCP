@@ -16,9 +16,9 @@
     </div>
     <nav class="nav" id="nav"></nav>
     <div class="winctl" id="winctl">
-      <button type="button" class="wc wc-min" data-win="minimize"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 6h6"/></svg></button>
-      <button type="button" class="wc wc-max" data-win="maximize"><svg viewBox="0 0 12 12" aria-hidden="true"><path class="ic-max" d="M3.5 3.5h5v5h-5z"/><path class="ic-restore" d="M4.5 3h4.5v4.5M3 4.5h4.5V9H3z"/></svg></button>
-      <button type="button" class="wc wc-close" data-win="close"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="m3.5 3.5 5 5m0-5-5 5"/></svg></button>
+      <button type="button" class="wc wc-min" data-win="minimize"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M0 5.5h10"/></svg></button>
+      <button type="button" class="wc wc-max" data-win="maximize"><svg viewBox="0 0 10 10" aria-hidden="true"><path class="ic-max" d="M.5.5h9v9h-9z"/><path class="ic-restore" d="M2.5 2.5V.5h7v7h-2M.5 2.5h7v7h-7z"/></svg></button>
+      <button type="button" class="wc wc-close" data-win="close"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="m.5.5 9 9m0-9-9 9"/></svg></button>
     </div>
   </header>
   <main class="main">
@@ -50,6 +50,14 @@
 <div class="grip" data-edge="ne"></div><div class="grip" data-edge="nw"></div>
 <div class="grip" data-edge="se"></div><div class="grip" data-edge="sw"></div>
 <div class="busy" id="busy" hidden><div class="spinner"></div><p id="busy-text"></p></div>
+<div class="boot" id="boot" role="alert" hidden>
+  <div class="card">
+    <h2>Guardia non riesce a partire</h2>
+    <p>La finestra non riceve risposta dal programma. Chiudila con Alt+F4 e riapri Guardia. Se succede ancora, riavvia il PC e riprova.</p>
+    <h2 lang="en">Guardia cannot start</h2>
+    <p lang="en">The window gets no answer from the program. Close it with Alt+F4 and open Guardia again. If it happens again, restart the PC and try again.</p>
+  </div>
+</div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <script>/*SCRIPT*/</script>
 </body>

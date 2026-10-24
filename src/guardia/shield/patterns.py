@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import unquote, urlsplit
 
+from guardia.shield.windows import long_path
+
 MAX_LEAVES = 10_000
 MAX_WALK_DEPTH = 64
 MAX_TEXT = 100_000
@@ -19,6 +21,8 @@ DRIVE_URL_PATH = re.compile(r"^/[a-zA-Z]:/")
 DEVICE_PREFIX = re.compile(r"^//[?.]/(unc/)?", re.IGNORECASE)
 LOCAL_SHARE = re.compile(r"^//(?:localhost|127\.0\.0\.1|\.)/([a-z])\$(?=/|$)", re.IGNORECASE)
 DRIVE = re.compile(r"^[a-z]:$", re.IGNORECASE)
+DRIVE_PATH = re.compile(r"^[a-z]:/", re.IGNORECASE)
+SHORT_NAME = re.compile(r"~\d")
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +93,19 @@ def _windows_path(text: str) -> str:
     return prefix + "/".join(_windows_part(index, part) for index, part in enumerate(parts))
 
 
+def expand_short_names(path: str) -> str:
+    if not DRIVE_PATH.match(path) or not SHORT_NAME.search(path):
+        return path
+    parts = path.split("/")
+    for end in range(len(parts), 1, -1):
+        if not SHORT_NAME.search("/".join(parts[:end])):
+            break
+        expanded = long_path("\\".join(parts[:end]))
+        if expanded is not None:
+            return "/".join([expanded.replace("\\", "/").rstrip("/"), *parts[end:]])
+    return path
+
+
 def normalize_path(value: str, home: str) -> str | None:
     text = value.strip()
     if not text or len(text) > MAX_PATH_TEXT or "\n" in text or "\x00" in text:
@@ -101,6 +118,8 @@ def normalize_path(value: str, home: str) -> str | None:
     text = _windows_path(text.replace("\\", "/"))
     prefix = "//" if text.startswith("//") else ""
     normalized = posixpath.normpath(text[len(prefix) :]) if text[len(prefix) :] else ""
+    if not prefix:
+        normalized = expand_short_names(normalized)
     return (prefix + normalized).lower()
 
 

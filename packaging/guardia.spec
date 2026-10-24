@@ -17,7 +17,18 @@ PACKAGING = Path(SPECPATH)
 PROJECT = PACKAGING.parent
 ICON = str(PROJECT / "src" / "guardia" / "app" / "guardia.ico")
 NUMBERS = tuple(int(part) for part in __version__.split(".")[:3]) + (0,)
-EXCLUDES = ["tkinter", "unittest", "pydoc", "doctest", "lib2to3", "PIL", "PyInstaller"]
+EXCLUDES = [
+    "tkinter",
+    "unittest",
+    "pydoc",
+    "doctest",
+    "lib2to3",
+    "PIL",
+    "PyInstaller",
+    "cryptography",
+    "setuptools",
+    "pkg_resources",
+]
 
 
 def version_info(description, internal_name):

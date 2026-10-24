@@ -89,14 +89,38 @@ def _reject_constant(name: str) -> Any:
     raise SafeReadError(ReadErrorCode.PARSE, f"non-standard constant {name}")
 
 
+def _pointer_part(key: str) -> str:
+    return key.replace("~", "~0").replace("/", "~1")
+
+
+def duplicate_pointers(value: Any, duplicates: dict[int, list[str]]) -> list[str]:
+    if not duplicates:
+        return []
+    found: list[str] = []
+    stack: list[tuple[Any, str]] = [(value, "")]
+    while stack:
+        current, pointer = stack.pop()
+        if isinstance(current, dict):
+            found.extend(
+                f"{pointer}/{_pointer_part(key)}" for key in duplicates.get(id(current), [])
+            )
+            stack.extend((item, f"{pointer}/{_pointer_part(key)}") for key, item in current.items())
+        elif isinstance(current, list):
+            stack.extend((item, f"{pointer}/{index}") for index, item in enumerate(current))
+    return sorted(found)
+
+
 def parse_json(text: str, *, jsonc: bool = False) -> ParsedDocument:
-    duplicates: list[str] = []
+    duplicates: dict[int, list[str]] = {}
+    alive: list[dict[str, Any]] = []
 
     def collect_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
         result: dict[str, Any] = {}
         for key, value in pairs:
             if key in result:
-                duplicates.append(key)
+                if id(result) not in duplicates:
+                    alive.append(result)
+                duplicates.setdefault(id(result), []).append(key)
             result[key] = value
         return result
 
@@ -116,7 +140,7 @@ def parse_json(text: str, *, jsonc: bool = False) -> ParsedDocument:
         ) from exc
     except ValueError as exc:
         raise SafeReadError(ReadErrorCode.PARSE, str(exc)[:200]) from exc
-    return ParsedDocument(value, duplicates, source)
+    return ParsedDocument(value, duplicate_pointers(value, duplicates), source)
 
 
 def parse_toml(text: str) -> ParsedDocument:

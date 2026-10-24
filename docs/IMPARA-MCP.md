@@ -24,8 +24,8 @@ Un paragone utile: MCP è per l'AI quello che la presa USB è per i dispositivi.
 ```
  ┌──────────── HOST (es. Claude Desktop) ────────────┐
  │                                                   │
- │   Modello AI  ◄──►  CLIENT MCP  ◄──────────────────┼──►  SERVER MCP "filesystem"
- │                     CLIENT MCP  ◄──────────────────┼──►  SERVER MCP "github"
+ │   Modello AI  ◄──►  CLIENT MCP  ◄─────────────────┼──►  SERVER MCP "filesystem"
+ │                     CLIENT MCP  ◄─────────────────┼──►  SERVER MCP "github"
  │                                                   │
  └───────────────────────────────────────────────────┘
 ```
@@ -173,7 +173,7 @@ MCP usa date come numeri di versione (es. `2025-11-25`).
 > **Senza stato (stateless)**: il server non deve ricordarsi nulla tra una richiesta e l'altra;
 > ogni richiesta contiene tutto ciò che serve per essere capita.
 
-Guardia MCP deve capire **entrambe** le versioni, perché in giro ci sono server vecchi e nuovi.
+Lo Scudo di Guardia MCP capisce **entrambe** le versioni, perché in giro ci sono server vecchi e nuovi.
 
 ---
 
@@ -192,9 +192,13 @@ L'host sa quali server avviare leggendo un **file di configurazione**. I princip
 | Cursor | `%USERPROFILE%\.cursor\mcp.json` e `.cursor\mcp.json` nel progetto | `mcpServers` |
 | VS Code | `%APPDATA%\Code\User\mcp.json` e `.vscode\mcp.json` nel progetto | `servers` |
 | Windsurf | `%USERPROFILE%\.codeium\windsurf\mcp_config.json` | `mcpServers` |
-| Gemini CLI | `%USERPROFILE%\.gemini\settings.json` | `mcpServers` |
+| Gemini CLI | `%USERPROFILE%\.gemini\settings.json` e `.gemini\settings.json` nel progetto | `mcpServers` |
+| Gemini CLI (estensioni) | `%USERPROFILE%\.gemini\extensions\<nome>\gemini-extension.json` | `mcpServers` |
 | Codex CLI | `%USERPROFILE%\.codex\config.toml` | `[mcp_servers.<nome>]` |
 | GitHub Copilot CLI | `%USERPROFILE%\.copilot\mcp-config.json` | `mcpServers` |
+
+Se hai impostato le variabili d'ambiente `CODEX_HOME` o `CLAUDE_CONFIG_DIR`, Guardia legge anche
+quelle cartelle.
 
 > **%APPDATA% / %USERPROFILE%**: scorciatoie di Windows per cartelle del tuo utente,
 > per esempio `C:\Users\<nome>\AppData\Roaming` e `C:\Users\<nome>`.

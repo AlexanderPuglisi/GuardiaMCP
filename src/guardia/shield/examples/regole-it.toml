@@ -1,7 +1,7 @@
 # Regole dello Scudo di Guardia MCP.
 # Ogni [[regola]] dice cosa fare quando un messaggio corrisponde alle sue condizioni.
 # Se più regole corrispondono, vince la più severa: blocca > chiedi > oscura > registra > consenti.
-# Dopo ogni modifica: «Salva e approva» nella sezione Scudo dell'app, oppure  guardia scudo regole approva
+# Dopo ogni modifica: «Salva e approva» nella sezione Scudo dell'app, oppure: guardia scudo regole approva
 # Guida completa: docs/SCUDO.md
 
 versione = 1
@@ -9,6 +9,8 @@ versione = 1
 # Cosa fare quando nessuna regola corrisponde: consenti, registra, chiedi o blocca.
 predefinito = "consenti"
 
+# 1. Blocca ogni chiamata che chiede di leggere o scrivere questi file: chiavi SSH,
+#    credenziali del cloud, certificati e file .env con le password.
 [[regola]]
 nome = "Mai toccare chiavi SSH, credenziali e file .env"
 azione = "blocca"
@@ -23,6 +25,8 @@ argomento.percorso = [
   "**/.git-credentials",
 ]
 
+# 2. Blocca le chiamate che mandano dati a servizi usati spesso per portare fuori informazioni
+#    (tunnel pubblici e raccoglitori di richieste).
 [[regola]]
 nome = "Non inviare dati a servizi di tunnel o raccolta"
 azione = "blocca"
@@ -33,15 +37,17 @@ argomento.host = [
   "*.trycloudflare.com",
   "webhook.site",
   "*.requestbin.net",
-  "*.pipedream.net",
+  "*.m.pipedream.net",
 ]
 
+# 3. Se un risultato contiene una chiave o una password, l'AI la riceve coperta da asterischi.
 [[regola]]
 nome = "Oscura i segreti nei risultati"
 azione = "oscura"
 fase = "risultato"
 contenuto.segreti = true
 
+# 4. Nasconde all'AI gli strumenti la cui descrizione prova a darle ordini.
 [[regola]]
 nome = "Nascondi gli strumenti che danno ordini all'AI"
 azione = "blocca"
@@ -53,6 +59,7 @@ contenuto.contiene = [
   "non dirlo all'utente",
 ]
 
+# 5. Ferma un server che chiama strumenti a raffica: oltre 30 chiamate al minuto, le altre sono bloccate.
 [[regola]]
 nome = "Al massimo 30 chiamate al minuto per server"
 azione = "blocca"
@@ -61,6 +68,7 @@ metodo = "tools/call"
 frequenza = { massimo = 30, secondi = 60 }
 
 # Esempio da adattare: togli i # davanti alle righe per attivarlo.
+# Prima di creare, cancellare, inviare o unire qualcosa su GitHub, Guardia ti chiede conferma.
 # [[regola]]
 # nome = "GitHub: chiedi prima di scrivere"
 # server = "github"

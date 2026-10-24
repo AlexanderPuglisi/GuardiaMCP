@@ -24,6 +24,8 @@ from guardia.app.settings import (
     with_option,
 )
 from guardia.app.shield_view import (
+    SHIELD_EVENTS,
+    event_details,
     outcome_lines,
     server_candidates,
     shield_state,
@@ -41,7 +43,8 @@ from guardia.render.terminal import severity_label
 from guardia.safeio import SafeReadError
 from guardia.scanner import ScanReport
 from guardia.secure_store import KeyStoreError, Protector
-from guardia.shield.activation import ActivationStore, Support, editable
+from guardia.shield.activation import ActivationStore, Support, editable, shield_names
+from guardia.shield.activation import Report as ActivationReport
 from guardia.shield.commands import example_text, format_issue
 from guardia.shield.pins import PinError, PinStore
 from guardia.shield.policy import (
@@ -202,37 +205,14 @@ class GuardiaApi:
                 details += " · " + t("ui.event_accepted")
         elif event == "export":
             details = f"{str(data.get('format', '')).upper()} · {data.get('file', '')}"
-        elif event == "shield_stop" and "forwarded" in data:
-            details = t(
-                "ui.event_shield_counts",
-                server=data.get("server", ""),
-                forwarded=int(data.get("forwarded", 0) or 0),
-                blocked=int(data.get("blocked", 0) or 0),
-                dropped=int(data.get("dropped", 0) or 0),
-            )
-        elif event in ("shield_start", "shield_stop"):
-            details = str(data.get("server", ""))
+        elif event in SHIELD_EVENTS:
+            details = event_details(record, t)
         elif event == SETTINGS_EVENT:
             change = self._change_view(record, t)
             details = f"{change['setting']} · {change['change']}"
         else:
             details = ""
-        known = (
-            "scan",
-            "export",
-            "shield_start",
-            "shield_stop",
-            "shield_decision",
-            "shield_enabled",
-            "shield_disabled",
-            "shield_relinked",
-            "tools_pinned",
-            "tools_pending",
-            "tools_approved",
-            "tools_forgotten",
-            "rules_approved",
-            SETTINGS_EVENT,
-        )
+        known = SHIELD_EVENTS | {"scan", "export", SETTINGS_EVENT}
         label_key = f"ui.event_{event}" if event in known else "ui.event_other"
         return {
             "seq": record.get("seq"),
@@ -296,8 +276,11 @@ class GuardiaApi:
             )
         else:
             content = json.dumps(self._report.to_dict(), indent=2, ensure_ascii=True)
-        data = content.encode("utf-8")
-        target.write_bytes(data)
+        data = content.encode("utf-8", "backslashreplace")
+        try:
+            target.write_bytes(data)
+        except OSError as exc:
+            raise self._fail("export") from exc
         digest = sha256_hex(data)
         self._ledger().append(
             "export", {"format": output_format, "file": target.name, "sha256": digest}
@@ -452,16 +435,23 @@ class GuardiaApi:
             raise self._fail("confirmation")
         if not isinstance(key, str):
             raise self._fail("invalid")
-        chosen = [
-            c
-            for c in server_candidates(self._env)
-            if c.server.key == key and c.support is Support.AUTO
-        ]
+        found = server_candidates(self._env)
+        chosen = [c for c in found if c.server.key == key and c.support is Support.AUTO]
         if not chosen:
             raise self._fail("invalid")
+        server = chosen[0].server
+        names = shield_names([server], [c.server for c in found])
         store = ActivationStore(self._env.data_dir, self._ledger())
-        report = store.enable([chosen[0].server], launcher())
-        lines = outcome_lines(report.changes, self._t())
+        return self._apply(lambda: store.enable([server], launcher(), names))
+
+    def _apply(self, action: Callable[[], ActivationReport]) -> dict[str, Any]:
+        t = self._t()
+        try:
+            report = action()
+        except (OSError, KeyStoreError) as exc:
+            error = safe_text(getattr(exc, "strerror", None) or type(exc).__name__, 120)
+            return self._shield_result(t("shield_setup.store_failed", error=error), False)
+        lines = outcome_lines(report.changes, t)
         return self._shield_result("\n".join(lines), succeeded(report.changes))
 
     def _protected(self, key: object) -> ServerEntry:
@@ -481,19 +471,19 @@ class GuardiaApi:
             raise self._fail("confirmation")
         server = self._protected(key)
         store = ActivationStore(self._env.data_dir, self._ledger())
-        store.adopt([server])
-        report = store.disable([server.name], file=server.source.path)
-        lines = outcome_lines(report.changes, self._t())
-        return self._shield_result("\n".join(lines), succeeded(report.changes))
+
+        def disable() -> ActivationReport:
+            store.adopt([server])
+            return store.disable([server.name], file=server.source.path)
+
+        return self._apply(disable)
 
     def shield_relink(self, key: object, confirmed: object) -> dict[str, Any]:
         if confirmed is not True:
             raise self._fail("confirmation")
         server = self._protected(key)
         store = ActivationStore(self._env.data_dir, self._ledger())
-        report = store.relink([server], launcher())
-        lines = outcome_lines(report.changes, self._t())
-        return self._shield_result("\n".join(lines), succeeded(report.changes))
+        return self._apply(lambda: store.relink([server], launcher()))
 
     def shield_approve_tools(self, server: object, confirmed: object) -> dict[str, Any]:
         if confirmed is not True:
@@ -550,18 +540,8 @@ class GuardiaApi:
         except SafeReadError as exc:
             raise self._fail("rules_unreadable") from exc
 
-    def shield_rules_example(self, confirmed: object) -> dict[str, Any]:
-        if confirmed is not True:
-            raise self._fail("confirmation")
-        t = self._t()
-        path = rules_path(self._env.data_dir)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            with path.open("xb") as handle:
-                handle.write(example_text(t.language).encode("utf-8"))
-        except FileExistsError:
-            return self._shield_result(t("ui.shield_rules_exist"), False)
-        return self._shield_result(t("ui.shield_example_created"), True)
+    def shield_rules_template(self) -> dict[str, str]:
+        return {"text": example_text(self._t().language)}
 
     def shield_rules_save(self, text: object, confirmed: object) -> dict[str, Any]:
         if confirmed is not True:

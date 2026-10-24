@@ -74,11 +74,12 @@ def test_protections_are_bilingual_and_relaxing_warns() -> None:
     relaxed = sorted(i.params["key"] for i in result.issues if i.code == "protection_relaxed")
     assert relaxed == [
         "analisi",
+        "approved_tools",
+        "result_secrets",
         "segreti_in_uscita",
-        "segreti_nei_risultati",
-        "strumenti_approvati",
     ]
     assert all(i.level is Level.WARNING for i in result.issues)
+    assert sorted(i.line or 0 for i in result.issues) == [3, 4, 6, 7]
 
 
 @pytest.mark.parametrize(
@@ -95,7 +96,7 @@ def test_protections_are_bilingual_and_relaxing_warns() -> None:
 def test_invalid_protection_values(body: str) -> None:
     result = protections(body)
     assert result.ruleset is None
-    assert result.errors[0].line == 2
+    assert result.errors[0].line == 3
 
 
 def test_live_checks_reuse_the_v1_rules() -> None:
@@ -265,7 +266,10 @@ def test_rug_pull_hides_the_changed_tool_until_approved(tmp_path: Path) -> None:
     first = Session(tmp_path)
     assert first.tools() == ["echo"]
     first.close()
-    assert any("prima volta, 1 strumenti" in line for line in first.reports)
+    assert any(
+        "prima connessione, strumenti memorizzati come approvati: 1" in line
+        for line in first.reports
+    )
     second = Session(tmp_path, "--rug", "--extra-tool")
     assert second.tools() == []
     blocked = second.shield.ask(call(1, "echo", {"text": "x"}))
@@ -400,7 +404,7 @@ def test_cli_tools_commands(env: HostEnvironment) -> None:
     pins.review("github", {"a": "1"})
     pins.review("github", {"a": "2", "b": "3"})
     code, output = run_cli(env, "scudo", "strumenti", "elenco", "--lingua", "it")
-    assert "«github»: 1 strumenti approvati, 2 in attesa." in output
+    assert "«github»: strumenti approvati 1, in attesa 2." in output
     assert "in attesa: «a» (cambiato" in output
     assert run_cli(env, "scudo", "strumenti", "approva", "--lingua", "it")[0] == 2
     code, output = run_cli(

@@ -48,7 +48,7 @@ def build() -> Image.Image:
     draw.text((476, 400), "Scanner · Real-time Shield · Signed ledger", font=small, fill=MUTED)
     rows = (
         ("OPEN SOURCE", "100% OFFLINE", "NO TELEMETRY"),
-        ("645 TESTS", "INDEPENDENT REVIEW", "APACHE 2.0"),
+        ("845 TESTS", "REVIEWED FROM SCRATCH", "APACHE 2.0"),
     )
     label = font("segoeuib.ttf", 17)
     for index, row in enumerate(rows):

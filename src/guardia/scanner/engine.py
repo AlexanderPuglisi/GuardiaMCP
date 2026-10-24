@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import re
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -19,7 +21,10 @@ from guardia.model import (
     SourceRecord,
     SourceStatus,
     ToolCollection,
+    ToolGap,
     frozen_mapping,
+    sha256_hex,
+    stable_json,
 )
 from guardia.scanner.checks import SERVER_CHECKS, Check, ScanContext
 from guardia.scanner.code_checks import code_findings
@@ -31,6 +36,9 @@ from guardia.scanner.tool_checks import (
     collection_notes,
     cross_server_findings,
 )
+
+JSON_ERROR = re.compile(r"^line (?P<line>\d+), column (?P<column>\d+): (?P<message>.+)$", re.DOTALL)
+TOML_ERROR = re.compile(r"\(at line (?P<line>\d+), column (?P<column>\d+)\)")
 
 
 def sort_findings(findings: Iterable[Finding]) -> tuple[Finding, ...]:
@@ -143,13 +151,37 @@ class ScanReport:
 
 
 def _file_finding(rule_id: str, record: SourceRecord, pointer: str = "", **params: str) -> Finding:
+    line = int(params["line"]) if params.get("line", "").isdigit() else None
     return Finding(
         rule_id=rule_id,
         severity=RULES[rule_id].severity,
-        location=Location(record.source.path, pointer),
+        location=Location(record.source.path, pointer, line),
         evidence=params.get("detail", ""),
         params=frozen_mapping(params),
     )
+
+
+def _error_position(detail: str) -> dict[str, str]:
+    found = JSON_ERROR.match(detail)
+    if found is not None:
+        message = found.group("message")
+    else:
+        found = TOML_ERROR.search(detail)
+        if found is None:
+            return {}
+        message = TOML_ERROR.sub("", detail)
+    return {
+        "line": found.group("line"),
+        "column": found.group("column"),
+        "message": message.strip(),
+    }
+
+
+def _readable_pointer(pointer: str) -> str:
+    if not pointer.startswith("/"):
+        return pointer
+    parts = [part.replace("~1", "/").replace("~0", "~") for part in pointer[1:].split("/")]
+    return " → ".join(parts)
 
 
 def source_findings(records: Sequence[SourceRecord]) -> tuple[Finding, ...]:
@@ -162,37 +194,72 @@ def source_findings(records: Sequence[SourceRecord]) -> tuple[Finding, ...]:
                     record,
                     reason=record.error_code or "",
                     detail=record.error_detail,
+                    **_error_position(record.error_detail),
                 )
             )
         for warning in record.warnings:
             code, _, detail = warning.partition(":")
             if code == "duplicate_key":
-                findings.append(_file_finding("G12-004", record, key=detail, detail=detail))
+                readable = _readable_pointer(detail)
+                findings.append(
+                    _file_finding("G12-004", record, detail, key=readable, detail=readable)
+                )
             elif code == "reference_outside_root":
                 findings.append(_file_finding("G12-005", record, reference=detail, detail=detail))
     return sort_findings(findings)
 
 
+def _definition(server: ServerEntry) -> str:
+    return sha256_hex(
+        stable_json(
+            {
+                "transport": server.transport.value,
+                "command": server.command,
+                "args": server.args,
+                "url": server.url,
+                "cwd": server.cwd,
+                "env": dict(server.env),
+                "headers": dict(server.headers),
+            }
+        )
+    )
+
+
+def _sessions(group: list[ServerEntry]) -> list[list[ServerEntry]]:
+    shared = [server for server in group if server.source.project is None]
+    projects: dict[str, list[ServerEntry]] = defaultdict(list)
+    for server in group:
+        if server.source.project is not None:
+            projects[os.path.normcase(str(server.source.project))].append(server)
+    if not projects:
+        return [shared]
+    return [shared + members for members in projects.values()]
+
+
 def conflicting_definitions(servers: Sequence[ServerEntry]) -> dict[str, list[Finding]]:
-    by_name: dict[str, list[ServerEntry]] = defaultdict(list)
+    groups: dict[tuple[Client, str], list[ServerEntry]] = defaultdict(list)
     for server in servers:
-        by_name[server.name.strip().lower()].append(server)
+        groups[(server.source.client, server.name.strip().lower())].append(server)
+    variants: dict[str, int] = {}
+    flagged: dict[str, ServerEntry] = {}
+    for group in groups.values():
+        for session in _sessions(group):
+            count = len({_definition(server) for server in session})
+            if count < 2:
+                continue
+            for server in session:
+                variants[server.key] = max(count, variants.get(server.key, 0))
+                flagged[server.key] = server
     extra: dict[str, list[Finding]] = defaultdict(list)
-    for group in by_name.values():
-        fingerprints = {server.fingerprint for server in group}
-        if len(fingerprints) < 2:
-            continue
-        for server in group:
-            extra[server.key].append(
-                Finding(
-                    rule_id="G12-003",
-                    severity=RULES["G12-003"].severity,
-                    location=server.location,
-                    params=frozen_mapping(
-                        {"server": server.name, "variants": str(len(fingerprints))}
-                    ),
-                )
+    for key, server in flagged.items():
+        extra[key].append(
+            Finding(
+                rule_id="G12-003",
+                severity=RULES["G12-003"].severity,
+                location=server.location,
+                params=frozen_mapping({"server": server.name, "variants": str(variants[key])}),
             )
+        )
     return extra
 
 
@@ -251,6 +318,9 @@ def scan_inventory(
                     incomplete = True
                     errors.append(f"{check.__name__}@{server.key}: {type(exc).__name__}")
         collection = tools.get(server.key) if tools is not None else None
+        if collection is not None and collection.gap is ToolGap.ERROR:
+            incomplete = True
+            errors.append(f"collect_tools@{server.key}: {', '.join(collection.notes)}")
         if collection is not None:
             tool_findings, tools_incomplete = _run_tool_checks(
                 server, collection, tool_checks, errors
@@ -258,6 +328,10 @@ def scan_inventory(
             findings.extend(tool_findings)
             incomplete = incomplete or tools_incomplete
         reports.append(ServerReport(server, sort_findings(findings), incomplete, collection))
+    errors.extend(
+        f"source@{record.source.path}: {record.error_code or ''}"
+        for record in inventory.failed_sources
+    )
     ordered = sorted(
         reports,
         key=lambda r: (-(r.risk if r.risk is not None else -1), r.server.name.lower()),

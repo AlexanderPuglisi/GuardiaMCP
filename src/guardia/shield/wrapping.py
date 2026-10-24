@@ -12,6 +12,7 @@ SHIELD_WORDS = frozenset({"scudo", "shield"})
 NAME_OPTIONS = frozenset({"--server", "--nome"})
 GUARDIA_PROGRAMS = frozenset({"guardia", "guardia.exe"})
 COMMAND_LINE_PROGRAM = "guardia.exe"
+PYTHON_FLAGS = frozenset({"-I", "-E", "-s", "-P", "-B", "-u"})
 
 
 class LauncherState(enum.StrEnum):
@@ -38,10 +39,13 @@ def unwrap(command: str | None, args: Sequence[str]) -> Wrapped | None:
     program = _program(command)
     rest = list(args)
     if program.startswith("python") or program in {"py", "py.exe", "pythonw.exe"}:
-        if rest[:2] != ["-m", "guardia"]:
+        flags = 0
+        while flags < len(rest) and rest[flags] in PYTHON_FLAGS:
+            flags += 1
+        if rest[flags : flags + 2] != ["-m", "guardia"]:
             return None
-        rest = rest[2:]
-        starter: tuple[str, ...] = (command, "-m", "guardia")
+        starter: tuple[str, ...] = (command, *rest[: flags + 2])
+        rest = rest[flags + 2 :]
     elif program in GUARDIA_PROGRAMS:
         starter = (command,)
     else:
@@ -63,7 +67,7 @@ def unwrap(command: str | None, args: Sequence[str]) -> Wrapped | None:
 def launcher() -> list[str]:
     if getattr(sys, "frozen", False):
         return [str(Path(sys.executable).with_name(COMMAND_LINE_PROGRAM))]
-    return [sys.executable, "-m", "guardia"]
+    return [sys.executable, "-I", "-m", "guardia"]
 
 
 def _same_program(first: str, second: str) -> bool:

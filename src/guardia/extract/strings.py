@@ -6,7 +6,7 @@ from collections.abc import Iterator
 from urllib.parse import urlsplit
 
 from guardia.model import SignalKind
-from guardia.redact import SECRET_VALUE, redact_text
+from guardia.redact import REDACTED, SECRET_VALUE
 from guardia.scanner.checks import TUNNEL_DOMAINS, URL_IN_TEXT
 
 MAX_LITERAL_LENGTH = 20_000
@@ -23,6 +23,10 @@ AGENT_CONFIGS = re.compile(
     r"|\.codex[/\\]config\.toml|\.gemini[/\\]settings\.json|managed-mcp\.json)",
     re.IGNORECASE,
 )
+
+
+def _show_prefix(match: re.Match[str]) -> str:
+    return match.group(0)[:4] + REDACTED
 
 
 def _public_ip(host: str) -> bool:
@@ -45,7 +49,11 @@ def classify(value: str) -> Iterator[tuple[SignalKind, str, str]]:
             yield SignalKind.AGENT_CONFIG, value[:160], match.group(0)
     secret = SECRET_VALUE.search(value)
     if secret:
-        yield SignalKind.SECRET, redact_text(value)[:160], secret.group(0)[:4] + "…"
+        yield (
+            SignalKind.SECRET,
+            SECRET_VALUE.sub(_show_prefix, value)[:160],
+            secret.group(0)[:4] + "…",
+        )
     if "://" not in value:
         return
     for url in URL_IN_TEXT.finditer(value):

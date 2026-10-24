@@ -41,12 +41,15 @@ class Phase(enum.StrEnum):
     SERVER_REQUEST = "server_request"
 
 
+ACTION_WORDS = {
+    Action.ALLOW: "consenti",
+    Action.LOG: "registra",
+    Action.REDACT: "oscura",
+    Action.ASK: "chiedi",
+    Action.BLOCK: "blocca",
+}
 ACTION_NAMES = {
-    "consenti": Action.ALLOW,
-    "registra": Action.LOG,
-    "oscura": Action.REDACT,
-    "chiedi": Action.ASK,
-    "blocca": Action.BLOCK,
+    **{word: action for action, word in ACTION_WORDS.items()},
     **{action.value: action for action in Action},
 }
 PHASE_NAMES = {
@@ -58,6 +61,7 @@ PHASE_NAMES = {
 }
 DEFAULT_ACTIONS = frozenset({Action.ALLOW, Action.LOG, Action.ASK, Action.BLOCK})
 ARGUMENT_PHASES = frozenset({Phase.CALL})
+RATE_PHASES = frozenset({Phase.CALL, Phase.SERVER_REQUEST})
 
 TOP_KEYS = {
     "version": ("versione", "version"),
@@ -169,20 +173,27 @@ class ResultMode(enum.StrEnum):
     BLOCK = "block"
 
 
+SENSITIVITY_WORDS = {
+    Sensitivity.OFF: "spento",
+    Sensitivity.CRITICAL: "critico",
+    Sensitivity.HIGH: "alto",
+    Sensitivity.MEDIUM: "medio",
+}
 SENSITIVITY_NAMES = {
-    "spento": Sensitivity.OFF,
-    "critico": Sensitivity.CRITICAL,
-    "alto": Sensitivity.HIGH,
-    "medio": Sensitivity.MEDIUM,
+    **{word: item for item, word in SENSITIVITY_WORDS.items()},
     **{item.value: item for item in Sensitivity},
 }
+RESULT_MODE_WORDS = {
+    ResultMode.OFF: "spento",
+    ResultMode.WARN: "avvisa",
+    ResultMode.BLOCK: "blocca",
+}
 RESULT_MODE_NAMES = {
-    "spento": ResultMode.OFF,
-    "avvisa": ResultMode.WARN,
-    "blocca": ResultMode.BLOCK,
+    **{word: item for item, word in RESULT_MODE_WORDS.items()},
     **{item.value: item for item in ResultMode},
 }
 OFF_NAMES = frozenset({"spento", "off"})
+OFF_WORDS = ("spento", "off")
 SECRET_ACTIONS = frozenset({Action.ASK, Action.BLOCK, Action.LOG})
 RESULT_SECRET_ACTIONS = frozenset({Action.REDACT})
 
@@ -225,28 +236,87 @@ def _bounded_number(value: object, high: int, *, integer: bool) -> float | None:
     return float(value)
 
 
+def _either(names: tuple[str, ...]) -> str:
+    return "|".join(map(re.escape, names))
+
+
+RULE_TABLE = _either(("regola", "rule"))
+SUB_TABLE = re.compile(rf"^\s*\[\s*(?:{RULE_TABLE})\s*\.")
+TABLE_HEADER = re.compile(r"^\s*\[\[?\s*[\w\-. \"']+\]\]?\s*(?:#.*)?$")
+
+
 class _Lines:
     def __init__(self, text: str) -> None:
         self.lines = text.splitlines()
-        header = re.compile(r"^\s*\[\[\s*(regola|rule)\s*\]\]", re.IGNORECASE)
+        header = re.compile(rf"^\s*\[\[\s*(?:{RULE_TABLE})\s*\]\]", re.IGNORECASE)
         self.headers = [number for number, line in enumerate(self.lines, 1) if header.match(line)]
+        self.first_table = next(
+            (number for number, line in enumerate(self.lines, 1) if TABLE_HEADER.match(line)),
+            len(self.lines) + 1,
+        )
 
     def rule(self, index: int) -> int | None:
         return self.headers[index] if index < len(self.headers) else None
 
-    def key(self, index: int, names: tuple[str, ...]) -> int | None:
+    def span(self, index: int) -> tuple[int, int] | None:
         start = self.rule(index)
         if start is None:
             return None
-        end = self.headers[index + 1] if index + 1 < len(self.headers) else len(self.lines) + 1
-        pattern = re.compile(r"^\s*(?:" + "|".join(map(re.escape, names)) + r")\s*[=.\]]")
+        for number in range(start + 1, len(self.lines) + 1):
+            line = self.lines[number - 1]
+            if TABLE_HEADER.match(line) and not SUB_TABLE.match(line):
+                return start, number
+        return start, len(self.lines) + 1
+
+    def key(self, index: int, names: tuple[str, ...]) -> int | None:
+        span = self.span(index)
+        if span is None:
+            return None
+        start, end = span
+        alternatives = _either(names)
+        pattern = re.compile(
+            rf"^\s*(?:(?:{alternatives})\s*[=.]|\[\s*(?:{RULE_TABLE})\s*\.\s*(?:{alternatives})\s*[\].])"
+        )
         for number in range(start, end):
             if pattern.match(self.lines[number - 1]):
                 return number
         return start
 
+    def sub_key(self, index: int, parent: tuple[str, ...], child: tuple[str, ...]) -> int | None:
+        span = self.span(index)
+        if span is None:
+            return None
+        start, end = span
+        dotted = re.compile(rf"^\s*(?:{_either(parent)})\s*\.\s*(?:{_either(child)})\s*=")
+        header = re.compile(rf"^\s*\[\s*(?:{RULE_TABLE})\s*\.\s*(?:{_either(parent)})\s*\]")
+        inside = re.compile(rf"^\s*(?:{_either(child)})\s*=")
+        within = False
+        for number in range(start, end):
+            line = self.lines[number - 1]
+            if dotted.match(line):
+                return number
+            if TABLE_HEADER.match(line):
+                within = bool(header.match(line))
+            elif within and inside.match(line):
+                return number
+        return self.key(index, parent)
+
+    def table_key(self, table: tuple[str, ...], names: tuple[str, ...]) -> int | None:
+        dotted = re.compile(rf"^\s*(?:{_either(table)})\s*\.\s*(?:{_either(names)})\s*=")
+        header = re.compile(rf"^\s*\[\s*(?:{_either(table)})\s*\]")
+        inside = re.compile(rf"^\s*(?:{_either(names)})\s*=")
+        within = False
+        for number, line in enumerate(self.lines, 1):
+            if dotted.match(line) and number < self.first_table:
+                return number
+            if TABLE_HEADER.match(line):
+                within = bool(header.match(line))
+            elif within and inside.match(line):
+                return number
+        return self.top_table(table)
+
     def top_table(self, names: tuple[str, ...]) -> int | None:
-        alternatives = "|".join(map(re.escape, names))
+        alternatives = _either(names)
         pattern = re.compile(rf"^\s*(?:\[\s*(?:{alternatives})\s*\]|(?:{alternatives})\s*[.=])")
         for number, line in enumerate(self.lines, 1):
             if pattern.match(line):
@@ -254,11 +324,43 @@ class _Lines:
         return None
 
     def top(self, names: tuple[str, ...]) -> int | None:
-        pattern = re.compile(r"^\s*(?:" + "|".join(map(re.escape, names)) + r")\s*=")
-        for number, line in enumerate(self.lines, 1):
+        pattern = re.compile(rf"^\s*(?:{_either(names)})\s*=")
+        for number, line in enumerate(self.lines[: self.first_table - 1], 1):
             if pattern.match(line):
                 return number
         return None
+
+    def top_any(self, name: str) -> int | None:
+        escaped = re.escape(name)
+        plain = re.compile(rf"^\s*{escaped}\s*[.=]")
+        table = re.compile(rf"^\s*\[\[?\s*{escaped}\s*[\].]")
+        for number, line in enumerate(self.lines, 1):
+            if (number < self.first_table and plain.match(line)) or table.match(line):
+                return number
+        return None
+
+
+def _english(written: str, names: tuple[str, ...], fallback: bool) -> bool:
+    if len(set(names)) == 1:
+        return fallback
+    return written == names[-1]
+
+
+class _Table(dict[str, Any]):
+    def __init__(self, schema: Mapping[str, tuple[str, ...]], english: bool) -> None:
+        super().__init__()
+        self.schema = schema
+        self.english = english
+        self.written: dict[str, str] = {}
+
+    def name(self, canonical: str) -> str:
+        if canonical in self.written:
+            return self.written[canonical]
+        names = self.schema[canonical]
+        return names[-1] if self.english else names[0]
+
+    def inner(self, canonical: str) -> bool:
+        return _english(self.name(canonical), self.schema[canonical], self.english)
 
 
 class _Checker:
@@ -266,6 +368,7 @@ class _Checker:
         self.lines = _Lines(text)
         self.home = home
         self.issues: list[Issue] = []
+        self.english = False
 
     def issue(
         self, level: Level, code: str, line: int | None, rule: str = "", **params: object
@@ -280,10 +383,11 @@ class _Checker:
         *,
         rule: str,
         context: str,
+        english: bool,
         locate: Callable[[str], int | None] | None = None,
-    ) -> dict[str, Any]:
+    ) -> _Table:
         aliases = {alias: canonical for canonical, names in schema.items() for alias in names}
-        result: dict[str, Any] = {}
+        result = _Table(schema, english)
         for key, value in table.items():
             canonical = aliases.get(key)
             if canonical is None:
@@ -304,7 +408,12 @@ class _Checker:
                 )
                 continue
             result[canonical] = value
+            result.written[canonical] = key
         return result
+
+    def words(self, values: Mapping[Any, str], english: bool, extra: tuple[str, ...] = ()) -> str:
+        names = [item.value if english else word for item, word in values.items()]
+        return ", ".join([*names, *extra])
 
     def strings(self, value: Any, key: str, line: int | None, rule: str) -> tuple[str, ...]:
         items = [value] if isinstance(value, str) else value
@@ -344,45 +453,74 @@ class _Checker:
                 )
         return tuple(compiled)
 
-    def argument(self, value: Any, index: int, rule: str) -> ArgumentCondition | None:
-        line = self.lines.key(index, RULE_KEYS["argument"])
-        if not isinstance(value, dict) or not value:
-            self.issue(Level.ERROR, "not_table", line, rule, key="argomento")
+    def section(
+        self,
+        rule_data: _Table,
+        canonical: str,
+        schema: Mapping[str, tuple[str, ...]],
+        index: int,
+        rule: str,
+    ) -> tuple[_Table | None, Callable[[str], int | None]]:
+        parent = RULE_KEYS[canonical]
+        key = rule_data.name(canonical)
+        line = self.lines.key(index, parent)
+        value = rule_data[canonical]
+
+        def at(child: str) -> int | None:
+            return self.lines.sub_key(index, parent, schema.get(child, (child,)))
+
+        if not isinstance(value, dict) or (canonical != "rate" and not value):
+            self.issue(Level.ERROR, "not_table", line, rule, key=key)
+            return None, at
+        data = self.table(
+            value,
+            schema,
+            line,
+            rule=rule,
+            context=key,
+            english=rule_data.inner(canonical),
+            locate=at,
+        )
+        return data, at
+
+    def texts(
+        self, data: _Table, canonical: str, at: Callable[[str], int | None], rule: str
+    ) -> tuple[str, ...]:
+        if canonical not in data:
+            return ()
+        return self.strings(data[canonical], data.name(canonical), at(canonical), rule)
+
+    def argument(self, rule_data: _Table, index: int, rule: str) -> ArgumentCondition | None:
+        data, at = self.section(rule_data, "argument", ARGUMENT_KEYS, index, rule)
+        if data is None:
             return None
-        data = self.table(value, ARGUMENT_KEYS, line, rule=rule, context="argomento")
+
+        def names(canonical: str) -> tuple[re.Pattern[str], ...]:
+            return tuple(name_glob(item) for item in self.texts(data, canonical, at, rule))
+
         return ArgumentCondition(
-            fields=self.globs(data["field"], "campo", line, rule) if "field" in data else (),
-            paths=tuple(
-                path_glob(item, self.home)
-                for item in (
-                    self.strings(data["path"], "percorso", line, rule) if "path" in data else ()
-                )
-            ),
-            hosts=self.globs(data["host"], "host", line, rule) if "host" in data else (),
-            hosts_not_in=(
-                self.globs(data["host_not_in"], "host_non_in", line, rule)
-                if "host_not_in" in data
-                else ()
-            ),
-            contains=(
-                tuple(
-                    item.lower() for item in self.strings(data["contains"], "contiene", line, rule)
-                )
-                if "contains" in data
-                else ()
-            ),
-            regex=self.regexes(data["regex"], "regex", line, rule) if "regex" in data else (),
+            fields=names("field"),
+            paths=tuple(path_glob(item, self.home) for item in self.texts(data, "path", at, rule)),
+            hosts=names("host"),
+            hosts_not_in=names("host_not_in"),
+            contains=tuple(item.lower() for item in self.texts(data, "contains", at, rule)),
+            regex=self.patterns(data, at, rule),
         )
 
-    def content(self, value: Any, index: int, rule: str) -> ContentCondition | None:
-        line = self.lines.key(index, RULE_KEYS["content"])
-        if not isinstance(value, dict) or not value:
-            self.issue(Level.ERROR, "not_table", line, rule, key="contenuto")
+    def patterns(
+        self, data: _Table, at: Callable[[str], int | None], rule: str
+    ) -> tuple[re.Pattern[str], ...]:
+        if "regex" not in data:
+            return ()
+        return self.regexes(data["regex"], data.name("regex"), at("regex"), rule)
+
+    def content(self, rule_data: _Table, index: int, rule: str) -> ContentCondition | None:
+        data, at = self.section(rule_data, "content", CONTENT_KEYS, index, rule)
+        if data is None:
             return None
-        data = self.table(value, CONTENT_KEYS, line, rule=rule, context="contenuto")
         secrets = data.get("secrets", False)
         if not isinstance(secrets, bool):
-            self.issue(Level.ERROR, "not_bool", line, rule, key="segreti")
+            self.issue(Level.ERROR, "not_bool", at("secrets"), rule, key=data.name("secrets"))
             secrets = False
         max_size = data.get("max_size")
         if max_size is not None and (
@@ -391,35 +529,47 @@ class _Checker:
             or not 1 <= max_size <= MAX_SIZE
         ):
             self.issue(
-                Level.ERROR, "bad_number", line, rule, key="dimensione_max", low=1, high=MAX_SIZE
+                Level.ERROR,
+                "bad_number",
+                at("max_size"),
+                rule,
+                key=data.name("max_size"),
+                low=1,
+                high=MAX_SIZE,
             )
             max_size = None
         return ContentCondition(
             secrets=secrets,
-            contains=(
-                tuple(
-                    item.lower() for item in self.strings(data["contains"], "contiene", line, rule)
-                )
-                if "contains" in data
-                else ()
-            ),
-            regex=self.regexes(data["regex"], "regex", line, rule) if "regex" in data else (),
+            contains=tuple(item.lower() for item in self.texts(data, "contains", at, rule)),
+            regex=self.patterns(data, at, rule),
             max_size=max_size,
         )
 
-    def rate(self, value: Any, index: int, rule: str) -> RateLimit | None:
-        line = self.lines.key(index, RULE_KEYS["rate"])
-        if not isinstance(value, dict):
-            self.issue(Level.ERROR, "not_table", line, rule, key="frequenza")
+    def rate(self, rule_data: _Table, index: int, rule: str) -> RateLimit | None:
+        data, at = self.section(rule_data, "rate", RATE_KEYS, index, rule)
+        if data is None:
             return None
-        data = self.table(value, RATE_KEYS, line, rule=rule, context="frequenza")
         maximum = _bounded_number(data.get("max"), MAX_RATE, integer=True)
         seconds = _bounded_number(data.get("seconds"), MAX_RATE_SECONDS, integer=False)
         if maximum is None:
-            self.issue(Level.ERROR, "bad_number", line, rule, key="massimo", low=1, high=MAX_RATE)
+            self.issue(
+                Level.ERROR,
+                "bad_number",
+                at("max"),
+                rule,
+                key=data.name("max"),
+                low=1,
+                high=MAX_RATE,
+            )
         if seconds is None:
             self.issue(
-                Level.ERROR, "bad_number", line, rule, key="secondi", low=1, high=MAX_RATE_SECONDS
+                Level.ERROR,
+                "bad_number",
+                at("seconds"),
+                rule,
+                key=data.name("seconds"),
+                low=1,
+                high=MAX_RATE_SECONDS,
             )
         if maximum is None or seconds is None:
             return None
@@ -441,9 +591,9 @@ class _Checker:
             return None
         return ACTION_NAMES[value.lower()]
 
-    def phases(self, value: Any, line: int | None, rule: str) -> frozenset[Phase]:
+    def phases(self, value: Any, line: int | None, rule: str, key: str) -> frozenset[Phase]:
         found: set[Phase] = set()
-        for item in self.strings(value, "fase", line, rule):
+        for item in self.strings(value, key, line, rule):
             phase = PHASE_NAMES.get(item.lower())
             if phase is None:
                 self.issue(Level.ERROR, "bad_phase", line, rule, value=item)
@@ -454,7 +604,7 @@ class _Checker:
     def rule(self, value: Any, index: int) -> Rule | None:
         start = self.lines.rule(index)
         if not isinstance(value, dict):
-            self.issue(Level.ERROR, "not_table", start, key="regola")
+            self.issue(Level.ERROR, "not_table", start, key="rule" if self.english else "regola")
             return None
         raw_name = value.get("nome", value.get("name"))
         label = (
@@ -466,131 +616,156 @@ class _Checker:
         def locate(key: str) -> int | None:
             return self.lines.key(index, (key,))
 
-        data = self.table(value, RULE_KEYS, start, rule=label, context="regola", locate=locate)
-        name = self.name(data, index)
-        enabled = data.get("enabled", True)
-        if not isinstance(enabled, bool):
-            self.issue(
-                Level.ERROR,
-                "not_bool",
-                self.lines.key(index, RULE_KEYS["enabled"]),
-                name,
-                key="attiva",
-            )
-        if "note" in data and not isinstance(data["note"], str):
-            self.issue(
-                Level.ERROR,
-                "not_strings",
-                self.lines.key(index, RULE_KEYS["note"]),
-                name,
-                key="nota",
-            )
-        if "action" not in data:
-            self.issue(Level.ERROR, "missing_action", start, name)
-            return None
-        action = self.action(
-            data["action"], self.lines.key(index, RULE_KEYS["action"]), name, "azione"
+        data = self.table(
+            value,
+            RULE_KEYS,
+            start,
+            rule=label,
+            context="rule" if self.english else "regola",
+            english=self.english,
+            locate=locate,
         )
+        name = self.name(data, index)
 
         def line_of(key: str) -> int | None:
             return self.lines.key(index, RULE_KEYS[key])
+
+        enabled = data.get("enabled", True)
+        if not isinstance(enabled, bool):
+            self.issue(Level.ERROR, "not_bool", line_of("enabled"), name, key=data.name("enabled"))
+        if "note" in data and not isinstance(data["note"], str):
+            self.issue(Level.ERROR, "not_strings", line_of("note"), name, key=data.name("note"))
+        if "action" not in data:
+            self.issue(Level.ERROR, "missing_action", start, name)
+            return None
+        action = self.action(data["action"], line_of("action"), name, data.name("action"))
+
+        def names(key: str) -> tuple[re.Pattern[str], ...]:
+            if key not in data:
+                return ()
+            return self.globs(data[key], data.name(key), line_of(key), name)
 
         rule = Rule(
             index=index,
             name=name,
             action=action or Action.BLOCK,
             line=start,
-            servers=self.globs(data["server"], "server", line_of("server"), name)
-            if "server" in data
-            else (),
-            tools=self.globs(data["tool"], "strumento", line_of("tool"), name)
-            if "tool" in data
-            else (),
-            methods=self.globs(data["method"], "metodo", line_of("method"), name)
-            if "method" in data
-            else (),
-            phases=self.phases(data["phase"], line_of("phase"), name)
+            servers=names("server"),
+            tools=names("tool"),
+            methods=names("method"),
+            phases=self.phases(data["phase"], line_of("phase"), name, data.name("phase"))
             if "phase" in data
             else frozenset(),
-            argument=self.argument(data["argument"], index, name) if "argument" in data else None,
-            content=self.content(data["content"], index, name) if "content" in data else None,
-            rate=self.rate(data["rate"], index, name) if "rate" in data else None,
+            argument=self.argument(data, index, name) if "argument" in data else None,
+            content=self.content(data, index, name) if "content" in data else None,
+            rate=self.rate(data, index, name) if "rate" in data else None,
         )
         self.warnings(rule)
         return rule if action is not None and enabled is True else None
 
-    def choice(self, value: Any, names: Mapping[str, Any], key: str, line: int | None) -> Any:
+    def choice(
+        self,
+        value: Any,
+        names: Mapping[str, Any],
+        words: Mapping[Any, str],
+        data: _Table,
+        key: str,
+    ) -> Any:
         if not isinstance(value, str) or value.lower() not in names:
-            options = ", ".join(sorted(names))
-            self.issue(Level.ERROR, "bad_choice", line, key=key, value=value, options=options)
+            line = self.lines.table_key(TOP_KEYS["protections"], PROTECTION_KEYS[key])
+            options = self.words(words, data.inner(key))
+            self.issue(
+                Level.ERROR, "bad_choice", line, key=data.name(key), value=value, options=options
+            )
             return None
         return names[value.lower()]
 
     def secret_action(
-        self, value: Any, allowed: frozenset[Action], key: str, line: int | None
+        self, value: Any, allowed: frozenset[Action], data: _Table, key: str
     ) -> tuple[bool, Action | None]:
         names: dict[str, Action | None] = {
             name: action for name, action in ACTION_NAMES.items() if action in allowed
         }
         names.update(dict.fromkeys(OFF_NAMES, None))
         if not isinstance(value, str) or value.lower() not in names:
-            options = ", ".join(sorted(names))
-            self.issue(Level.ERROR, "bad_choice", line, key=key, value=value, options=options)
+            english = data.inner(key)
+            words = {action: word for action, word in ACTION_WORDS.items() if action in allowed}
+            options = self.words(words, english, (OFF_WORDS[1] if english else OFF_WORDS[0],))
+            line = self.lines.table_key(TOP_KEYS["protections"], PROTECTION_KEYS[key])
+            self.issue(
+                Level.ERROR, "bad_choice", line, key=data.name(key), value=value, options=options
+            )
             return False, None
         return True, names[value.lower()]
 
-    def protections(self, value: Any) -> Protections:
+    def protections(self, value: Any, english: bool, key: str) -> Protections:
         line = self.lines.top_table(TOP_KEYS["protections"])
         if not isinstance(value, dict):
-            self.issue(Level.ERROR, "not_table", line, key="protezioni")
+            self.issue(Level.ERROR, "not_table", line, key=key)
             return Protections()
-        data = self.table(value, PROTECTION_KEYS, line, rule="", context="protezioni")
+
+        def at(name: str) -> int | None:
+            return self.lines.table_key(TOP_KEYS["protections"], (name,))
+
+        data = self.table(
+            value, PROTECTION_KEYS, line, rule="", context=key, english=english, locate=at
+        )
         result = Protections()
         if "approved_tools" in data:
             if isinstance(data["approved_tools"], bool):
                 result = replace(result, approved_tools=data["approved_tools"])
             else:
-                self.issue(Level.ERROR, "not_bool", line, key="strumenti_approvati")
+                where = self.lines.table_key(
+                    TOP_KEYS["protections"], PROTECTION_KEYS["approved_tools"]
+                )
+                self.issue(Level.ERROR, "not_bool", where, key=data.name("approved_tools"))
         if "analysis" in data:
-            chosen = self.choice(data["analysis"], SENSITIVITY_NAMES, "analisi", line)
+            chosen = self.choice(
+                data["analysis"], SENSITIVITY_NAMES, SENSITIVITY_WORDS, data, "analysis"
+            )
             result = replace(result, analysis=chosen or result.analysis)
         if "results" in data:
-            chosen = self.choice(data["results"], RESULT_MODE_NAMES, "risultati", line)
+            chosen = self.choice(
+                data["results"], RESULT_MODE_NAMES, RESULT_MODE_WORDS, data, "results"
+            )
             result = replace(result, results=chosen or result.results)
         if "outgoing_secrets" in data:
             valid, action = self.secret_action(
-                data["outgoing_secrets"], SECRET_ACTIONS, "segreti_in_uscita", line
+                data["outgoing_secrets"], SECRET_ACTIONS, data, "outgoing_secrets"
             )
             result = replace(result, outgoing_secrets=action) if valid else result
         if "result_secrets" in data:
             valid, action = self.secret_action(
-                data["result_secrets"], RESULT_SECRET_ACTIONS, "segreti_nei_risultati", line
+                data["result_secrets"], RESULT_SECRET_ACTIONS, data, "result_secrets"
             )
             result = replace(result, result_secrets=action) if valid else result
         if "credential_requests" in data:
             valid, action = self.secret_action(
-                data["credential_requests"], SECRET_ACTIONS, "richieste_credenziali", line
+                data["credential_requests"], SECRET_ACTIONS, data, "credential_requests"
             )
             result = replace(result, credential_requests=action) if valid else result
-        self.relaxed(result, line)
+        self.relaxed(result, data)
         return result
 
-    def relaxed(self, protections: Protections, line: int | None) -> None:
+    def relaxed(self, protections: Protections, data: _Table) -> None:
         checks = (
-            ("strumenti_approvati", protections.approved_tools is False),
-            ("analisi", protections.analysis in (Sensitivity.OFF, Sensitivity.CRITICAL)),
-            ("risultati", protections.results is ResultMode.OFF),
-            ("segreti_in_uscita", protections.outgoing_secrets in (None, Action.LOG)),
-            ("segreti_nei_risultati", protections.result_secrets is None),
-            ("richieste_credenziali", protections.credential_requests in (None, Action.LOG)),
+            ("approved_tools", protections.approved_tools is False),
+            ("analysis", protections.analysis in (Sensitivity.OFF, Sensitivity.CRITICAL)),
+            ("results", protections.results is ResultMode.OFF),
+            ("outgoing_secrets", protections.outgoing_secrets in (None, Action.LOG)),
+            ("result_secrets", protections.result_secrets is None),
+            ("credential_requests", protections.credential_requests in (None, Action.LOG)),
         )
         for key, weaker in checks:
             if weaker:
-                self.issue(Level.WARNING, "protection_relaxed", line, key=key)
+                line = self.lines.table_key(TOP_KEYS["protections"], PROTECTION_KEYS[key])
+                self.issue(Level.WARNING, "protection_relaxed", line, key=data.name(key))
 
     def warnings(self, rule: Rule) -> None:
         if rule.argument is not None and rule.phases and not rule.phases & ARGUMENT_PHASES:
             self.issue(Level.WARNING, "argument_never_matches", rule.line, rule.name)
+        if rule.rate is not None and rule.phases and not rule.phases & RATE_PHASES:
+            self.issue(Level.WARNING, "rate_never_matches", rule.line, rule.name)
         if rule.action is Action.REDACT and rule.phases == frozenset({Phase.LIST}):
             self.issue(Level.ERROR, "redact_on_list", rule.line, rule.name)
         has_condition = any(
@@ -615,14 +790,36 @@ def _toml_line(error: tomllib.TOMLDecodeError) -> int | None:
     return int(match.group(1)) if match else None
 
 
+def _file_english(document: Mapping[str, Any]) -> bool:
+    english = sum(names[-1] in document for names in TOP_KEYS.values())
+    italian = sum(names[0] in document for names in TOP_KEYS.values())
+    return english > italian
+
+
 def _top(
     checker: _Checker, document: dict[str, Any]
 ) -> tuple[Action, list[Any], Protections] | None:
+    checker.english = _file_english(document)
     if all(name in document for name in TOP_KEYS["rules"]):
         checker.issue(Level.ERROR, "mixed_rule_tables", checker.lines.rule(0))
         return None
-    data = checker.table(document, TOP_KEYS, None, rule="", context="file")
-    version = data.get("version")
+    data = checker.table(
+        document,
+        TOP_KEYS,
+        None,
+        rule="",
+        context="file",
+        english=checker.english,
+        locate=checker.lines.top_any,
+    )
+    if "rules" in data:
+        checker.english = data.inner("rules")
+    if "version" not in data:
+        checker.issue(
+            Level.ERROR, "missing_version", 1, key=data.name("version"), expected=SCHEMA_VERSION
+        )
+        return None
+    version = data["version"]
     if version != SCHEMA_VERSION or isinstance(version, bool):
         checker.issue(
             Level.ERROR,
@@ -635,20 +832,25 @@ def _top(
     default = Action.ALLOW
     if "default" in data:
         line = checker.lines.top(TOP_KEYS["default"])
-        parsed = checker.action(data["default"], line, "", "predefinito")
+        parsed = checker.action(data["default"], line, "", data.name("default"))
         if parsed is not None and parsed not in DEFAULT_ACTIONS:
             checker.issue(Level.ERROR, "bad_default", line, value=data["default"])
         elif parsed is not None:
             default = parsed
     rules = data.get("rules", [])
     if not isinstance(rules, list):
-        checker.issue(Level.ERROR, "not_table", None, key="regola")
+        line = checker.lines.top_any(data.name("rules"))
+        checker.issue(Level.ERROR, "not_table", line, key=data.name("rules"))
         return None
     if len(rules) > MAX_RULES:
-        checker.issue(Level.ERROR, "too_many_rules", None, limit=MAX_RULES)
+        checker.issue(Level.ERROR, "too_many_rules", checker.lines.rule(MAX_RULES), limit=MAX_RULES)
         return None
     protections = (
-        checker.protections(data["protections"]) if "protections" in data else Protections()
+        checker.protections(
+            data["protections"], data.inner("protections"), data.name("protections")
+        )
+        if "protections" in data
+        else Protections()
     )
     return default, rules, protections
 

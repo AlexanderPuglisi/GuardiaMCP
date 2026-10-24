@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import os
 import re
 import unicodedata
 from collections import defaultdict
@@ -64,10 +65,10 @@ HIDDEN_MARKERS = _compile(
     r"<\s*/?\s*(important|system|sys|instructions?|secret|hidden|admin|priority"
     r"|ai[_-]?instructions?|assistant[_-]?instructions?|note[_-]?to[_-]?(ai|assistant|model))\b[^>]*>",
     r"\[\s*(SYSTEM|IMPORTANT|INSTRUCTIONS?|ADMIN|HIDDEN)\s*\]",
-    r"<!--[\s\S]*?-->",
+    r"<!--(?P<comment>[\s\S]*?)-->",
     r"\{\{\s*(system|instructions?)\b",
-    r"^\s*#{1,6}\s*(system(\s+(prompt|instructions?|message))?|instructions?\s+for\s+(the\s+)?"
-    r"(ai|assistant|model|llm))\s*:?\s*$",
+    r"(?P<heading>^\s*#{1,6}\s*(system(\s+(prompt|instructions?|message))?|instructions?\s+for\s+"
+    r"(the\s+)?(ai|assistant|model|llm))\s*:?\s*$)",
 )
 CONCEALMENT = _compile(
     r"\b(do\s+not|don'?t|never|must\s+not|should\s+not)\s+(mention|tell|reveal|disclose)\s+"
@@ -102,7 +103,7 @@ FAKE_DELIMITERS = _compile(
     r"|system_prompt|user_message|assistant_message|antml:[a-z_]+)\s*>",
     r"<\|(im_start|im_end|system|user|assistant|endoftext)\|>",
     r"\[/?INST\]|<<\s*/?SYS\s*>>",
-    r"(^|\n)\s*(Human|Assistant|System)\s*:\s",
+    r"(?P<role>(^|\n)\s*(Human|Assistant|System)\s*:\s)",
 )
 _SEND = (
     r"(include|pass|put|insert|add|append|attach|provide|send|copy|paste|forward|upload|post|share"
@@ -111,7 +112,8 @@ _SEND = (
 CONTEXT_EXFILTRATION = _compile(
     _SEND + r"\b[^.\n]{0,60}\b((the\s+)?(entire|full|whole|complete)\s+(conversation|chat)"
     r"|conversation\s+history|chat\s+history|previous\s+messages|all\s+(previous\s+)?messages"
-    r"|message\s+history|system\s+prompt|your\s+(system\s+)?instructions|(full|entire)\s+context"
+    r"|message\s+history|system\s+prompt|your\s+(system\s+)?instructions"
+    r"|(full|entire|whole)\s+context\s+window"
     r"|(the\s+)?user'?s\s+(messages|prompts?)|other\s+tools?'?\s*(outputs?|results?)"
     r"|cronologia\s+della\s+(conversazione|chat)|intera\s+conversazione|messaggi\s+precedenti"
     r"|prompt\s+di\s+sistema)\b"
@@ -120,14 +122,19 @@ _READ_OR_SEND = (
     r"(read|cat|open|load|get|fetch|access|send|include|pass|provide|attach|copy|upload|forward"
     r"|share|post|collect|extract|leggi|apri|invia|includi|passa|copia|allega|carica)"
 )
-_SENSITIVE_FILES = (
-    r"(~/?\.ssh\b|\.ssh[/\\]|\bid_(rsa|ed25519|ecdsa|dsa)\b|\.aws[/\\]|\.aws\s+credentials"
-    r"|\.env\b|\.npmrc\b|\.pypirc\b|\.netrc\b|\.git-credentials\b|\.kube[/\\]config"
-    r"|\.docker[/\\]config\.json|\bmcp\.json\b|claude_desktop_config|\.claude\.json"
-    r"|\.cursor[/\\]|\bprivate[\s_-]?keys?\b|wallet\.dat|\bseed\s+phrase\b|\bkeychain\b"
+_PRIVATE_FILES = (
+    r"(\bid_(rsa|ed25519|ecdsa|dsa)\b(?!\.pub)|\.aws[/\\]credentials|\.aws\s+credentials"
+    r"|\.netrc\b|\.git-credentials\b|\bprivate[\s_-]?keys?\b|wallet\.dat|\bseed\s+phrase\b"
     r"|\blogin\s+data\b|cookies\.sqlite|/etc/(passwd|shadow)\b)"
 )
+_CONFIG_FILES = (
+    r"(~/?\.ssh\b|\.ssh[/\\]|\.aws[/\\]|\.env\b(?!\.(example|sample|template|dist)\b)"
+    r"|\.npmrc\b|\.pypirc\b|\.kube[/\\]config|\.docker[/\\]config\.json|\bmcp\.json\b"
+    r"|claude_desktop_config|\.claude\.json|\.cursor[/\\]|\bkeychain\b)"
+)
+_SENSITIVE_FILES = rf"({_PRIVATE_FILES}|{_CONFIG_FILES})"
 SENSITIVE_FILE_ACCESS = _compile(rf"\b{_READ_OR_SEND}\b[^.\n]{{0,80}}{_SENSITIVE_FILES}")
+PRIVATE_FILES = _compile(_PRIVATE_FILES)
 _EXFIL_VERBS = (
     r"(send|upload|forward|post|transmit|share|leak|exfiltrate|email|invia|inoltra|trasmetti"
     r"|condividi|carica)"
@@ -141,16 +148,17 @@ URL_EXFILTRATION = _compile(
     r"\b(send|post|upload|forward|report|transmit|submit|exfiltrate|invia|carica|inoltra)\b"
     r"[^.\n]{0,80}(https?://[^\s\"'<>)]+|\bwebhooks?\b)"
 )
+_LITERAL_ADDRESS = r"([\w.+-]+@[\w-]+(\.[\w-]+)*\.[a-z]{2,}|\+?\d[\d\s-]{7,}\d)"
 RECIPIENT_REDIRECT = _compile(
     r"\b(change|modify|replace|override|set)\s+(the\s+)?(recipient|destination|receiver"
-    r"|to\s+address|phone\s+number|bcc|email\s+address)\b",
+    rf"|to\s+address|phone\s+number|bcc|email\s+address)\s+(to|with|=)\s+{_LITERAL_ADDRESS}",
     r"\b(always|also)\s+(send|forward|cc|bcc|copy)\b[^.\n]{0,40}[\w.+-]+@[\w-]+\.[a-z]{2,}",
     r"\b(send|forward)\b[^.\n]{0,40}\+\d[\d\s-]{7,}",
 )
 SHADOWING = _compile(
     r"\b(when|whenever|if|before|after)\s+(the\s+user\s+|you\s+)?(uses?|calls?|invokes?|runs?)\s+"
     r"(the\s+|any\s+)?(other|another|any|all|every)\s+(tools?|servers?|functions?)\b",
-    r"\b(all|any|every)\s+(other\s+)?(tools?|servers?|functions?|mcp\s+servers?)\s+(must|should"
+    r"\b(all|any|every)\s+other\s+(tools?|servers?|functions?|mcp\s+servers?)\s+(must|should"
     r"|need\s+to|are\s+required\s+to|will)\b",
     r"\bother\s+(tools?|servers?|functions?)\s+(must|should|need\s+to|are\s+required\s+to)\b",
     r"\b(this\s+tool|it)\s+(replaces|overrides|supersedes|takes\s+precedence\s+over)\b",
@@ -179,7 +187,7 @@ EXECUTION_TEXT = _compile(
 )
 SECRET_PARAMETER = re.compile(
     r"^(password|passwd|pwd|secret|api[_-]?key|apikey|token|access[_-]?token|private[_-]?key"
-    r"|credentials?|cookie|session[_-]?id)$",
+    r"|credentials?|cookie)$",
     re.IGNORECASE,
 )
 DESTRUCTIVE_WORDS = frozenset(
@@ -339,20 +347,18 @@ NEGATION = re.compile(
     re.IGNORECASE,
 )
 NEGATABLE_RULES = frozenset({"G02-003", "G06-005", "G07-004", "G09-010"})
+CONCEALING_RULES = frozenset({"G01-002", "G01-003"})
 
 
 def _negated(text: str, match: re.Match[str]) -> bool:
     return NEGATION.search(text[max(0, match.start() - 40) : match.start()]) is not None
 
 
-def first_unquoted(
-    pattern: re.Pattern[str], text: str, negatable: bool = False
-) -> re.Match[str] | None:
+def _unquoted(pattern: re.Pattern[str], text: str, negatable: bool) -> Iterator[re.Match[str]]:
     for match in pattern.finditer(text):
         if _quoted(text, match) or (negatable and _negated(text, match)):
             continue
-        return match
-    return None
+        yield match
 
 
 def _pattern_source(rule_id: str, text: str, kind: ToolKind, label: str) -> str | None:
@@ -361,6 +367,261 @@ def _pattern_source(rule_id: str, text: str, kind: ToolKind, label: str) -> str 
     if label.startswith("body.code"):
         return None
     return INLINE_CODE.sub(" ", text)
+
+
+ACTION_PATTERNS = (
+    INJECTION,
+    CONCEALMENT,
+    CONTEXT_EXFILTRATION,
+    PRE_ACTION,
+    SHADOWING,
+    RECIPIENT_REDIRECT,
+    SECRET_EXFILTRATION,
+    SENSITIVE_FILE_ACCESS,
+    URL_EXFILTRATION,
+)
+MODEL_DIRECTIVE = _compile(
+    r"\b(ai|assistant|model|llm|claude|chatgpt|gpt)\s*[:,]\s*\w",
+    r"\b(you|the\s+(ai|assistant|model|llm))\s+(must|should|shall|will|need\s+to|have\s+to"
+    r"|are\s+(required|supposed)\s+to)\b",
+    r"\b(note|instructions?|message)\s+(to|for)\s+(the\s+)?(ai|assistant|model|llm|claude)\b",
+)
+READER_DIRECTIVE = _compile(
+    r"\b(you|your)\b",
+    r"(^|[.!?;:]\s*|\b(then|first|now|and)\s+)(read|send|include|upload|copy|forward|post|call"
+    r"|run|execute|ignore|delete|fetch|open|reveal|tell|attach|email|share|transmit|always"
+    r"|never)\b",
+)
+ROLE_PAYLOAD = _compile(
+    r"\b(full|unrestricted|admin(istrator)?|root)\s+(access|rights|privileges|permissions)\b",
+    r"\bwithout\s+(asking|confirm\w*|permission|approval|telling)\b",
+    r"\b(already|has\s+been|have\s+been|is)\s+(approved|authori[sz]ed|confirmed|granted"
+    r"|verified)\b",
+    r"\bI\s+(will|'ll|am\s+going\s+to|must)\s+(now\s+)?(read|send|run|execute|call|delete"
+    r"|upload|open|access|fetch|forward|share|ignore)\b",
+)
+EXFILTRATION_MODIFIER = _compile(
+    r"\b(also|always|additionally|in\s+addition|as\s+well|secretly|silently|covertly|quietly"
+    r"|discreetly|instead|every\s+time|each\s+time|whenever|without\s+(telling|informing"
+    r"|notifying|alerting|asking))\b",
+    r"\b(after|before|on|with|for)\s+(every|each)\s+(call|use|request|response|reply|answer"
+    r"|message|run|invocation)\b",
+    r"\b(anche|sempre|di\s+nascosto|ogni\s+volta|senza\s+(avvisare|dire|informare|chiedere))\b",
+)
+SECRET_OWNER = _compile(r"\b(the\s+user'?s|users'|your|their|all|every|any)\b")
+DESTINATION = _compile(r"https?://", r"\bwebhooks?\b", r"[\w.+-]+@[\w-]+\.[a-z]{2,}")
+LITERAL_URL = _compile(r"https?://")
+REQUEST_OBJECT = _compile(
+    r"^\s*(an?|the)\s+((http|https|get|post|put|patch|delete|api|web|rest|graphql)\s+)*"
+    r"(request|call|query)\b"
+)
+SENSITIVE_CUE = _compile(
+    _SENSITIVE_FILES,
+    r"\b(api[\s_-]?keys?|(access|auth|bearer|session|oauth|github|refresh)[\s_-]?tokens?"
+    r"|passwords?|credentials?|secrets?|cookies?|private\s+keys?)\b",
+    r"https?://",
+    r"\b(conversation|chat|message)\s+history\b",
+    r"\bsystem\s+prompt\b",
+)
+OUTWARD_VERBS = _compile(
+    r"\b(send|upload|forward|post|transmit|share|leak|exfiltrate|email|invia|inoltra|carica"
+    r"|condividi)\b"
+)
+SENDING_WORDS = frozenset(
+    {
+        "send",
+        "post",
+        "upload",
+        "publish",
+        "notify",
+        "share",
+        "forward",
+        "submit",
+        "reply",
+        "comment",
+        "broadcast",
+        "push",
+        "deliver",
+        "dispatch",
+        "transmit",
+        "tweet",
+        "webhook",
+        "webhooks",
+    }
+)
+SECRET_WORDS = frozenset(
+    {
+        "secret",
+        "secrets",
+        "credential",
+        "credentials",
+        "token",
+        "tokens",
+        "key",
+        "keys",
+        "apikey",
+        "password",
+        "passwords",
+        "vault",
+        "keychain",
+        "keyring",
+    }
+)
+SENTENCE_END = re.compile(r"[.!?](?=\s|$)|\n")
+FOLLOWING = 120
+
+
+def _sentence(text: str, match: re.Match[str]) -> str:
+    start = max((end.end() for end in SENTENCE_END.finditer(text, 0, match.start())), default=0)
+    after = SENTENCE_END.search(text, match.end())
+    return text[start : after.start() if after else len(text)]
+
+
+def _following(text: str, match: re.Match[str]) -> str:
+    return text[match.start() : match.end() + FOLLOWING]
+
+
+def _line_after(text: str, match: re.Match[str]) -> str:
+    end = text.find("\n", match.end())
+    return text[match.end() : end if end != -1 else len(text)]
+
+
+def _declares(context: ToolContext, words: frozenset[str]) -> bool:
+    return context.tool.kind is ToolKind.TOOL and bool(_words(context.tool.name) & words)
+
+
+def _instructional(comment: str, skill: bool) -> bool:
+    if len(comment.split()) < 3:
+        return False
+    if any(pattern.search(comment) for pattern in ACTION_PATTERNS):
+        return True
+    if MODEL_DIRECTIVE.search(comment):
+        return True
+    return not skill and READER_DIRECTIVE.search(comment.strip()) is not None
+
+
+def _hidden_marker(match: re.Match[str], skill: bool) -> bool:
+    comment = match.group("comment")
+    if comment is not None:
+        return _instructional(comment, skill)
+    return not (skill and match.group("heading") is not None)
+
+
+def _role_line(text: str, match: re.Match[str]) -> bool:
+    if match.group("role") is None:
+        return True
+    rest = _line_after(text, match)
+    return ROLE_PAYLOAD.search(rest) is not None or any(
+        pattern.search(rest) for pattern in ACTION_PATTERNS
+    )
+
+
+def _url_request(text: str, match: re.Match[str]) -> bool:
+    verb = re.match(r"\w+", match.group(0))
+    rest = match.group(0)[verb.end() :] if verb else match.group(0)
+    return REQUEST_OBJECT.match(rest) is not None
+
+
+@dataclass(frozen=True, slots=True)
+class Clue:
+    text: str
+    match: re.Match[str]
+    context: ToolContext
+    concealed: bool
+
+    @property
+    def skill(self) -> bool:
+        return self.context.tool.kind is ToolKind.SKILL
+
+    @property
+    def sentence(self) -> str:
+        return _sentence(self.text, self.match)
+
+    @property
+    def urged(self) -> bool:
+        return self.concealed or EXFILTRATION_MODIFIER.search(self.sentence) is not None
+
+
+def _context_severity(clue: Clue, base: Severity) -> Severity | None:
+    if clue.urged or DESTINATION.search(clue.sentence):
+        return base
+    return None if clue.skill else Severity.MEDIUM
+
+
+def _secret_severity(clue: Clue, base: Severity) -> Severity | None:
+    owned = SECRET_OWNER.search(clue.match.group(0)) is not None
+    if clue.urged or owned or DESTINATION.search(clue.sentence):
+        return base
+    if clue.skill or _declares(clue.context, SENDING_WORDS | SECRET_WORDS):
+        return None
+    return Severity.MEDIUM
+
+
+def _file_severity(clue: Clue, base: Severity) -> Severity | None:
+    if not clue.skill or clue.concealed:
+        return base
+    following = _following(clue.text, clue.match)
+    if PRIVATE_FILES.search(following) or OUTWARD_VERBS.search(following):
+        return base
+    return base if EXFILTRATION_MODIFIER.search(clue.sentence) else None
+
+
+def _url_severity(clue: Clue, base: Severity) -> Severity | None:
+    if clue.urged:
+        return base
+    if _declares(clue.context, SENDING_WORDS) or _url_request(clue.text, clue.match):
+        return None
+    return base if LITERAL_URL.search(clue.match.group(0)) else None
+
+
+def _hidden_severity(clue: Clue, base: Severity) -> Severity | None:
+    return base if _hidden_marker(clue.match, clue.skill) else None
+
+
+def _role_severity(clue: Clue, base: Severity) -> Severity | None:
+    return base if _role_line(clue.text, clue.match) else None
+
+
+def _pre_action_severity(clue: Clue, base: Severity) -> Severity | None:
+    return base if SENSITIVE_CUE.search(_following(clue.text, clue.match)) else None
+
+
+def _shadowing_severity(clue: Clue, base: Severity) -> Severity | None:
+    return base if not clue.skill or clue.urged else None
+
+
+Grader = Callable[[Clue, Severity], Severity | None]
+GRADERS: dict[str, Grader] = {
+    "G01-002": _hidden_severity,
+    "G02-002": _role_severity,
+    "G02-003": _context_severity,
+    "G02-004": _pre_action_severity,
+    "G04-001": _shadowing_severity,
+    "G06-005": _secret_severity,
+    "G07-004": _file_severity,
+    "G09-010": _url_severity,
+}
+
+
+def _graded(rule_id: str, clue: Clue) -> Severity | None:
+    base = RULES[rule_id].severity
+    grader = GRADERS.get(rule_id)
+    return base if grader is None else grader(clue, base)
+
+
+def _strongest(
+    rule_id: str, pattern: re.Pattern[str], source: str, context: ToolContext, concealed: bool
+) -> tuple[str, re.Match[str], Severity] | None:
+    negatable = rule_id in NEGATABLE_RULES
+    for text in (source, " ".join(source.split())):
+        best: tuple[str, re.Match[str], Severity] | None = None
+        for match in _unquoted(pattern, text, negatable):
+            severity = _graded(rule_id, Clue(text, match, context, concealed))
+            if severity is not None and (best is None or severity > best[2]):
+                best = (text, match, severity)
+        if best is not None:
+            return best
+    return None
 
 
 def check_text_fields(context: ToolContext) -> Iterator[Finding]:
@@ -378,17 +639,17 @@ def check_text_fields(context: ToolContext) -> Iterator[Finding]:
         normalized = unicodedata.normalize(
             "NFKC", "".join(c for c in text if ord(c) not in TAG_BLOCK)
         )
+        concealed = False
         for rule_id, pattern in PATTERN_RULES:
             source = _pattern_source(rule_id, normalized, kind, field.label)
             if source is None:
                 continue
-            negatable = rule_id in NEGATABLE_RULES
-            match = first_unquoted(pattern, source, negatable)
-            if match is None:
-                source = " ".join(source.split())
-                match = first_unquoted(pattern, source, negatable)
-            if match:
-                yield tool_finding(rule_id, context, field, snippet(source, match))
+            found = _strongest(rule_id, pattern, source, context, concealed)
+            if found is None:
+                continue
+            excerpt, match, severity = found
+            concealed = concealed or rule_id in CONCEALING_RULES
+            yield tool_finding(rule_id, context, field, snippet(excerpt, match), severity)
         payload = decode_hidden_payload(text)
         if payload:
             preview = " ".join(payload.split())[:EVIDENCE_WIDTH]
@@ -454,21 +715,46 @@ def _distinctive(name: str) -> bool:
     return len(name) >= 5 and bool(re.search(r"[_\-]|[a-z][A-Z]", name))
 
 
+def _load_scope(server: ServerEntry) -> tuple[str, str]:
+    project = server.source.project
+    return server.source.client.value, os.path.normcase(str(project)) if project else ""
+
+
+def _load_together(first: str, second: str) -> bool:
+    return not first or not second or first == second
+
+
+def _tool_owners(
+    servers: Sequence[ServerEntry], collections: Mapping[str, ToolCollection]
+) -> dict[str, dict[str, list[tuple[str, str]]]]:
+    owners: dict[str, dict[str, list[tuple[str, str]]]] = defaultdict(lambda: defaultdict(list))
+    for server in servers:
+        client, project = _load_scope(server)
+        for tool in collections.get(server.key, ToolCollection()).tools:
+            if tool.kind is ToolKind.TOOL:
+                owners[client][tool.name].append((server.name.strip().lower(), project))
+    return owners
+
+
 def cross_server_findings(
     servers: Sequence[ServerEntry], collections: Mapping[str, ToolCollection]
 ) -> dict[str, list[Finding]]:
-    owners: dict[str, set[str]] = defaultdict(set)
-    for server in servers:
-        for tool in collections.get(server.key, ToolCollection()).tools:
-            if tool.kind.value == "tool":
-                owners[tool.name].add(server.name.strip().lower())
+    owners_by_client = _tool_owners(servers, collections)
     findings: dict[str, list[Finding]] = defaultdict(list)
     for server in servers:
+        tools = collections.get(server.key, ToolCollection()).tools
+        if not tools:
+            continue
         own = server.name.strip().lower()
-        for tool in collections.get(server.key, ToolCollection()).tools:
+        client, project = _load_scope(server)
+        owners = {
+            name: {owner for owner, scope in entries if _load_together(project, scope)}
+            for name, entries in owners_by_client.get(client, {}).items()
+        }
+        for tool in tools:
             context = ToolContext(server, tool)
             others = owners.get(tool.name, set()) - {own}
-            if tool.kind.value == "tool" and others:
+            if tool.kind is ToolKind.TOOL and others:
                 findings[server.key].append(
                     tool_finding(
                         "G04-003", context, None, tool.name, other=", ".join(sorted(others))

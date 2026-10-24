@@ -209,6 +209,7 @@ def main() -> int:
         hidden=sys.platform == "win32",
         background_color=BACKGROUND,
         text_select=True,
+        zoomable=True,
         frameless=True,
         easy_drag=False,
         shadow=True,

@@ -12,6 +12,7 @@ from guardia.render.terminal import (
     baseline_line,
     coverage_line,
     coverage_summary,
+    finding_evidence,
     finding_params,
     ledger_line,
     severity_label,
@@ -100,8 +101,9 @@ def _finding(finding: Finding, t: Translator) -> str:
         key = "skills.field" if params.get("kind") == "skill" else "scan.tool_field"
         where += " — " + t(key, tool=params["tool"], field=params.get("field", ""))
     rows = [(t("scan.where"), f'<span class="mono">{_e(where)}</span>')]
-    if finding.evidence:
-        rows.append((t("scan.found"), f"<code>{_e(finding.evidence, PARAM_WIDTH)}</code>"))
+    evidence = finding_evidence(finding, t)
+    if evidence:
+        rows.append((t("scan.found"), f"<code>{_e(evidence, PARAM_WIDTH)}</code>"))
     rows.append((t("scan.why"), _e(t(f"rules.{finding.rule_id}.why", **params))))
     rows.append((t("scan.fix"), _e(t(f"rules.{finding.rule_id}.fix", **params))))
     body = "".join(f"<dt>{_e(label)}</dt><dd>{value}</dd>" for label, value in rows)

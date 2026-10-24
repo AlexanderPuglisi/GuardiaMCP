@@ -27,8 +27,17 @@ class Pending:
     params_name: str = ""
 
 
-def _key(request_id: RequestId) -> PendingKey:
+def pending_key(request_id: RequestId) -> PendingKey:
     return (type(request_id).__name__, request_id)
+
+
+def cancelled_request(message: Message) -> RequestId | None:
+    if message.method != "notifications/cancelled":
+        return None
+    request_id = message.params.get("requestId")
+    if valid_id(request_id) and isinstance(request_id, str | int):
+        return request_id
+    return None
 
 
 def _version(value: object) -> str | None:
@@ -54,7 +63,7 @@ class Session:
         )
         with self._lock:
             table = self.pending[direction]
-            key = _key(message.id)
+            key = pending_key(message.id)
             if key in table:
                 return Admission.DUPLICATE
             if len(table) >= MAX_PENDING:
@@ -66,17 +75,15 @@ class Session:
         if message.id is None:
             return None
         with self._lock:
-            return self.pending[direction.opposite].pop(_key(message.id), None)
+            return self.pending[direction.opposite].pop(pending_key(message.id), None)
 
     def forget(self, direction: Direction, request_id: RequestId) -> None:
         with self._lock:
-            self.pending[direction].pop(_key(request_id), None)
+            self.pending[direction].pop(pending_key(request_id), None)
 
     def cancel(self, direction: Direction, message: Message) -> None:
-        if message.method != "notifications/cancelled":
-            return
-        request_id = message.params.get("requestId")
-        if valid_id(request_id) and isinstance(request_id, str | int):
+        request_id = cancelled_request(message)
+        if request_id is not None:
             self.forget(direction, request_id)
 
     def observe(self, message: Message, pending: Pending | None = None) -> None:

@@ -105,7 +105,7 @@ def _dumps(value: object) -> bytes:
         ensure_ascii=False,
         allow_nan=False,
         default=_json_default,
-    ).encode("utf-8")
+    ).encode("utf-8", "backslashreplace")
 
 
 def canonical_json(value: object) -> bytes:
@@ -398,6 +398,7 @@ class ToolGap(enum.StrEnum):
     NO_SOURCE = "no_source"
     BINARY = "binary"
     NOT_FOUND = "not_found"
+    ERROR = "error"
 
 
 @dataclass(frozen=True, slots=True)

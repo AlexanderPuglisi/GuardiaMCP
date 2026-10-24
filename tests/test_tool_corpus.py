@@ -38,6 +38,8 @@ INTEGRATION_ONLY_RULES = frozenset(
         "G12-005",
         "G12-006",
         "G12-007",
+        "G12-008",
+        "G12-009",
         "G13-001",
         "G13-002",
         "G14-001",
@@ -48,7 +50,12 @@ INTEGRATION_ONLY_RULES = frozenset(
 
 
 DPAPI_EXCEPTION = frozenset({"ctypes"})
-ALLOWED_EXECUTION = {"secure_store.py": DPAPI_EXCEPTION, "process.py": frozenset({"subprocess"})}
+JOB_EXCEPTION = frozenset({"ctypes"})
+ALLOWED_EXECUTION = {
+    "secure_store.py": DPAPI_EXCEPTION,
+    "process.py": frozenset({"subprocess"}),
+    "windows.py": JOB_EXCEPTION,
+}
 
 
 def extract(path: Path) -> list[ToolDefinition]:
@@ -177,7 +184,7 @@ def test_guardia_never_imports_execution_primitives() -> None:
     for path in source.rglob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         allowed = ALLOWED_EXECUTION.get(path.name, frozenset())
-        if path.name == "process.py":
+        if path.name in ("process.py", "windows.py"):
             assert path.parent.name == "shield", path
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):

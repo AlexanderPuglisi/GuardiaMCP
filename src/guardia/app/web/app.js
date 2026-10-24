@@ -13,17 +13,28 @@
   };
   const VIEWS = ["overview", "inventory", "findings", "shield", "ledger", "reports", "settings"];
   const state = {
-    ui: {}, settings: {}, report: null, view: "overview", version: "", dataDir: "",
+    ui: {}, settings: {}, report: null, view: "overview", version: "", dataDir: "", booted: false,
     entryId: null, entryType: "all", problemsOnly: false, entrySearch: "",
-    findingLevel: "all", findingSearch: "", ledger: null, shield: null, rulesEditor: null, settingsHistory: null,
+    findingLevel: "all", findingSearch: "", expanded: new Set(),
+    ledger: null, shield: null, rulesEditor: null, settingsHistory: null,
   };
   const MIN_SIZE = [900, 600];
+  const STACKED = "(max-width: 1180px)";
+  const BRIDGE_TIMEOUT_MS = 15000;
   const windowState = { maximized: false, resizing: null, target: null, pending: false };
+
+  function locale() {
+    return state.settings.language === "en" ? "en-GB" : "it-IT";
+  }
+
+  function num(value) {
+    return new Intl.NumberFormat(locale()).format(value);
+  }
 
   function t(key, values) {
     let text = state.ui[key] || key;
     for (const [name, value] of Object.entries(values || {})) {
-      text = text.split("{" + name + "}").join(String(value));
+      text = text.split("{" + name + "}").join(typeof value === "number" ? num(value) : String(value));
     }
     return text;
   }
@@ -62,8 +73,13 @@
   function localTime(iso) {
     const date = new Date(iso);
     if (Number.isNaN(date.getTime())) return String(iso).slice(0, 19);
-    return date.toLocaleString(state.settings.language === "en" ? "en-GB" : "it-IT",
-      { dateStyle: "short", timeStyle: "medium" });
+    return date.toLocaleString(locale(), {
+      year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit",
+    });
+  }
+
+  function shortHash(hash) {
+    return hash.length > 16 ? hash.slice(0, 16) + "…" : hash;
   }
 
   function badge(level, label) {
@@ -91,6 +107,39 @@
       toast(t("error", { message: (error && error.message) || String(error) }));
       throw error;
     }
+  }
+
+  function ask(question, action) {
+    return new Promise((resolve) => {
+      const previous = document.activeElement;
+      const cancel = el("button", { cls: "btn", text: t("dialog_cancel"), attrs: { type: "button" } });
+      const accept = el("button", { cls: "btn primary", text: action, attrs: { type: "button" } });
+      const back = el("div", { cls: "dialog-back" },
+        el("div", { cls: "dialog", attrs: { role: "alertdialog", "aria-modal": "true", "aria-label": action, "aria-describedby": "dialog-text" } },
+          el("p", { text: question, attrs: { id: "dialog-text" } }),
+          el("div", { cls: "row" }, cancel, accept)));
+      function onKey(event) {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          close(false);
+        } else if (event.key === "Tab") {
+          event.preventDefault();
+          (document.activeElement === accept ? cancel : accept).focus();
+        }
+      }
+      function close(answer) {
+        document.removeEventListener("keydown", onKey, true);
+        back.remove();
+        if (previous && previous.isConnected) previous.focus({ preventScroll: true });
+        resolve(answer);
+      }
+      cancel.addEventListener("click", () => close(false));
+      accept.addEventListener("click", () => close(true));
+      back.addEventListener("mousedown", (event) => { if (event.target === back) event.preventDefault(); });
+      document.addEventListener("keydown", onKey, true);
+      document.body.append(back);
+      accept.focus();
+    });
   }
 
   async function copy(text) {
@@ -128,6 +177,17 @@
     event.preventDefault();
   }
 
+  function focusKey() {
+    const active = document.activeElement;
+    return active && active.dataset ? active.dataset.focus || "" : "";
+  }
+
+  function restoreFocus(key) {
+    if (!key) return;
+    const target = document.querySelector('[data-focus="' + CSS.escape(key) + '"]');
+    if (target && target !== document.activeElement) target.focus({ preventScroll: true });
+  }
+
   function apply(next) {
     state.ui = next.ui;
     state.settings = next.settings;
@@ -138,11 +198,13 @@
   }
 
   function show(view) {
+    const changed = view !== state.view;
     state.view = view;
     if (view === "ledger") loadLedger();
     if (view === "shield") loadShield();
     if (view === "settings") loadSettingsHistory();
     render();
+    if (changed) document.getElementById("content").scrollTop = 0;
   }
 
   function renderNav() {
@@ -158,8 +220,8 @@
     for (const view of VIEWS) {
       const label = t("nav_" + view);
       const count = counts[view] !== undefined && counts[view] !== ""
-        ? el("em", { cls: "count" + ((view === "findings" && severe) || view === "shield" ? " alert" : ""), text: counts[view] }) : null;
-      const button = el("button", { attrs: { type: "button", title: label, "aria-label": label }, on: { click: () => show(view) } },
+        ? el("em", { cls: "count" + ((view === "findings" && severe) || view === "shield" ? " alert" : ""), text: num(counts[view]) }) : null;
+      const button = el("button", { attrs: { type: "button", title: label, "aria-label": label, "data-focus": "nav:" + view }, on: { click: () => show(view) } },
         icon(view), el("span", { text: label }), count);
       if (view === state.view) button.setAttribute("aria-current", "page");
       nav.append(button);
@@ -179,7 +241,8 @@
     document.getElementById("subtitle").textContent = report
       ? t("last_scan", { time: localTime(report.generated_at), seconds: report.seconds })
       : t("never");
-    document.getElementById("baseline-pill").textContent = report && report.baseline.active ? t("baseline_active") : t("baseline_off");
+    document.getElementById("baseline-pill").textContent = !report ? ""
+      : report.baseline.active ? t("baseline_active") : t("baseline_off");
     document.getElementById("offline").textContent = t("offline");
     document.getElementById("version").textContent = "v" + state.version;
     const scan = document.getElementById("scan-button");
@@ -227,7 +290,7 @@
     for (const item of report.summary) {
       const fill = el("i");
       fill.style.width = Math.round((item.count / max) * 100) + "%";
-      cards.append(el("div", { cls: "card sev-card" }, el("small", { text: item.label }), el("b", { text: item.count }),
+      cards.append(el("div", { cls: "card sev-card" }, el("small", { text: item.label }), el("b", { text: num(item.count) }),
         el("div", { cls: "bar " + item.severity }, fill)));
     }
     root.append(cards, el("h2", { text: t("priority_title") }));
@@ -236,7 +299,7 @@
     for (const finding of report.priority) {
       list.append(el("button", {
         cls: "prio-item", attrs: { type: "button" },
-        on: { click: () => openEntry(finding.entry_id) },
+        on: { click: () => openFinding(finding) },
       }, badge(finding.severity, finding.severity_label),
       el("div", {}, el("b", { text: finding.title }), el("p", { text: finding.why })),
       el("span", { cls: "who", text: finding.entry_name })));
@@ -255,19 +318,19 @@
       el("h3", {}, el("span", { cls: "led " + (ledger.tampered ? "bad" : ledger.intact ? "" : "warn") }), t("ledger_title")),
       el("p", { text: ledger.line }), ledgerRow));
     status.append(el("div", { cls: "card status-card" },
-      el("h3", {}, el("span", { cls: "led warn" }), t("coverage_title")),
+      el("h3", {}, el("span", { cls: "led " + (report.coverage_gaps ? "warn" : "") }), t("coverage_title")),
       el("p", { text: report.coverage.join(" ") })));
     root.append(status);
     if (!report.complete) root.append(el("div", { cls: "note-box", text: t("incomplete", { count: report.errors }) }));
-    root.append(el("div", { cls: "note-box", text: state.ui["scan.not_safe"] }));
+    root.append(el("div", { cls: "note-box neutral", text: state.ui["scan.not_safe"] }));
     return root;
   }
 
-  function segmented(options, current, onPick) {
+  function segmented(name, options, current, onPick) {
     const group = el("div", { cls: "seg", attrs: { role: "group" } });
     for (const [value, label] of options) {
       group.append(el("button", {
-        text: label, attrs: { type: "button", "aria-pressed": String(value === current) },
+        text: label, attrs: { type: "button", "aria-pressed": String(value === current), "data-focus": "seg:" + name + ":" + value },
         on: { click: () => onPick(value) },
       }));
     }
@@ -302,11 +365,43 @@
     return [entry.name, entry.client, entry.path, entry.target].some((v) => v.toLowerCase().includes(query));
   }
 
+  function revealDetail() {
+    if (!window.matchMedia(STACKED).matches) return;
+    const box = document.querySelector(".detail");
+    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (box) box.scrollIntoView({ block: "start", behavior: calm ? "auto" : "smooth" });
+  }
+
   function openEntry(id) {
     if (!id) return;
     state.entryId = id;
     state.view = "inventory";
     render();
+    document.getElementById("content").scrollTop = 0;
+    revealDetail();
+  }
+
+  function findingKey(finding) {
+    return finding.rule_id + "|" + finding.where;
+  }
+
+  function openFinding(finding) {
+    if (finding.entry_id) {
+      openEntry(finding.entry_id);
+      return;
+    }
+    const key = "finding:" + findingKey(finding);
+    state.expanded.add(findingKey(finding));
+    if (!findingMatches(finding)) {
+      state.findingLevel = "all";
+      state.findingSearch = "";
+    }
+    show("findings");
+    const row = document.querySelector('[data-focus="' + CSS.escape(key) + '"]');
+    if (row) {
+      row.scrollIntoView({ block: "center" });
+      row.focus({ preventScroll: true });
+    }
   }
 
   function detail(entry) {
@@ -321,7 +416,8 @@
       badge(entry.risk, entry.risk_label),
       el("h3", { text: entry.name }),
       el("div", { cls: "muted" }, entry.client + " · " + entry.scope + (entry.target ? " · " : ""), entry.target ? el("span", { cls: "mono", text: entry.target }) : null),
-      chips));
+      entry.enabled === false ? el("p", { cls: "off-note", text: t("entry_disabled_hint") }) : null,
+      chips.childElementCount ? chips : null));
     if (!entry.findings.length) box.append(el("div", { cls: "empty", text: t("no_findings") }));
     for (const finding of entry.findings) box.append(findingBlock(finding));
     const actions = el("div", { cls: "actions" },
@@ -335,11 +431,15 @@
 
   function inventory(report) {
     const root = el("section");
+    if (!report.entries.length) {
+      root.append(el("div", { cls: "card empty", text: t("inventory_empty") }));
+      return root;
+    }
     root.append(el("div", { cls: "toolbar" },
       search(state.entrySearch, t("search_entries"), (v) => { state.entrySearch = v; renderTable(); }),
-      segmented([["all", t("filter_all")], ["server", t("filter_servers")], ["skill", t("filter_skills")]], state.entryType,
+      segmented("type", [["all", t("filter_all")], ["server", t("filter_servers")], ["skill", t("filter_skills")]], state.entryType,
         (v) => { state.entryType = v; render(); }),
-      segmented([[true, t("filter_problems")]], state.problemsOnly, () => { state.problemsOnly = !state.problemsOnly; render(); })));
+      segmented("problems", [[true, t("filter_problems")]], state.problemsOnly, () => { state.problemsOnly = !state.problemsOnly; render(); })));
     const body = el("tbody");
     const table = el("table", {},
       el("thead", {}, el("tr", {}, el("th", { text: t("col_risk") }), el("th", { text: t("col_name") }),
@@ -349,14 +449,16 @@
     function renderTable() {
       body.replaceChildren();
       const entries = report.entries.filter(entryMatches);
-      if (!entries.length) body.append(el("tr", {}, el("td", { cls: "empty", text: t("no_results"), attrs: { colspan: 4 } })));
+      if (!entries.length) body.append(el("tr", { cls: "blank" }, el("td", { cls: "empty", text: t("no_results"), attrs: { colspan: 4 } })));
       for (const entry of entries) {
-        const row = el("tr", { attrs: { "aria-selected": String(entry.id === state.entryId), tabindex: 0 } },
+        const off = entry.enabled === false;
+        const row = el("tr", { cls: off ? "off" : "", attrs: { "aria-selected": String(entry.id === state.entryId), tabindex: 0, "data-focus": "entry:" + entry.id } },
           el("td", {}, badge(entry.risk, entry.risk_label)),
-          el("td", {}, el("div", { cls: "name", text: entry.name }), pathLine("where", entry.path)),
+          el("td", {}, el("div", { cls: "name-line" }, el("span", { cls: "name", text: entry.name }),
+            off ? el("span", { cls: "chip", text: t("entry_disabled") }) : null), pathLine("where", entry.path)),
           el("td", { text: entry.client }),
           el("td", { text: entry.type_label + (entry.transport ? " · " + entry.transport : "") }));
-        const pick = () => { state.entryId = entry.id; render(); };
+        const pick = () => { state.entryId = entry.id; render(); revealDetail(); };
         row.addEventListener("click", pick);
         row.addEventListener("keydown", (event) => { if (event.key === "Enter") pick(); });
         body.append(row);
@@ -376,30 +478,53 @@
     return [finding.title, finding.where, finding.rule_id, finding.entry_name].some((v) => v.toLowerCase().includes(query));
   }
 
+  function findingPlace(finding) {
+    const line = finding.line ? t("line", { line: String(finding.line) }) : "";
+    if (finding.entry_name) return finding.entry_name + " · " + (line || finding.path);
+    return finding.path + (line ? " · " + line : "");
+  }
+
   function findingsView(report) {
     const root = el("section");
+    const all = [...report.findings, ...report.file_findings].sort((a, b) => b.severity_rank - a.severity_rank);
+    if (!all.length) {
+      root.append(el("div", { cls: "card empty", text: t("findings_empty") }));
+      return root;
+    }
     root.append(el("div", { cls: "toolbar" },
       search(state.findingSearch, t("search_findings"), (v) => { state.findingSearch = v; renderRows(); }),
-      segmented([["all", t("filter_all")], ["severe", t("filter_severe")], ["medium", t("filter_medium")], ["minor", t("filter_minor")]],
+      segmented("level", [["all", t("filter_all")], ["severe", t("filter_severe")], ["medium", t("filter_medium")], ["minor", t("filter_minor")]],
         state.findingLevel, (v) => { state.findingLevel = v; render(); })));
     const body = el("tbody");
     root.append(el("table", {},
       el("thead", {}, el("tr", {}, el("th", { text: t("col_level") }), el("th", { text: t("col_problem") }),
         el("th", { text: t("col_where") }), el("th", { text: t("col_rule") }))), body));
-    const all = [...report.findings, ...report.file_findings].sort((a, b) => b.severity_rank - a.severity_rank);
+    function expand(key) {
+      const focus = focusKey();
+      if (state.expanded.has(key)) state.expanded.delete(key);
+      else state.expanded.add(key);
+      renderRows();
+      restoreFocus(focus);
+    }
     function renderRows() {
       body.replaceChildren();
       const rows = all.filter(findingMatches);
-      if (!rows.length) body.append(el("tr", {}, el("td", { cls: "empty", text: t("no_results"), attrs: { colspan: 4 } })));
+      if (!rows.length) body.append(el("tr", { cls: "blank" }, el("td", { cls: "empty", text: t("no_results"), attrs: { colspan: 4 } })));
       for (const finding of rows) {
-        const row = el("tr", { attrs: { tabindex: 0 } },
+        const key = findingKey(finding);
+        const inline = !finding.entry_id;
+        const open = inline && state.expanded.has(key);
+        const row = el("tr", { attrs: { tabindex: 0, "data-focus": "finding:" + key } },
           el("td", {}, badge(finding.severity, finding.severity_label)),
           el("td", { text: finding.title }),
-          el("td", { text: (finding.entry_name ? finding.entry_name + " · " : "") + (finding.line ? t("line", { line: finding.line }) : finding.path) }),
+          el("td", { text: findingPlace(finding) }),
           el("td", { cls: "mono", text: finding.rule_id }));
-        row.addEventListener("click", () => openEntry(finding.entry_id));
-        row.addEventListener("keydown", (event) => { if (event.key === "Enter") openEntry(finding.entry_id); });
+        if (inline) row.setAttribute("aria-expanded", String(open));
+        const act = () => (inline ? expand(key) : openEntry(finding.entry_id));
+        row.addEventListener("click", act);
+        row.addEventListener("keydown", (event) => { if (event.key === "Enter") act(); });
         body.append(row);
+        if (open) body.append(el("tr", { cls: "expand" }, el("td", { attrs: { colspan: 4 } }, findingBlock(finding))));
       }
     }
     renderRows();
@@ -418,8 +543,8 @@
     } catch { }
   }
 
-  async function shieldAction(method, args, question) {
-    if (!window.confirm(question)) return;
+  async function shieldAction(method, args, question, action) {
+    if (!(await ask(question, action))) return;
     busy(true, t("shield_working"));
     try {
       const next = await call(method, ...args, true);
@@ -431,26 +556,27 @@
     }
   }
 
-  async function openRulesEditor() {
+  async function openRulesEditor(template) {
     try {
-      const loaded = await call("shield_rules_text");
-      state.rulesEditor = { text: loaded.text, original: loaded.text, issues: [], message: "", ok: true };
+      const loaded = await call(template ? "shield_rules_template" : "shield_rules_text");
+      state.rulesEditor = { text: loaded.text, original: template ? "" : loaded.text, issues: [], message: "", ok: true, template };
     } catch {
       return;
     }
     render();
   }
 
-  function closeRulesEditor() {
+  async function closeRulesEditor() {
     const editor = state.rulesEditor;
-    if (editor && editor.text !== editor.original && !window.confirm(t("shield_discard_changes"))) return;
+    if (editor && editor.template && !(await ask(t("shield_discard_template"), t("shield_discard")))) return;
+    if (editor && !editor.template && editor.text !== editor.original && !(await ask(t("shield_discard_changes"), t("shield_discard")))) return;
     state.rulesEditor = null;
     render();
   }
 
   async function saveRules() {
     const editor = state.rulesEditor;
-    if (!window.confirm(t("shield_confirm_save"))) return;
+    if (!(await ask(t("shield_confirm_save"), t("shield_save_rules")))) return;
     busy(true, t("shield_working"));
     try {
       const next = await call("shield_rules_save", editor.text, true);
@@ -459,6 +585,7 @@
       editor.message = next.message || "";
       editor.ok = Boolean(next.ok);
       if (next.ok) editor.original = editor.text;
+      if (next.rules && next.rules.exists) editor.template = false;
       if (next.message) toast(next.message);
     } catch { } finally {
       busy(false);
@@ -470,7 +597,7 @@
     const editor = state.rulesEditor;
     const area = el("textarea", {
       cls: "rules-editor",
-      attrs: { spellcheck: "false", wrap: "off", "aria-label": t("shield_editor_label") },
+      attrs: { spellcheck: "false", wrap: "off", "aria-label": t("shield_editor_label"), "data-focus": "rules:text" },
     });
     area.value = editor.text;
     area.addEventListener("input", () => { editor.text = area.value; });
@@ -478,30 +605,35 @@
     if (editor.message) notes.append(el("p", { cls: editor.ok ? "ok-note" : "issue", text: editor.message }));
     for (const line of editor.issues) notes.append(el("p", { cls: "issue mono", text: line }));
     return el("div", { cls: "rules-box" },
+      editor.template ? el("p", { cls: "template-note", text: t("shield_template_hint") }) : null,
       el("p", { cls: "muted", text: t("shield_editor_hint") }),
       area,
       notes,
       el("div", { cls: "row" },
-        el("button", { cls: "btn primary", text: t("shield_save_rules"), attrs: { type: "button" }, on: { click: saveRules } }),
-        el("button", { cls: "btn", text: t("shield_close_editor"), attrs: { type: "button" }, on: { click: closeRulesEditor } })));
+        el("button", { cls: "btn primary", text: t("shield_save_rules"), attrs: { type: "button", "data-focus": "rules:save" }, on: { click: saveRules } }),
+        el("button", { cls: "btn", text: t("shield_close_editor"), attrs: { type: "button", "data-focus": "rules:close" }, on: { click: closeRulesEditor } })));
   }
 
   function shieldRules(shield) {
     const rules = shield.rules;
     const level = rules.state === "locked" ? "bad" : rules.state === "active" ? "" : "off";
+    const editing = Boolean(state.rulesEditor);
     const actions = el("div", { cls: "row" });
-    if (!rules.exists) {
+    if (!editing && !rules.exists) {
       actions.append(el("button", {
-        cls: "btn primary", text: t("shield_create_example"), attrs: { type: "button" },
-        on: { click: () => shieldAction("shield_rules_example", [], t("shield_confirm_example")) },
+        cls: "btn primary", text: t("shield_create_example"), attrs: { type: "button", "data-focus": "rules:example" },
+        on: { click: () => openRulesEditor(true) },
       }));
-    } else if (!state.rulesEditor) {
-      actions.append(el("button", { cls: "btn primary", text: t("shield_edit_rules"), attrs: { type: "button" }, on: { click: openRulesEditor } }));
-    }
-    if (rules.state === "locked" && rules.exists && !state.rulesEditor) {
+    } else if (!editing) {
       actions.append(el("button", {
-        cls: "btn danger", text: t("shield_approve_rules"), attrs: { type: "button" },
-        on: { click: () => shieldAction("shield_approve_rules", [], t("shield_confirm_rules")) },
+        cls: "btn primary", text: t("shield_edit_rules"), attrs: { type: "button", "data-focus": "rules:edit" },
+        on: { click: () => openRulesEditor(false) },
+      }));
+    }
+    if (rules.state === "locked" && rules.exists && !editing) {
+      actions.append(el("button", {
+        cls: "btn danger", text: t("shield_approve_rules"), attrs: { type: "button", "data-focus": "rules:approve" },
+        on: { click: () => shieldAction("shield_approve_rules", [], t("shield_confirm_rules"), t("shield_approve_rules")) },
       }));
     }
     if (rules.exists) {
@@ -511,35 +643,36 @@
       el("h3", {}, el("span", { cls: "led " + level }), t("shield_rules_title")),
       el("p", { text: rules.text }),
       el("p", { cls: "muted", text: t(rules.exists ? "shield_rules_hint" : "shield_rules_start") }),
-      actions,
-      state.rulesEditor ? rulesEditor() : null);
+      actions.childElementCount ? actions : null,
+      editing ? rulesEditor() : null);
   }
 
   function shieldServers(shield) {
+    if (!shield.servers.length) return el("div", { cls: "card empty", text: t("shield_servers_empty") });
     const body = el("tbody");
     for (const server of shield.servers) {
       const action = el("td", { cls: "actions-cell" });
       if (server.can_enable) {
         action.append(el("button", {
-          cls: "btn primary", text: t("shield_protect"), attrs: { type: "button" },
-          on: { click: () => shieldAction("shield_enable", [server.key], t("shield_confirm_enable", { name: server.name, path: server.path })) },
+          cls: "btn primary", text: t("shield_protect"), attrs: { type: "button", "data-focus": "shield:enable:" + server.key },
+          on: { click: () => shieldAction("shield_enable", [server.key], t("shield_confirm_enable", { name: server.name, path: server.path }), t("shield_protect")) },
         }));
       } else if (server.can_disable) {
         if (server.can_relink) {
           action.append(el("button", {
-            cls: "btn primary", text: t("shield_relink"), attrs: { type: "button" },
-            on: { click: () => shieldAction("shield_relink", [server.key], t("shield_confirm_relink", { name: server.name })) },
+            cls: "btn primary", text: t("shield_relink"), attrs: { type: "button", "data-focus": "shield:relink:" + server.key },
+            on: { click: () => shieldAction("shield_relink", [server.key], t("shield_confirm_relink", { name: server.name }), t("shield_relink")) },
           }));
         }
         action.append(el("button", {
-          cls: "btn", text: t("shield_unprotect"), attrs: { type: "button" },
-          on: { click: () => shieldAction("shield_disable", [server.key], t("shield_confirm_disable", { name: server.name })) },
+          cls: "btn", text: t("shield_unprotect"), attrs: { type: "button", "data-focus": "shield:disable:" + server.key },
+          on: { click: () => shieldAction("shield_disable", [server.key], t("shield_confirm_disable", { name: server.name }), t("shield_unprotect")) },
         }));
       } else if (server.snippet) {
         action.append(el("button", {
-          cls: "btn", text: t("shield_copy_snippet"), attrs: { type: "button" },
+          cls: "btn", text: t("shield_copy_snippet"), attrs: { type: "button", "data-focus": "shield:snippet:" + server.key },
           on: { click: () => copy(server.snippet) },
-        }));
+        }), el("p", { cls: "cell-hint", text: t("shield_snippet_hint") }));
       }
       body.append(el("tr", {},
         el("td", {}, el("div", { cls: "name", text: server.name }), pathLine("where", server.path)),
@@ -547,8 +680,7 @@
         el("td", { cls: server.launcher === "missing" ? "status-bad" : "", text: server.status }),
         action));
     }
-    if (!shield.servers.length) body.append(el("tr", {}, el("td", { cls: "empty", text: t("no_results"), attrs: { colspan: 4 } })));
-    return el("table", {},
+    return el("table", { cls: "plain" },
       el("thead", {}, el("tr", {}, el("th", { text: t("col_name") }), el("th", { text: t("col_client") }),
         el("th", { text: t("col_status") }), el("th", { text: t("col_action") }))), body);
   }
@@ -566,11 +698,11 @@
           el("span", { cls: "mono", text: item.fingerprint })));
       }
       list.append(el("div", { cls: "event" },
-        el("span", { cls: "seq", text: items.length }),
+        el("span", { cls: "seq", text: num(items.length) }),
         el("div", {}, el("b", { text: server }), names),
         el("button", {
-          cls: "btn danger", text: t("shield_approve_tools"), attrs: { type: "button" },
-          on: { click: () => shieldAction("shield_approve_tools", [server], t("shield_confirm_tools", { name: server })) },
+          cls: "btn danger", text: t("shield_approve_tools"), attrs: { type: "button", "data-focus": "shield:tools:" + server },
+          on: { click: () => shieldAction("shield_approve_tools", [server], t("shield_confirm_tools", { name: server }), t("shield_approve_tools")) },
         })));
     }
     return list;
@@ -595,15 +727,16 @@
       root.append(el("div", { cls: "card empty", text: t("loading") }));
       return root;
     }
-    root.append(
-      shieldRules(shield),
-      el("h2", { text: t("shield_servers_title") }),
-      el("p", { cls: "muted", text: t("shield_summary", { protected: shield.protected, total: shield.servers.length }) + " " + t("shield_servers_hint") }),
-      shieldServers(shield),
-      el("h2", { text: t("shield_pending_title") }),
-      shieldPending(shield),
-      el("h2", { text: t("shield_events_title") }),
-      shieldEvents(shield));
+    const waiting = shield.pending.items.length > 0 || !shield.pending.valid;
+    const pending = [el("h2", { text: t("shield_pending_title") }), shieldPending(shield)];
+    if (waiting) root.append(...pending);
+    root.append(shieldRules(shield), el("h2", { text: t("shield_servers_title") }));
+    if (shield.servers.length) {
+      root.append(el("p", { cls: "muted", text: t("shield_summary", { protected: shield.protected, total: shield.servers.length }) + " " + t("shield_servers_hint") }));
+    }
+    root.append(shieldServers(shield));
+    if (!waiting) root.append(...pending);
+    root.append(el("h2", { text: t("shield_events_title") }), shieldEvents(shield));
     return root;
   }
 
@@ -627,7 +760,7 @@
     const card = el("div", { cls: "card status-card" }, el("h3", {}, el("span", { cls: "led " + level }), summary));
     if (ledger.anchor_checked && ledger.intact) card.append(el("p", { text: t("anchor_ok") }));
     for (const issue of ledger.issues) {
-      card.append(el("p", { cls: "issue", text: (issue.line ? t("line", { line: issue.line }) + ": " : "") + issue.problem }));
+      card.append(el("p", { cls: "issue", text: (issue.line ? t("line", { line: String(issue.line) }) + ": " : "") + issue.problem }));
     }
     root.append(card);
     if (ledger.anchor) {
@@ -646,7 +779,8 @@
     for (const event of ledger.events) {
       list.append(el("div", { cls: "event" },
         el("span", { cls: "seq", text: event.seq }),
-        el("div", {}, el("b", { text: event.label }), " · ", event.details, el("div", { cls: "hash", text: event.hash })),
+        el("div", {}, el("b", { text: event.label }), event.details ? " · " + event.details : "",
+          el("div", { cls: "hash", text: shortHash(event.hash), attrs: { title: event.hash } })),
         el("span", { cls: "muted", text: localTime(event.time) })));
     }
     root.append(list);
@@ -670,7 +804,7 @@
         el("button", { cls: "btn" + (format === "html" ? " primary" : ""), text: t("export_button"), attrs: { type: "button" },
           on: { click: () => exportReport(format) } })));
     }
-    root.append(cards, el("div", { cls: "note-box", text: t("export_note") }));
+    root.append(cards, el("div", { cls: "note-box neutral", text: t("export_note") }));
     return root;
   }
 
@@ -681,7 +815,8 @@
   function toggle(name) {
     const value = Boolean(state.settings[name]);
     return el("button", {
-      cls: "switch", attrs: { type: "button", role: "switch", "aria-checked": String(value), "aria-label": t("settings_" + name) },
+      cls: "switch",
+      attrs: { type: "button", role: "switch", "aria-checked": String(value), "aria-label": t("settings_" + name), "data-focus": "setting:" + name },
       on: { click: () => changeSetting("set_option", name, !value) },
     });
   }
@@ -695,19 +830,29 @@
     if (state.view === "settings") render();
   }
 
+  function refreshTranslated() {
+    loadShield();
+    if (state.ledger) loadLedger();
+    if (state.settingsHistory) loadSettingsHistory();
+  }
+
   async function changeSetting(method, ...args) {
+    const before = JSON.stringify(state.settings);
+    const language = state.settings.language;
     try {
       apply(await call(method, ...args));
-      toast(t("settings_saved"));
     } catch {
       return;
     }
+    const changed = JSON.stringify(state.settings) !== before;
+    if (changed) toast(t("settings_saved"));
     render();
-    loadSettingsHistory();
+    if (state.settings.language !== language) refreshTranslated();
+    else if (changed) loadSettingsHistory();
   }
 
   async function restoreSetting(item) {
-    if (!window.confirm(t("history_confirm_restore", { setting: item.setting, change: item.change }))) return;
+    if (!(await ask(t("history_confirm_restore", { setting: item.setting, change: item.change }), t("history_restore")))) return;
     await changeSetting("restore_setting", item.seq, true);
   }
 
@@ -729,7 +874,7 @@
 
   function settingsView() {
     const root = el("section");
-    const language = el("select", { attrs: { "aria-label": t("settings_language") } },
+    const language = el("select", { attrs: { "aria-label": t("settings_language"), "data-focus": "setting:language" } },
       el("option", { text: "Italiano", attrs: { value: "it" } }), el("option", { text: "English", attrs: { value: "en" } }));
     language.value = state.settings.language;
     language.addEventListener("change", () => changeSetting("set_language", language.value));
@@ -740,7 +885,7 @@
       settingRow(t("settings_baseline"), t("settings_baseline_text"), toggle("baseline")),
       settingRow(t("settings_glow"), t("settings_glow_text"), toggle("glow")),
       settingRow(t("settings_projects"), t("settings_projects_text"),
-        el("button", { cls: "btn", text: t("add_folder"), attrs: { type: "button" },
+        el("button", { cls: "btn", text: t("add_folder"), attrs: { type: "button", "data-focus": "setting:add-folder" },
           on: { click: () => changeSetting("add_project") } })));
     for (const project of state.settings.projects) {
       card.append(el("div", { cls: "project" }, el("span", { cls: "mono", text: project }),
@@ -750,8 +895,8 @@
     card.append(settingRow(t("settings_data"), state.dataDir,
       el("button", { cls: "btn", text: t("copy_path"), attrs: { type: "button" }, on: { click: () => copy(state.dataDir) } })));
     root.append(card,
-      el("div", { cls: "note-box", text: t("settings_rescan") }),
-      el("div", { cls: "note-box", text: t("settings_note") }),
+      el("div", { cls: "note-box neutral", text: t("settings_rescan") }),
+      el("div", { cls: "note-box neutral", text: t("settings_note") }),
       el("h2", { text: t("settings_history_title") }),
       el("p", { cls: "muted", text: t("settings_history_hint") }),
       settingsHistory());
@@ -759,6 +904,7 @@
   }
 
   function render() {
+    const focus = focusKey();
     renderNav();
     renderHeader();
     const content = document.getElementById("content");
@@ -773,13 +919,14 @@
     else if (state.view === "reports") view = reportsView();
     else view = overview(report);
     content.replaceChildren(view);
+    restoreFocus(focus);
   }
 
   async function runScan() {
     busy(true, t("scanning"));
     try {
       state.report = await call("scan");
-      toast(t("scan_done", { total: state.report.total }));
+      toast(state.report.total ? t("scan_done", { total: state.report.total }) : t("scan_done_none"));
     } catch { } finally {
       busy(false);
       render();
@@ -787,7 +934,7 @@
   }
 
   async function acceptChanges() {
-    if (!window.confirm(t("accept_confirm"))) return;
+    if (!(await ask(t("accept_confirm"), t("accept_changes")))) return;
     busy(true, t("scanning"));
     try {
       state.report = await call("accept_changes", true);
@@ -799,11 +946,14 @@
   }
 
   async function setLanguage(language) {
+    if (language === state.settings.language) return;
     try {
       apply(await call("set_language", language));
-      render();
-      if (state.view === "settings") loadSettingsHistory();
-    } catch { }
+    } catch {
+      return;
+    }
+    render();
+    refreshTranslated();
   }
 
   function setMaximized(on) {
@@ -889,9 +1039,19 @@
     }
   }
 
+  function bootFailed() {
+    if (!state.booted) document.getElementById("boot").hidden = false;
+  }
+
   async function start() {
-    apply(await call("state"));
     wireWindow();
+    try {
+      apply(await window.pywebview.api.state());
+    } catch {
+      bootFailed();
+      return;
+    }
+    state.booted = true;
     try {
       setMaximized(Boolean((await call("window_state")).maximized));
     } catch { }
@@ -905,6 +1065,7 @@
     await runScan();
   }
 
+  setTimeout(bootFailed, BRIDGE_TIMEOUT_MS);
   if (window.pywebview && window.pywebview.api) start();
   else window.addEventListener("pywebviewready", start, { once: true });
 })();

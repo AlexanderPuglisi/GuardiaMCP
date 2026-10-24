@@ -22,6 +22,7 @@ from guardia.shield.wrapping import unwrap
 
 TRANSPORT_ALIASES: Mapping[str, Transport] = {
     "stdio": Transport.STDIO,
+    "local": Transport.STDIO,
     "http": Transport.HTTP,
     "streamable-http": Transport.HTTP,
     "streamable_http": Transport.HTTP,
@@ -107,6 +108,22 @@ def infer_transport(raw: Mapping[str, Any], client: Client) -> Transport:
     return Transport.UNKNOWN if url is None else _url_transport(url, client)
 
 
+def _codex_headers(
+    raw: Mapping[str, Any], headers: Mapping[str, str], pointer: str, outcome: ParseOutcome
+) -> Mapping[str, str]:
+    merged = dict(headers)
+    merged.update(_string_map(raw.get("http_headers"), pointer + "/http_headers", outcome))
+    from_env = _string_map(raw.get("env_http_headers"), pointer + "/env_http_headers", outcome)
+    merged.update({header: "${" + variable + "}" for header, variable in from_env.items()})
+    token = raw.get("bearer_token")
+    if isinstance(token, str):
+        merged.setdefault("Authorization", f"Bearer {token}")
+    variable = raw.get("bearer_token_env_var")
+    if isinstance(variable, str):
+        merged.setdefault("Authorization", "Bearer ${" + variable + "}")
+    return frozen_mapping(merged)
+
+
 def normalize_entry(
     name: str,
     raw: Mapping[str, Any],
@@ -125,6 +142,9 @@ def normalize_entry(
     url = next((raw[key] for key in URL_KEYS if isinstance(raw.get(key), str)), None)
     cwd = raw.get("cwd")
     enabled = raw.get("disabled") is not True and raw.get("enabled") is not False
+    headers = _string_map(raw.get("headers"), pointer + "/headers", outcome)
+    if source.client is Client.CODEX:
+        headers = _codex_headers(raw, headers, pointer, outcome)
     return ServerEntry(
         name=name,
         source=source,
@@ -134,7 +154,7 @@ def normalize_entry(
         args=args,
         env=_string_map(raw.get("env"), pointer + "/env", outcome),
         url=url,
-        headers=_string_map(raw.get("headers"), pointer + "/headers", outcome),
+        headers=headers,
         cwd=cwd if isinstance(cwd, str) else None,
         enabled=enabled and not force_disabled,
         raw=frozen_mapping(raw),

@@ -28,6 +28,7 @@ _NUMBER = re.compile(r"\d[\w.]*|\.\d[\w]*")
 _PUNCT = re.compile(r"=>|\.\.\.|\?\.|\?\?|[{}()\[\];,:.?=+\-*/%<>&|^!~@#]")
 _ESCAPE = re.compile(r"\\(u\{[0-9a-fA-F]{1,6}\}|u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|\r\n|.)", re.DOTALL)
 _SIMPLE_ESCAPES = {"n": "\n", "t": "\t", "r": "\r", "b": "\b", "f": "\f", "v": "\v", "0": "\0"}
+_SURROGATE = re.compile("[\ud800-\udfff]")
 REGEX_KEYWORDS = frozenset(
     {
         "return",
@@ -82,7 +83,10 @@ def _unescape(match: re.Match[str]) -> str:
 
 
 def decode_string(literal: str) -> str:
-    return _ESCAPE.sub(_unescape, literal)
+    text = _ESCAPE.sub(_unescape, literal)
+    if _SURROGATE.search(text) is None:
+        return text
+    return text.encode("utf-16", "surrogatepass").decode("utf-16", "replace")
 
 
 def _scan_template(text: str, start: int) -> tuple[str, int]:

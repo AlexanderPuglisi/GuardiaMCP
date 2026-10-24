@@ -134,16 +134,16 @@ def _walk_skills(base: Path, depth: int = SKILL_WALK_DEPTH) -> Iterator[Path]:
 
 
 def skill_locations(env: HostEnvironment, projects: list[Path]) -> Iterator[tuple[Path, Client]]:
-    claude = env.home / ".claude"
-    for path in _direct_skills(claude / "skills"):
-        yield path, Client.CLAUDE_CODE
-    for base in (
-        claude / "skills" / "synced",
-        claude / "plugins" / "synced",
-        claude / "plugins" / "cache",
-    ):
-        for path in _walk_skills(base):
+    for claude in env.claude_dirs():
+        for path in _direct_skills(claude / "skills"):
             yield path, Client.CLAUDE_CODE
+        for base in (
+            claude / "skills" / "synced",
+            claude / "plugins" / "synced",
+            claude / "plugins" / "cache",
+        ):
+            for path in _walk_skills(base):
+                yield path, Client.CLAUDE_CODE
     for profile in child_dirs(env.local_app_data / "Claude-Data"):
         if not profile.name.startswith("claude_"):
             continue

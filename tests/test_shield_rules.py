@@ -85,10 +85,10 @@ def test_keys_and_values_are_bilingual_and_mixable() -> None:
     ("text", "expected"),
     [
         ("versione = 1\n[[regola]\n", ("error", "toml", 2)),
-        ("predefinito = 'consenti'\n", ("error", "bad_version", None)),
+        ("predefinito = 'consenti'\n", ("error", "missing_version", 1)),
         ("versione = 2\n", ("error", "bad_version", 1)),
         ("versione = 1\npredefinito = 'oscura'\n", ("error", "bad_default", 2)),
-        ("versione = 1\nregole = []\n", ("error", "unknown_key_hint", None)),
+        ("versione = 1\nregole = []\n", ("error", "unknown_key_hint", 2)),
         (rules(rule('nome = "a"\nazione = "bloca"')), ("error", "bad_action", 5)),
         (
             rules(rule('nome = "a"\nazione = "blocca"\nstrumeto = "x"')),
@@ -635,7 +635,7 @@ def test_cli_rules_workflow(env: HostEnvironment) -> None:
     assert code == 1
     assert "BLOCCO TOTALE" in output
     code, output = run_cli(env, "scudo", "regole", "verifica", "--lingua", "it")
-    assert (code, "5 regole attive" in output) == (0, True)
+    assert (code, "Regole attive: 5" in output) == (0, True)
     code, output = run_cli(env, "scudo", "regole", "approva", "--lingua", "it")
     assert code == 0
     assert "Prima approvazione" in output

@@ -1,7 +1,7 @@
 # Guardia MCP Shield rules.
 # Each [[rule]] says what to do when a message matches its conditions.
 # When several rules match, the strictest wins: block > ask > redact > log > allow.
-# After every change: "Save and approve" in the Shield section of the app, or  guardia shield rules approve
+# After every change: "Save and approve" in the Shield section of the app, or: guardia shield rules approve
 # Full guide: docs/SHIELD.md
 
 version = 1
@@ -9,6 +9,8 @@ version = 1
 # What to do when no rule matches: allow, log, ask or block.
 default = "allow"
 
+# 1. Blocks every call that asks to read or write these files: SSH keys, cloud credentials,
+#    certificates and .env files with passwords.
 [[rule]]
 name = "Never touch SSH keys, credentials and .env files"
 action = "block"
@@ -23,6 +25,8 @@ argument.path = [
   "**/.git-credentials",
 ]
 
+# 2. Blocks calls that send data to services often used to smuggle information out
+#    (public tunnels and request collectors).
 [[rule]]
 name = "Do not send data to tunnel or collection services"
 action = "block"
@@ -33,15 +37,17 @@ argument.host = [
   "*.trycloudflare.com",
   "webhook.site",
   "*.requestbin.net",
-  "*.pipedream.net",
+  "*.m.pipedream.net",
 ]
 
+# 3. If a result contains a key or a password, the AI receives it covered with asterisks.
 [[rule]]
 name = "Redact secrets in results"
 action = "redact"
 phase = "result"
 content.secrets = true
 
+# 4. Hides from the AI the tools whose description tries to give it orders.
 [[rule]]
 name = "Hide tools that give orders to the AI"
 action = "block"
@@ -53,6 +59,7 @@ content.contains = [
   "non dirlo all'utente",
 ]
 
+# 5. Stops a server that calls tools in bursts: beyond 30 calls a minute, the rest are blocked.
 [[rule]]
 name = "At most 30 calls per minute per server"
 action = "block"
@@ -61,6 +68,7 @@ method = "tools/call"
 rate = { max = 30, seconds = 60 }
 
 # Example to adapt: remove the # in front of the lines to enable it.
+# Before creating, deleting, pushing or merging anything on GitHub, Guardia asks you first.
 # [[rule]]
 # name = "GitHub: ask before writing"
 # server = "github"

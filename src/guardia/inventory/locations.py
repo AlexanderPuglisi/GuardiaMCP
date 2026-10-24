@@ -2,17 +2,39 @@ from __future__ import annotations
 
 import enum
 import os
-from collections.abc import Iterable, Iterator
+import re
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
 from guardia.inventory.environment import HostEnvironment
 from guardia.model import Client, ConfigSource, Scope
+from guardia.safeio import SafeReadError, parse_json, read_text
 
 MAX_DIR_ENTRIES = 2000
 MAX_WALKED_DIRS = 5000
+MAX_SETTINGS_BYTES = 1024 * 1024
 PLUGIN_WALK_DEPTH = 6
 PRUNED_DIRS = frozenset({"node_modules", ".git", "__pycache__", ".venv", "venv", "site-packages"})
+EXAMPLE_DIRS = frozenset(
+    {
+        "example",
+        "examples",
+        "demo",
+        "demos",
+        "doc",
+        "docs",
+        "test",
+        "tests",
+        "__tests__",
+        "fixtures",
+        "sample",
+        "samples",
+        "template",
+        "templates",
+    }
+)
+VERSION_NAME = re.compile(r"^(?:v?\d+(?:\.\d+)*(?:[-+][0-9A-Za-z.-]+)?|[0-9a-f]{7,40})$")
 VSCODE_FLAVOURS = ("Code", "Code - Insiders", "VSCodium")
 
 
@@ -36,6 +58,7 @@ class ConfigLocation:
     jsonc: bool = False
     project: Path | None = None
     root: Path | None = None
+    disabled: bool = False
 
     @property
     def source(self) -> ConfigSource:
@@ -119,13 +142,9 @@ def user_locations(env: HostEnvironment) -> list[ConfigLocation]:
                 )
             )
         locations.extend(plugin_locations(claude_dir / "rpm", Client.CLAUDE_DESKTOP))
-    locations.append(
-        ConfigLocation(
-            Client.CLAUDE_CODE,
-            Scope.USER,
-            env.home / ".claude.json",
-            ConfigFormat.CLAUDE_CODE_STATE,
-        )
+    locations.extend(
+        ConfigLocation(Client.CLAUDE_CODE, Scope.USER, state, ConfigFormat.CLAUDE_CODE_STATE)
+        for state in env.claude_state_files()
     )
     locations.append(
         ConfigLocation(
@@ -135,8 +154,11 @@ def user_locations(env: HostEnvironment) -> list[ConfigLocation]:
             ConfigFormat.MCP_SERVERS,
         )
     )
-    code_plugins = env.home / ".claude" / "plugins" / "cache"
-    locations.extend(plugin_locations(code_plugins, Client.CLAUDE_CODE))
+    enabled = enabled_plugins(env)
+    for claude_dir in env.claude_dirs():
+        locations.extend(
+            plugin_locations(claude_dir / "plugins" / "cache", Client.CLAUDE_CODE, enabled)
+        )
     locations.append(
         ConfigLocation(
             Client.CURSOR, Scope.USER, env.home / ".cursor" / "mcp.json", ConfigFormat.MCP_SERVERS
@@ -180,10 +202,20 @@ def user_locations(env: HostEnvironment) -> list[ConfigLocation]:
             jsonc=True,
         )
     )
-    locations.append(
+    locations.extend(
         ConfigLocation(
-            Client.CODEX, Scope.USER, env.home / ".codex" / "config.toml", ConfigFormat.CODEX_TOML
+            Client.GEMINI_CLI,
+            Scope.PLUGIN,
+            extension / "gemini-extension.json",
+            ConfigFormat.MCP_SERVERS,
+            jsonc=True,
+            root=extension,
         )
+        for extension in child_dirs(env.home / ".gemini" / "extensions")
+    )
+    locations.extend(
+        ConfigLocation(Client.CODEX, Scope.USER, codex / "config.toml", ConfigFormat.CODEX_TOML)
+        for codex in env.codex_dirs()
     )
     locations.append(
         ConfigLocation(
@@ -196,7 +228,52 @@ def user_locations(env: HostEnvironment) -> list[ConfigLocation]:
     return locations
 
 
-def plugin_locations(base: Path, client: Client) -> list[ConfigLocation]:
+def enabled_plugins(env: HostEnvironment) -> dict[str, bool]:
+    enabled: dict[str, bool] = {}
+    for claude_dir in env.claude_dirs():
+        try:
+            document = parse_json(
+                read_text(claude_dir / "settings.json", MAX_SETTINGS_BYTES), jsonc=True
+            )
+        except SafeReadError:
+            continue
+        plugins = document.value.get("enabledPlugins") if isinstance(document.value, dict) else None
+        if isinstance(plugins, dict):
+            enabled.update(
+                {str(key): value for key, value in plugins.items() if isinstance(value, bool)}
+            )
+    return enabled
+
+
+def _plugin_disabled(parts: tuple[str, ...], enabled: Mapping[str, bool]) -> bool:
+    return len(parts) >= 2 and enabled.get(f"{parts[1]}@{parts[0]}") is False
+
+
+def _mtime(path: Path) -> float:
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+def _newest_versions(base: Path, locations: list[ConfigLocation]) -> list[ConfigLocation]:
+    kept: list[ConfigLocation] = []
+    grouped: dict[tuple[str, str], dict[str, list[ConfigLocation]]] = {}
+    for location in locations:
+        parts = (location.root or location.path.parent).relative_to(base).parts
+        if len(parts) >= 3 and VERSION_NAME.match(parts[2]):
+            grouped.setdefault((parts[0], parts[1]), {}).setdefault(parts[2], []).append(location)
+        else:
+            kept.append(location)
+    for (marketplace, plugin), versions in grouped.items():
+        newest = max(versions, key=lambda name: _mtime(base / marketplace / plugin / name))
+        kept.extend(versions[newest])
+    return kept
+
+
+def plugin_locations(
+    base: Path, client: Client, enabled: Mapping[str, bool] | None = None
+) -> list[ConfigLocation]:
     try:
         if not base.is_dir():
             return []
@@ -204,6 +281,10 @@ def plugin_locations(base: Path, client: Client) -> list[ConfigLocation]:
         return []
     locations: list[ConfigLocation] = []
     for directory, filenames in walk_limited(base, PLUGIN_WALK_DEPTH):
+        parts = directory.relative_to(base).parts
+        if any(part.lower() in EXAMPLE_DIRS for part in parts):
+            continue
+        disabled = _plugin_disabled(parts, enabled or {})
         if ".mcp.json" in filenames:
             locations.append(
                 ConfigLocation(
@@ -212,6 +293,7 @@ def plugin_locations(base: Path, client: Client) -> list[ConfigLocation]:
                     directory / ".mcp.json",
                     ConfigFormat.MCP_SERVERS,
                     root=directory,
+                    disabled=disabled,
                 )
             )
         if directory.name == ".claude-plugin" and "plugin.json" in filenames:
@@ -222,9 +304,10 @@ def plugin_locations(base: Path, client: Client) -> list[ConfigLocation]:
                     directory / "plugin.json",
                     ConfigFormat.PLUGIN_MANIFEST,
                     root=directory.parent,
+                    disabled=disabled,
                 )
             )
-    return locations
+    return _newest_versions(base, locations)
 
 
 def project_locations(project: Path) -> list[ConfigLocation]:

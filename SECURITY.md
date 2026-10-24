@@ -28,14 +28,14 @@ Each guarantee below is enforced by an automated test, not only by a promise.
 
 | Guarantee | How it is enforced |
 |---|---|
-| Never runs the code it analyzes | No `eval`/`exec`, dynamic import or pickle anywhere in the source (`tests/test_tool_corpus.py`). The only `ctypes` use is the Windows DPAPI call in `secure_store.py`. |
-| Starts a process only for the Shield, and only the one you configured | `subprocess` is allowed in exactly one module, `shield/process.py`, which starts the server command written in your configuration and Guardia's own confirmation window, never through a shell (`tests/test_tool_corpus.py`). The scanner and the app never start processes. |
+| Never runs the code it analyzes | No `eval`/`exec`, dynamic import or pickle anywhere in the source (`tests/test_tool_corpus.py`). `ctypes` is used only for Windows system calls: DPAPI in `secure_store.py`, and in `shield/windows.py` the job that ends a server's whole process tree, the expansion of short path names and the check for network drives (`tests/test_tool_corpus.py`). |
+| Starts a process only for the Shield, and only the one you configured | `subprocess` is allowed in exactly one module, `shield/process.py`, which starts the server command written in your configuration and Guardia's own confirmation window, never through a shell (`tests/test_tool_corpus.py`). The scanner and the app never start programs; the app window is drawn by Microsoft Edge WebView2, which runs its own helper processes. |
 | Never connects to the network | No network module is imported; `urllib.parse` is used only to read text (`tests/test_self_defense.py`). The desktop app page has `connect-src 'none'`. |
 | Changes a configuration file only when you confirm it | The scanner writes only to `%LOCALAPPDATA%\GuardiaMCP` (baseline, ledger, app settings) and to the report files you choose. Only `guardia shield enable/disable --confirm` (or the button in the app, after a confirmation) changes a client file: it saves a backup first, changes only that server's entry, and writes nothing if the file changed meanwhile (`tests/test_shield_activation.py`). |
 | Text from analyzed files can never become code | Terminal output escapes control and bidirectional characters; the HTML report has no scripts and a strict CSP; the desktop app builds the page with `textContent` only and refuses `innerHTML` (`tests/test_app.py`). |
 | Secrets are not copied into reports | Known secret formats are replaced with `[REDACTED]`; secrets in environment variables are shown only as name and length. |
-| Defensive file reading | Size limit (64 MB per file), nesting limit, duplicate-key detection, rejection of `NaN`/`Infinity` and of numbers too large to handle. Unreadable files are reported as a finding (G12-006, G12-007) instead of silently passing. Paths to network shares (`\\server\share`) found in configurations are never opened. |
-| Small attack surface | The CLI has **zero** runtime dependencies. Only the desktop app depends on `pywebview` (with `pythonnet`, `clr-loader`, `proxy-tools`, `bottle` on Windows). All versions are pinned in `uv.lock`. |
+| Defensive file reading | Size limits (128 MB per configuration file, 64 MB for other files), nesting limit, duplicate-key detection, rejection of `NaN`/`Infinity` and of numbers too large to handle. Unreadable files are reported as a finding (G12-006, G12-007) and mark the analysis as incomplete instead of silently passing. Network shares (`\\server\share`, `\\wsl.localhost\…`) and mapped network drives found in configurations are never opened automatically: only a folder you pass yourself with `--project` is read. |
+| Small attack surface | The CLI has **zero** runtime dependencies. Only the desktop app depends on `pywebview`, which on Windows brings `bottle`, `proxy-tools`, `typing-extensions`, `pythonnet`, `clr-loader`, `cffi` and `pycparser`. All versions are pinned in `uv.lock`, and the executables are built without the development tools (`--no-dev`). |
 
 ### Honest limits
 
@@ -61,7 +61,8 @@ Guardia MCP is a useful layer, not a guarantee. Please read these limits before 
 **Rules are patterns, not understanding.** There is no AI by design. Rules can produce false alarms
 and can miss new tricks. Because the project is open source, an attacker can read the rules and try
 to write text that avoids them. Obfuscation beyond the supported decoders (Base64, hex, Unicode
-tag characters and other invisible characters) will be missed.
+tag characters and other invisible characters) will be missed. A known false alarm: server code
+that lists sensitive paths only to block them (a deny list) can be reported as if it read them.
 
 **Rug-pull detection is trust on first use.** The first scan records what exists today as the
 baseline; a server that was already malicious at that moment is judged only by the other rules.
@@ -86,11 +87,12 @@ English and Italian keywords. Rules and protections are patterns: text written t
 can succeed. The confirmation window
 shows who asks and why, but cannot know who clicks it. The signed rules file stops hidden changes, yet anyone who can run code as your
 Windows user can also use the signing key. The Shield sees only MCP messages: a malicious server is still a program
-on your PC and can read your files directly, without using MCP. On Windows, if a server does not
-stop when asked, the Shield ends the process it started, but programs that process started in turn
-(for example `node` started by `npx`) may keep running. Commands that are `.cmd` or `.bat` files
-(such as `npx` on Windows) pass their arguments through `cmd.exe`, exactly as when your client runs
-them: the Shield does not add this risk, but it does not remove it either.
+on your PC and can read your files directly, without using MCP. On Windows the server runs inside
+a job, so when the Shield stops the programs it started in turn (for example `node` started by
+`npx`) end too; a program started in the very first instant, before the job applies, could escape.
+Commands that are `.cmd` or `.bat` files (such as `npx` on Windows) pass their arguments through
+`cmd.exe`: the Shield quotes them and refuses line breaks, but `cmd.exe` still expands `%NAME%`,
+exactly as when your client runs them.
 
 **Claude Desktop from the Microsoft Store.** Windows gives Store apps a private copy of
 `AppData`. If the Shield, started by Claude, is the first to create Guardia's data folder,
@@ -154,14 +156,14 @@ Ogni garanzia è verificata da un test automatico, non solo promessa.
 
 | Garanzia | Come viene verificata |
 |---|---|
-| Non esegue mai il codice che analizza | Nel sorgente non c'è nessun `eval`/`exec`, import dinamico o pickle (`tests/test_tool_corpus.py`). L'unico uso di `ctypes` è la chiamata a DPAPI di Windows in `secure_store.py`. |
-| Avvia un processo solo per lo Scudo, e solo quello che hai configurato tu | `subprocess` è permesso in un solo modulo, `shield/process.py`, che avvia il comando del server scritto nella tua configurazione e la finestra di conferma di Guardia, mai tramite una shell (`tests/test_tool_corpus.py`). Lo scanner e l'app non avviano mai processi. |
+| Non esegue mai il codice che analizza | Nel sorgente non c'è nessun `eval`/`exec`, import dinamico o pickle (`tests/test_tool_corpus.py`). `ctypes` serve solo per chiamate di sistema di Windows: DPAPI in `secure_store.py`, e in `shield/windows.py` il job che chiude tutto l'albero di processi di un server, l'espansione dei nomi brevi dei percorsi e il controllo dei dischi di rete (`tests/test_tool_corpus.py`). |
+| Avvia un processo solo per lo Scudo, e solo quello che hai configurato tu | `subprocess` è permesso in un solo modulo, `shield/process.py`, che avvia il comando del server scritto nella tua configurazione e la finestra di conferma di Guardia, mai tramite una shell (`tests/test_tool_corpus.py`). Lo scanner e l'app non avviano mai programmi; la finestra dell'app la disegna Microsoft Edge WebView2, che usa propri processi di supporto. |
 | Non si collega mai alla rete | Nessun modulo di rete viene importato; `urllib.parse` serve solo a leggere testo (`tests/test_self_defense.py`). La pagina dell'app desktop ha `connect-src 'none'`. |
 | Modifica un file di configurazione solo quando lo confermi | La scansione scrive solo in `%LOCALAPPDATA%\GuardiaMCP` (base di confronto, registro, impostazioni dell'app) e nei file di rapporto che scegli tu. Solo `guardia scudo attiva/disattiva --conferma` (o il pulsante nell'app, dopo una conferma) cambia un file di un client: prima salva una copia, cambia solo la voce di quel server e non scrive nulla se nel frattempo il file è cambiato (`tests/test_shield_activation.py`). |
 | Il testo dei file analizzati non diventa mai codice | L'output nel terminale neutralizza i caratteri di controllo e bidirezionali; il rapporto HTML non ha script e ha una CSP rigida; l'app desktop costruisce la pagina solo con `textContent` e rifiuta `innerHTML` (`tests/test_app.py`). |
 | I segreti non finiscono nei rapporti | I formati di segreto noti diventano `[REDACTED]`; i segreti nelle variabili d'ambiente compaiono solo come nome e lunghezza. |
-| Lettura difensiva dei file | Limite di dimensione (64 MB per file), limite di annidamento, controllo delle chiavi duplicate, rifiuto di `NaN`/`Infinity` e dei numeri troppo grandi. I file illeggibili vengono segnalati come problema (G12-006, G12-007) invece di passare in silenzio. I percorsi di rete (`\\server\condivisione`) trovati nelle configurazioni non vengono mai aperti. |
-| Poca superficie d'attacco | La CLI ha **zero** dipendenze. Solo l'app desktop dipende da `pywebview` (con `pythonnet`, `clr-loader`, `proxy-tools`, `bottle` su Windows). Tutte le versioni sono bloccate in `uv.lock`. |
+| Lettura difensiva dei file | Limiti di dimensione (128 MB per i file di configurazione, 64 MB per gli altri file), limite di annidamento, controllo delle chiavi duplicate, rifiuto di `NaN`/`Infinity` e dei numeri troppo grandi. I file illeggibili vengono segnalati come problema (G12-006, G12-007) e rendono l'analisi incompleta invece di passare in silenzio. Le cartelle di rete (`\\server\condivisione`, `\\wsl.localhost\…`) e i dischi di rete trovati nelle configurazioni non vengono mai aperti in automatico: si legge solo una cartella che indichi tu con `--progetto`. |
+| Poca superficie d'attacco | La CLI ha **zero** dipendenze. Solo l'app desktop dipende da `pywebview`, che su Windows porta con sé `bottle`, `proxy-tools`, `typing-extensions`, `pythonnet`, `clr-loader`, `cffi` e `pycparser`. Tutte le versioni sono bloccate in `uv.lock`, e gli eseguibili vengono costruiti senza gli strumenti di sviluppo (`--no-dev`). |
 
 ### Limiti, detti onestamente
 
@@ -192,7 +194,9 @@ trovato nulla.
 regole possono dare falsi allarmi e non accorgersi di trucchi nuovi. Il progetto è open source,
 quindi un attaccante può leggere le regole e provare a scrivere testi che le evitano. Gli
 offuscamenti diversi da quelli che Guardia sa decodificare (Base64, esadecimale,
-caratteri Unicode «tag» e altri caratteri invisibili) non vengono riconosciuti.
+caratteri Unicode «tag» e altri caratteri invisibili) non vengono riconosciuti. Un falso allarme
+noto: il codice di un server che elenca percorsi sensibili solo per bloccarli (una lista di
+divieti) può essere segnalato come se li leggesse.
 
 **Il controllo delle modifiche (rug pull) si fida della prima volta.** La prima scansione salva
 come base quello che c'è oggi: un server che era già malevolo in quel momento viene giudicato solo
@@ -219,12 +223,12 @@ testo scritto per aggirarle può riuscirci. La finestra di conferma
 mostra chi chiede e perché, ma non può sapere chi clicca. Il file delle regole firmato ferma le modifiche di nascosto, ma chi
 riesce a eseguire codice con il tuo utente di Windows può usare anche la chiave di firma. Lo Scudo
 vede solo i messaggi MCP: un server malevolo resta un programma sul tuo
-PC e può leggere i tuoi file direttamente, senza passare da MCP. Su Windows, se un server non si
-ferma quando glielo si chiede, lo Scudo chiude il processo che ha avviato, ma i programmi avviati a
-loro volta da quel processo (per esempio `node` avviato da `npx`) possono restare attivi. I comandi
-che sono file `.cmd` o `.bat` (come `npx` su Windows) passano i loro argomenti attraverso `cmd.exe`,
-esattamente come quando li avvia il tuo client: lo Scudo non aggiunge questo rischio, ma nemmeno
-lo toglie.
+PC e può leggere i tuoi file direttamente, senza passare da MCP. Su Windows il server gira dentro
+un job, quindi quando lo Scudo si ferma finiscono anche i programmi che ha avviato a sua volta (per
+esempio `node` avviato da `npx`); un programma avviato nel primissimo istante, prima che il job
+valga, potrebbe sfuggire. I comandi che sono file `.cmd` o `.bat` (come `npx` su Windows) passano i
+loro argomenti attraverso `cmd.exe`: lo Scudo li mette tra virgolette e rifiuta gli a capo, ma
+`cmd.exe` espande comunque `%NOME%`, esattamente come quando li avvia il tuo client.
 
 **Claude Desktop installato dal Microsoft Store.** Windows dà alle app dello Store una copia
 privata di `AppData`. Se il primo a creare la cartella dei dati di Guardia è lo Scudo avviato da

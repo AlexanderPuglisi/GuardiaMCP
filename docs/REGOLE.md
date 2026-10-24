@@ -1,6 +1,6 @@
 # Guida alle regole di Guardia MCP
 
-Questa guida elenca tutte le 88 regole che Guardia usa per controllare server MCP e skill. Per ognuna trovi perché è un rischio e come correggerlo. La guida è generata dal programma stesso con `guardia regole --markdown`, quindi è sempre allineata al codice. Nei testi, «…» indica un valore che nel rapporto vero viene sostituito con il nome del server, del file o del campo trovato.
+Questa guida elenca tutte le 90 regole che Guardia usa per controllare server MCP e skill. Per ognuna trovi perché è un rischio e come correggerlo. La guida è generata dal programma stesso con `guardia regole --markdown`, quindi è sempre allineata al codice. Nei testi, «…» indica un valore che nel rapporto vero viene sostituito con il nome del server, del file o del campo trovato.
 
 ## I livelli di gravità
 
@@ -60,7 +60,7 @@ Le regole scritte da te in formato TOML guidano lo Scudo in tempo reale (vedi do
 - **G09** — Rete sospetta: 12 regole
 - **G10** — Dipendenze e catena di fornitura: 11 regole
 - **G11** — Esposizione in rete: 1 regola
-- **G12** — Igiene della configurazione: 7 regole
+- **G12** — Igiene della configurazione: 9 regole
 - **G13** — Registro a prova di manomissione: 2 regole
 - **G14** — Skill: 3 regole
 
@@ -574,7 +574,7 @@ Le regole scritte da te in formato TOML guidano lo Scudo in tempo reale (vedi do
 
 **Come correggere.** Verifica il plugin: un plugin legittimo usa solo file al suo interno.
 
-### G12-006 · BASSO — File di configurazione non analizzabile
+### G12-006 · MEDIO — File di configurazione non analizzabile
 
 **Perché.** Il file non è stato letto (…), quindi i server che contiene non sono stati controllati.
 
@@ -585,6 +585,18 @@ Le regole scritte da te in formato TOML guidano lo Scudo in tempo reale (vedi do
 **Perché.** … file del server «…» non sono stati analizzati: troppo grandi, illeggibili o scritti in modo da non poter essere letti. Un file costruito apposta può servire a nascondere strumenti.
 
 **Come correggere.** Controlla i file indicati nel rapporto JSON. Se il server viene da una fonte ufficiale, di solito è innocuo.
+
+### G12-008 · MEDIO — Avviato da un altro programma «guardia»
+
+**Perché.** La voce "…" passa da un programma che si chiama come Guardia ma non è questa installazione (…). Se è una tua vecchia copia di Guardia va solo ricollegata; se non la riconosci potrebbe essere un programma travestito, che Guardia non può controllare.
+
+**Come correggere.** Se è una tua copia di Guardia, apri l'app e premi «Ricollega» nella sezione Scudo (oppure: guardia scudo ricollega --nome NOME --conferma). Se non la riconosci, togli la voce e controlla quel programma.
+
+### G12-009 · MEDIO — Il programma dello Scudo non esiste più
+
+**Perché.** La voce "…" passa dallo Scudo, ma il programma … non c'è più (per esempio la cartella di Guardia è stata spostata o cancellata): l'app AI non riesce ad avviare questo server.
+
+**Come correggere.** Apri Guardia e premi «Ricollega» nella sezione Scudo (oppure: guardia scudo ricollega --tutti --conferma), poi riavvia l'app AI.
 
 ## G13 — Registro a prova di manomissione
 

@@ -6,17 +6,32 @@ import os
 import re
 import tomllib
 import unicodedata
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 from guardia.inventory.parsers import URL_KEYS
 from guardia.model import Finding, ServerEntry, Severity, Transport, frozen_mapping, json_pointer
-from guardia.redact import SECRET_VALUE, is_secret_name, redact_args, redact_free_text, redact_url
+from guardia.redact import (
+    NO_SECRET,
+    REFERENCE,
+    SECRET_VALUE,
+    WEAK_SECRET,
+    is_plain_value,
+    is_secret_assignment,
+    is_secret_name,
+    looks_random,
+    redact_args,
+    redact_free_text,
+    redact_url,
+    secret_name_strength,
+)
 from guardia.scanner.commandline import (
     damerau_levenshtein,
+    official_registry,
+    package_key,
     parse_docker_run,
     parse_runner,
     program_name,
@@ -105,6 +120,7 @@ def check_hidden_characters(server: ServerEntry, context: ScanContext) -> Iterat
 
 SHELLS = frozenset({"cmd", "powershell", "pwsh", "bash", "sh", "zsh", "dash", "fish", "wsl"})
 POWERSHELLS = frozenset({"powershell", "pwsh"})
+POSIX_SHELLS = frozenset({"bash", "sh", "zsh", "dash", "fish"})
 LOLBINS = frozenset(
     {
         "mshta",
@@ -134,6 +150,38 @@ INTERPRETER_INLINE: dict[str, frozenset[str]] = {
     "bun": frozenset({"-e", "--eval", "-p", "--print"}),
     "php": frozenset({"-r"}),
 }
+PYTHONS = frozenset({"python", "python3", "pythonw", "py"})
+PYTHON_INLINE_CLUSTER = re.compile(r"-[bBdEhiIOqsSuvxRP]*c")
+INTERPRETER_VALUES: dict[str, frozenset[str]] = {
+    "node": frozenset(
+        {
+            "-r",
+            "--require",
+            "--import",
+            "--loader",
+            "--experimental-loader",
+            "-C",
+            "--conditions",
+            "--inspect-port",
+            "--title",
+            "--input-type",
+            "--env-file",
+            "--env-file-if-exists",
+            "--watch-path",
+            "--disable-warning",
+            "--redirect-warnings",
+        }
+    ),
+    "bun": frozenset({"-r", "--preload", "--cwd", "--config", "--env-file"}),
+    "perl": frozenset({"-I", "-M", "-m"}),
+    "ruby": frozenset({"-I", "-r", "-C", "-E"}),
+    "php": frozenset({"-d", "-c", "-z"}),
+    **{name: frozenset({"-W", "-X", "--check-hash-based-pycs"}) for name in PYTHONS},
+}
+INTERPRETER_STOPS: dict[str, frozenset[str]] = {
+    "php": frozenset({"-f"}),
+    **{name: frozenset({"-m"}) for name in PYTHONS},
+}
 
 
 def _is_prefix_flag(arg: str, full: str, minimum: int = 2) -> bool:
@@ -143,7 +191,32 @@ def _is_prefix_flag(arg: str, full: str, minimum: int = 2) -> bool:
 INLINE_SHELL_FLAGS: dict[str, frozenset[str]] = {
     "cmd": frozenset({"/c", "/k", "/r"}),
     "wsl": frozenset({"-e", "--exec", "--"}),
+    "fish": frozenset({"--command"}),
 }
+POSIX_INLINE_CLUSTER = re.compile(r"-[A-Za-z]*c[A-Za-z]*")
+SHELL_VALUE_OPTIONS: dict[str, frozenset[str]] = {
+    "wsl": frozenset(
+        {"-d", "--distribution", "-u", "--user", "--cd", "--shell-type", "--distribution-id"}
+    ),
+    "bash": frozenset({"-o", "+o", "--rcfile", "--init-file"}),
+    "sh": frozenset({"-o", "+o"}),
+    "zsh": frozenset({"-o", "+o"}),
+    "dash": frozenset({"-o", "+o"}),
+    "fish": frozenset({"--init-command", "-d", "--debug", "--debug-output", "--features"}),
+}
+POWERSHELL_VALUE_OPTIONS: tuple[tuple[str, int], ...] = (
+    ("-executionpolicy", 3),
+    ("-windowstyle", 2),
+    ("-workingdirectory", 3),
+    ("-configurationname", 4),
+    ("-inputformat", 4),
+    ("-outputformat", 2),
+    ("-psconsolefile", 3),
+    ("-version", 2),
+    ("-settingsfile", 3),
+    ("-custompipename", 3),
+)
+POWERSHELL_VALUE_ALIASES = frozenset({"-ep", "-ex", "-wd", "-of", "-if"})
 
 
 def _shell_flags(program: str, arg: str) -> tuple[bool, bool]:
@@ -151,10 +224,68 @@ def _shell_flags(program: str, arg: str) -> tuple[bool, bool]:
     if program in POWERSHELLS:
         encoded = lowered in ("-ec", "-e") or _is_prefix_flag(lowered, "-encodedcommand", 3)
         return encoded or _is_prefix_flag(lowered, "-command"), encoded
-    return lowered in INLINE_SHELL_FLAGS.get(program, frozenset({"-c"})), False
+    if program in POSIX_SHELLS and POSIX_INLINE_CLUSTER.fullmatch(arg):
+        return True, False
+    return lowered in INLINE_SHELL_FLAGS.get(program, frozenset()), False
+
+
+def _shell_option_prefixes(program: str) -> tuple[str, ...]:
+    if program == "cmd":
+        return ("/",)
+    return ("-", "+") if program in POSIX_SHELLS else ("-",)
+
+
+def _shell_takes_value(program: str, lowered: str) -> bool:
+    if program in POWERSHELLS:
+        return lowered in POWERSHELL_VALUE_ALIASES or any(
+            _is_prefix_flag(lowered, name, minimum) for name, minimum in POWERSHELL_VALUE_OPTIONS
+        )
+    return lowered in SHELL_VALUE_OPTIONS.get(program, frozenset())
 
 
 SHELL_METACHARS = re.compile(r"[&|;<>`]|\$\(")
+
+
+@dataclass(frozen=True, slots=True)
+class ShellCall:
+    flag: int
+    start: int
+    encoded: bool = False
+
+
+def shell_call(program: str, args: Sequence[str]) -> ShellCall | None:
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        lowered = arg.lower()
+        inline, encoded = _shell_flags(program, arg)
+        if inline or encoded:
+            return ShellCall(index, index + 1, encoded)
+        if program in POWERSHELLS and _is_prefix_flag(lowered, "-file"):
+            return None
+        if not arg.startswith(_shell_option_prefixes(program)):
+            return ShellCall(index, index) if program == "wsl" else None
+        index += 2 if _shell_takes_value(program, lowered) else 1
+    return None
+
+
+def inline_code_index(program: str, args: Sequence[str]) -> int | None:
+    flags = INTERPRETER_INLINE.get(program)
+    if not flags:
+        return None
+    values = INTERPRETER_VALUES.get(program, frozenset())
+    stops = INTERPRETER_STOPS.get(program, frozenset())
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        name = arg.partition("=")[0] if arg.startswith("--") else arg
+        cluster = program in PYTHONS and PYTHON_INLINE_CLUSTER.fullmatch(arg) is not None
+        if name in flags or name.lower() in flags or cluster:
+            return index
+        if not arg.startswith("-") or arg == "--" or arg in stops:
+            return None
+        index += 2 if arg in values else 1
+    return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,21 +297,15 @@ class EffectiveCommand:
     wrapped_by: str | None = None
 
 
-def _inline_index(program: str, args: tuple[str, ...]) -> int | None:
-    for index, arg in enumerate(args):
-        inline, encoded = _shell_flags(program, arg)
-        if encoded or (not inline and not arg.startswith(("-", "/"))):
-            return None
-        if inline:
-            return index
-    return None
+def _chained(parts: Sequence[str]) -> bool:
+    return any(SHELL_METACHARS.search(part) for part in parts)
 
 
-def _unwrap(server: ServerEntry, program: str, index: int) -> EffectiveCommand | None:
-    rest = server.args[index + 1 :]
-    if not rest or any(SHELL_METACHARS.search(part) for part in rest):
+def _unwrap(server: ServerEntry, program: str, call: ShellCall) -> EffectiveCommand | None:
+    rest = server.args[call.start :]
+    if call.encoded or not rest or _chained(rest):
         return None
-    pointers = [arg_pointer(server, index + 1 + k) for k in range(len(rest))]
+    pointers = [arg_pointer(server, call.start + k) for k in range(len(rest))]
     if len(rest) == 1 and " " in rest[0].strip():
         words = rest[0].split()
         return EffectiveCommand(
@@ -197,8 +322,8 @@ def effective_command(server: ServerEntry) -> EffectiveCommand:
         tuple(arg_pointer(server, i) for i in range(len(server.args))),
     )
     program = program_name(server.command) if server.command else ""
-    index = _inline_index(program, server.args) if program in SHELLS else None
-    unwrapped = _unwrap(server, program, index) if index is not None else None
+    call = shell_call(program, server.args) if program in SHELLS else None
+    unwrapped = _unwrap(server, program, call) if call is not None else None
     return unwrapped or direct
 
 
@@ -207,25 +332,22 @@ def check_shells_and_interpreters(server: ServerEntry, context: ScanContext) -> 
         return
     program = program_name(server.command)
     effective = effective_command(server)
-    if program in SHELLS:
-        for index, arg in enumerate(server.args):
-            inline, encoded = _shell_flags(program, arg)
-            if encoded:
-                yield emit("G05-002", server, arg_pointer(server, index), arg, program=program)
-                return
-            if inline:
-                if effective.wrapped_by is None:
-                    yield emit("G05-001", server, arg_pointer(server, index), arg, program=program)
-                break
+    call = shell_call(program, server.args) if program in SHELLS else None
+    if call is not None:
+        flag = server.args[call.flag]
+        if call.encoded:
+            yield emit("G05-002", server, arg_pointer(server, call.flag), flag, program=program)
+            return
+        if effective.wrapped_by is None and _chained(server.args[call.start :]):
+            yield emit("G05-001", server, arg_pointer(server, call.flag), flag, program=program)
     inner = program_name(effective.command) if effective.command else ""
     for candidate in {program, inner} & LOLBINS:
         yield emit("G05-003", server, effective.command_pointer, candidate, program=candidate)
-    inline_flags = INTERPRETER_INLINE.get(inner)
-    if inline_flags:
-        for arg, pointer in zip(effective.args, effective.pointers, strict=True):
-            if arg in inline_flags or arg.lower() in inline_flags:
-                yield emit("G05-007", server, pointer, arg, program=inner)
-                return
+    index = inline_code_index(inner, effective.args)
+    if index is not None:
+        yield emit(
+            "G05-007", server, effective.pointers[index], effective.args[index], program=inner
+        )
 
 
 DOWNLOAD_EXECUTE = re.compile(
@@ -276,9 +398,6 @@ def check_command_patterns(server: ServerEntry, context: ScanContext) -> Iterato
         yield emit("G05-006", server, f"{server.pointer}/command", server.command)
 
 
-REFERENCE = re.compile(
-    r"\$\{[^}]+\}|%[A-Za-z_][A-Za-z0-9_]*%|^\$[A-Za-z_][A-Za-z0-9_]*$|\$env:[A-Za-z_]"
-)
 PLACEHOLDER = re.compile(
     r"^(|<[^>]*>|\[[^\]]*\]|(your|my|insert|enter|put)[-_ ].*|x{3,}|\*{3,}|\.{3}|changeme"
     r"|change[-_]me|placeholder|todo|none|null|undefined|example.*|dummy|test|secret|token"
@@ -297,19 +416,67 @@ def is_placeholder(value: str) -> bool:
     return PLACEHOLDER.match(value.strip()) is not None
 
 
+AUTHORIZATION_SCHEMES = frozenset({"bearer", "basic", "token"})
+
+
+def _authorization_value(value: str) -> bool:
+    scheme, _, token = value.strip().partition(" ")
+    token = token.strip()
+    return (
+        scheme.lower() in AUTHORIZATION_SCHEMES
+        and len(token) >= 8
+        and " " not in token
+        and not is_reference(token)
+        and not is_placeholder(token)
+    )
+
+
 def is_literal_secret(name: str, value: str) -> bool:
     if is_reference(value) or is_placeholder(value):
         return False
-    if SECRET_VALUE.search(value):
+    if SECRET_VALUE.search(value) or _authorization_value(value):
         return True
-    if not is_secret_name(name):
+    strength = secret_name_strength(name)
+    if strength == NO_SECRET or is_plain_value(value):
         return False
+    if strength == WEAK_SECRET:
+        return looks_random(value)
     return len(value.strip()) >= 8 or PASSWORD_NAME.search(name) is not None
+
+
+def url_has_credentials(url: str) -> bool:
+    if SECRET_VALUE.search(url):
+        return True
+    try:
+        parts = urlsplit(url)
+        password = parts.password
+    except ValueError:
+        return False
+    if password and not is_reference(password) and not is_placeholder(unquote(password)):
+        return True
+    for piece in parts.query.split("&"):
+        key, _, value = piece.partition("=")
+        plain = unquote(value)
+        if value and not is_placeholder(plain) and is_secret_assignment(unquote(key), plain):
+            return True
+    return False
+
+
+def _exposed_url(text: str) -> str | None:
+    return next((url for url in URL_IN_TEXT.findall(text) if url_has_credentials(url)), None)
+
+
+def _secret_outside_urls(original: str, cleaned: str) -> bool:
+    return URL_IN_TEXT.sub("", original) != URL_IN_TEXT.sub("", cleaned)
 
 
 def check_secrets(server: ServerEntry, context: ScanContext) -> Iterator[Finding]:
     for name, value in server.env.items():
-        if is_literal_secret(name, value):
+        exposed = _exposed_url(value)
+        if exposed is not None:
+            shown = redact_url(exposed)
+            yield emit("G06-004", server, env_pointer(server, name), shown, value=shown)
+        elif is_literal_secret(name, value):
             yield emit(
                 "G06-001",
                 server,
@@ -320,14 +487,16 @@ def check_secrets(server: ServerEntry, context: ScanContext) -> Iterator[Finding
             )
     redacted = redact_args(server.args)
     for index, (original, cleaned) in enumerate(zip(server.args, redacted, strict=True)):
-        if original == cleaned or is_reference(original) or is_placeholder(original):
+        if is_placeholder(original):
             continue
         previous = server.args[index - 1] if index > 0 else ""
         shown = (
             f"{previous} {cleaned}" if previous.startswith("-") and "=" not in previous else cleaned
         )
-        rule = "G06-004" if "://" in original else "G06-002"
-        yield emit(rule, server, arg_pointer(server, index), shown, value=shown)
+        if _exposed_url(original) is not None:
+            yield emit("G06-004", server, arg_pointer(server, index), shown, value=shown)
+        elif not is_reference(original) and _secret_outside_urls(original, cleaned):
+            yield emit("G06-002", server, arg_pointer(server, index), shown, value=shown)
     for name, value in server.headers.items():
         literal = is_literal_secret(name, value) or (
             name.lower() in AUTH_HEADERS and not is_reference(value) and not is_placeholder(value)
@@ -341,61 +510,133 @@ def check_secrets(server: ServerEntry, context: ScanContext) -> Iterator[Finding
                 name=name,
                 length=str(len(value)),
             )
-    if server.url and not is_reference(server.url):
+    if server.url and url_has_credentials(server.url):
         cleaned = redact_url(server.url)
-        if cleaned != server.url:
-            yield emit("G06-004", server, url_pointer(server), cleaned, value=cleaned)
+        yield emit("G06-004", server, url_pointer(server), cleaned, value=cleaned)
 
 
-SENSITIVE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = tuple(
-    (re.compile(pattern, re.IGNORECASE), rule)
-    for pattern, rule in (
-        (
-            r"(^|[\\/])\.ssh([\\/]|$)|\bid_(rsa|dsa|ecdsa|ed25519)\b|\.(pem|ppk|pfx|p12)$",
-            "G07-001",
-        ),
-        (r"(^|[\\/])\.(aws|azure|kube|gnupg|gcloud|oci|terraform\.d)([\\/]|$)", "G07-001"),
-        (
-            r"\.docker[\\/]config\.json|\.git-credentials|(^|[\\/])[._](npmrc|pypirc|netrc|pgpass)$",
-            "G07-001",
-        ),
-        (
-            r"[\\/](google[\\/]chrome|microsoft[\\/]edge|bravesoftware[\\/]brave-browser"
-            r"|mozilla[\\/]firefox)([\\/]|$)",
-            "G07-001",
-        ),
-        (r"login data|(^|[\\/])cookies(\.sqlite)?$|key4\.db|logins\.json", "G07-001"),
-        (r"wallet\.dat|[\\/](electrum|exodus|atomic|metamask)([\\/]|$)", "G07-001"),
-        (r"[\\/]windows[\\/]system32[\\/]config([\\/]|$)", "G07-001"),
-        (
-            r"claude_desktop_config\.json|(^|[\\/])\.claude\.json$|(^|[\\/])\.mcp\.json$"
-            r"|[\\/]\.cursor[\\/]mcp\.json|mcp_config\.json|[\\/]\.codex[\\/]config\.toml",
-            "G07-002",
-        ),
-        (r"(^|[\\/])\.env(\.[a-z0-9]+)?$", "G07-003"),
-    )
+def _path_pattern(pattern: str) -> re.Pattern[str]:
+    return re.compile(pattern, re.IGNORECASE)
+
+
+KEY_FILE = _path_pattern(r"\.(pem|ppk|pfx|p12)$")
+DOTENV_FILE = _path_pattern(
+    r"(^|[\\/])\.env(\.(?!(example|sample|template|dist|defaults?|schema)$)[a-z0-9]+)?$"
 )
+SENSITIVE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (
+        _path_pattern(
+            r"(^|[\\/])\.ssh([\\/]|$)(?![^\\/]*\.pub$)|\bid_(rsa|dsa|ecdsa|ed25519)\b(?!\.pub)"
+        ),
+        "G07-001",
+    ),
+    (KEY_FILE, "G07-001"),
+    (
+        _path_pattern(r"(^|[\\/])\.(aws|azure|kube|gnupg|gcloud|oci|terraform\.d)([\\/]|$)"),
+        "G07-001",
+    ),
+    (
+        _path_pattern(
+            r"\.docker[\\/]config\.json|\.git-credentials|(^|[\\/])[._](npmrc|pypirc|netrc|pgpass)$"
+        ),
+        "G07-001",
+    ),
+    (
+        _path_pattern(
+            r"(appdata[\\/](local|roaming)|application support|\.config)[\\/]"
+            r"(google[\\/]chrome|google-chrome|chromium|microsoft[\\/]edge|microsoft-edge"
+            r"|bravesoftware[\\/]brave-browser|mozilla[\\/]firefox)"
+            r"(?![\\/]application([\\/]|$))([\\/]|$)|[\\/]\.mozilla[\\/]firefox([\\/]|$)"
+        ),
+        "G07-001",
+    ),
+    (_path_pattern(r"login data|(^|[\\/])cookies(\.sqlite)?$|key4\.db|logins\.json"), "G07-001"),
+    (_path_pattern(r"wallet\.dat|[\\/](electrum|exodus|atomic|metamask)([\\/]|$)"), "G07-001"),
+    (_path_pattern(r"[\\/]windows[\\/]system32[\\/]config([\\/]|$)"), "G07-001"),
+    (
+        _path_pattern(
+            r"claude_desktop_config\.json|(^|[\\/])\.claude\.json$|(^|[\\/])\.mcp\.json$"
+            r"|[\\/]\.cursor[\\/]mcp\.json|mcp_config\.json|[\\/]\.codex[\\/]config\.toml"
+        ),
+        "G07-002",
+    ),
+    (DOTENV_FILE, "G07-003"),
+)
+ENV_FILE_OPTIONS = frozenset({"--env-file", "--env-file-if-exists", "--envfile", "-e"})
+CA_BUNDLE_VARIABLES = frozenset(
+    {
+        "node_extra_ca_certs",
+        "ssl_cert_file",
+        "ssl_cert_dir",
+        "requests_ca_bundle",
+        "curl_ca_bundle",
+        "git_ssl_cainfo",
+        "git_ssl_capath",
+        "pip_cert",
+        "aws_ca_bundle",
+        "npm_config_cafile",
+        "ca_bundle",
+    }
+)
+CA_OPTION = re.compile(
+    r"^--?(ca|cacert|ca-?certs?|ca-?file|cafile|ca-?bundle|ca-?path|root-?ca"
+    r"|(tls|ssl)-?ca(-?file|-?cert)?|extra-?ca-?certs?)$"
+)
+CERTIFICATE_NAME = re.compile(
+    r"(^|[-_.])(ca|cacert|root|chain|fullchain|bundle|certs?|certificates?|trust\w*)([-_.]|$)",
+    re.IGNORECASE,
+)
+PRIVATE_NAME = re.compile(r"key|priv|secret", re.IGNORECASE)
 
 
-def _path_like_values(server: ServerEntry) -> Iterator[tuple[str, str]]:
+def _path_like_values(server: ServerEntry) -> Iterator[tuple[str, str, str]]:
+    previous = ""
     for index, arg in enumerate(server.args):
-        value = arg.partition("=")[2] if arg.startswith("-") and "=" in arg else arg
-        yield arg_pointer(server, index), value.strip().strip('"')
+        if arg.startswith("-") and "=" in arg:
+            owner, _, value = arg.partition("=")
+        else:
+            owner, value = (previous if previous.startswith("-") else ""), arg
+        yield arg_pointer(server, index), value.strip().strip('"'), owner.lower()
+        previous = arg
     if server.cwd:
-        yield f"{server.pointer}/cwd", server.cwd
+        yield f"{server.pointer}/cwd", server.cwd, "cwd"
     for name, value in server.env.items():
         if not is_secret_name(name):
             for part in re.split(r"[;,]", value):
-                yield env_pointer(server, name), part.strip().strip('"')
+                yield env_pointer(server, name), part.strip().strip('"'), name.lower()
+
+
+def _certificate_file(value: str, owner: str) -> bool:
+    if owner in CA_BUNDLE_VARIABLES or CA_OPTION.match(owner):
+        return True
+    name = re.split(r"[\\/]", value)[-1]
+    stem = name.rsplit(".", 1)[0]
+    return (
+        name.lower().endswith(".pem")
+        and CERTIFICATE_NAME.search(stem) is not None
+        and PRIVATE_NAME.search(name) is None
+    )
+
+
+def _expected_file(pattern: re.Pattern[str], value: str, owner: str) -> bool:
+    if pattern is DOTENV_FILE:
+        return owner in ENV_FILE_OPTIONS
+    if pattern is KEY_FILE:
+        return _certificate_file(value, owner)
+    return False
 
 
 def check_sensitive_paths(server: ServerEntry, context: ScanContext) -> Iterator[Finding]:
     reported: set[tuple[str, str]] = set()
-    for pointer, value in _path_like_values(server):
+    for pointer, value, owner in _path_like_values(server):
         if not value:
             continue
         for pattern, rule in SENSITIVE_PATTERNS:
-            if pattern.search(value) and (pointer, rule) not in reported:
+            if not pattern.search(value):
+                continue
+            if _expected_file(pattern, value, owner):
+                break
+            if (pointer, rule) not in reported:
                 reported.add((pointer, rule))
                 yield emit(rule, server, pointer, value, path=value)
                 break
@@ -497,7 +738,7 @@ TUNNEL_DOMAINS = (
     "pastebin.com",
     "webhook.site",
     "requestbin.com",
-    "pipedream.net",
+    "m.pipedream.net",
     "interact.sh",
     "oast.fun",
     "oast.me",
@@ -528,20 +769,21 @@ TLS_ENV_DISABLED: dict[str, frozenset[str]] = {
     "REQUESTS_CA_BUNDLE": frozenset({""}),
 }
 LOOPBACK_NAMES = frozenset({"localhost", "localhost.localdomain", "ip6-localhost"})
+CALLBACK_VARIABLE = re.compile(r"(redirect|callback)_?(uri|url)s?$", re.IGNORECASE)
 METADATA_NAMES = frozenset({"metadata.google.internal", "metadata", "metadata.azure.com"})
 NUMERIC_HOST = re.compile(r"^(0x[0-9a-f]+|\d+|0[0-7]+(\.0[0-7]+)*)$", re.IGNORECASE)
 
 
-def collect_urls(server: ServerEntry) -> Iterator[tuple[str, str]]:
+def collect_urls(server: ServerEntry) -> Iterator[tuple[str, str, str]]:
     if server.url:
-        yield url_pointer(server), server.url
+        yield url_pointer(server), server.url, ""
     for index, arg in enumerate(server.args):
         for match in URL_IN_TEXT.finditer(arg):
-            yield arg_pointer(server, index), match.group(0)
+            yield arg_pointer(server, index), match.group(0), ""
     for name, value in server.env.items():
         if not is_secret_name(name):
             for match in URL_IN_TEXT.finditer(value):
-                yield env_pointer(server, name), match.group(0)
+                yield env_pointer(server, name), match.group(0), name
 
 
 def _parse_ip(host: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
@@ -554,11 +796,13 @@ def _parse_ip(host: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None
     return address
 
 
-def _host_findings(server: ServerEntry, pointer: str, url: str, host: str) -> Iterator[Finding]:
+def _host_findings(
+    server: ServerEntry, pointer: str, url: str, host: str, proxy: bool
+) -> Iterator[Finding]:
     address = _parse_ip(host)
     if host in METADATA_NAMES or (address is not None and address.is_link_local):
         yield emit("G09-002", server, pointer, redact_url(url), host=host)
-    elif address is not None and not address.is_loopback:
+    elif address is not None and not address.is_loopback and not proxy:
         if address.is_private or address.is_reserved or address.is_unspecified:
             yield emit("G09-003", server, pointer, redact_url(url), host=host)
         elif address.is_global:
@@ -572,7 +816,7 @@ def _host_findings(server: ServerEntry, pointer: str, url: str, host: str) -> It
 
 
 def check_network(server: ServerEntry, context: ScanContext) -> Iterator[Finding]:
-    for pointer, url in collect_urls(server):
+    for pointer, url, owner in collect_urls(server):
         if is_reference(url):
             continue
         try:
@@ -584,10 +828,12 @@ def check_network(server: ServerEntry, context: ScanContext) -> Iterator[Finding
             continue
         address = _parse_ip(host)
         loopback = host in LOOPBACK_NAMES or (address is not None and address.is_loopback)
-        if parts.scheme.lower() in ("http", "ws"):
+        proxy = owner.upper().endswith("_PROXY")
+        callback = loopback and CALLBACK_VARIABLE.search(owner) is not None
+        if parts.scheme.lower() in ("http", "ws") and not proxy and not callback:
             rule = "G09-005" if loopback else "G09-001"
             yield emit(rule, server, pointer, redact_url(url), host=host)
-        yield from _host_findings(server, pointer, url, host)
+        yield from _host_findings(server, pointer, url, host, proxy)
     if server.transport is Transport.SSE:
         yield emit("G09-009", server, server.pointer, "sse")
     for index, arg in enumerate(server.args):
@@ -608,12 +854,14 @@ def known_packages() -> dict[str, tuple[str, ...]]:
 
 
 def similar_known_package(ecosystem: str, name: str) -> str | None:
-    candidates = known_packages().get(ecosystem, ())
-    lowered = name.lower()
-    if len(lowered) < 5 or lowered in candidates:
+    candidates = {
+        package_key(ecosystem, known): known for known in known_packages().get(ecosystem, ())
+    }
+    key = package_key(ecosystem, name)
+    if len(key) < 5 or key in candidates:
         return None
-    for known in candidates:
-        if len(known) >= 5 and 0 < damerau_levenshtein(lowered, known, 2) <= 2:
+    for normalized, known in candidates.items():
+        if len(normalized) >= 5 and 0 < damerau_levenshtein(key, normalized, 2) <= 2:
             return known
     return None
 
@@ -638,7 +886,10 @@ def check_supply_chain(server: ServerEntry, context: ScanContext) -> Iterator[Fi
                     "G10-001", server, pointer, package.spec, package=package.name, version=version
                 )
         for index, registry in runner.registries:
-            yield emit("G10-004", server, effective.pointers[index], registry, registry=registry)
+            if not official_registry(runner.ecosystem, registry):
+                yield emit(
+                    "G10-004", server, effective.pointers[index], registry, registry=registry
+                )
     docker = parse_docker_run(effective.command, effective.args)
     if docker is not None and docker.image is not None:
         index, image = docker.image

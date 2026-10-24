@@ -16,6 +16,16 @@ PARAM_WIDTH = 200
 WRAP_WIDTH = 100
 NO_RISK = "—"
 UNKNOWN_RISK = "?"
+JSON_MESSAGES = (
+    ("Expecting ',' delimiter", "comma"),
+    ("Expecting ':' delimiter", "colon"),
+    ("Expecting property name enclosed in double quotes", "property"),
+    ("Expecting value", "value"),
+    ("Extra data", "extra"),
+    ("Unterminated string", "string"),
+    ("Invalid control character", "control"),
+    ("Invalid \\", "escape"),
+)
 
 
 def translate_warning(warning: str, t: Translator) -> str:
@@ -28,6 +38,20 @@ def translate_warning(warning: str, t: Translator) -> str:
 
 def severity_label(severity: Severity | None, t: Translator) -> str:
     return NO_RISK if severity is None else t(f"severity.{severity.label}")
+
+
+def finding_evidence(finding: Finding, t: Translator) -> str:
+    params = finding.params
+    if finding.rule_id != "G12-006" or "line" not in params or "column" not in params:
+        return finding.evidence
+    message = params.get("message", "")
+    code = next((code for prefix, code in JSON_MESSAGES if message.startswith(prefix)), None)
+    return t(
+        "error.parse_at",
+        line=params["line"],
+        column=params["column"],
+        message=t(f"json_error.{code}") if code is not None else message,
+    )
 
 
 def _source_label(client: str, scope: str, t: Translator) -> str:
@@ -198,8 +222,9 @@ def render_finding(number: int, finding: Finding, t: Translator) -> list[str]:
         where += " — " + t("scan.tool_only", tool=params["tool"])
     lines = [f"  {number}. {severity} · {finding.rule_id} · {title}"]
     lines.extend(_wrapped(t("scan.where"), where))
-    if finding.evidence:
-        lines.extend(_wrapped(t("scan.found"), safe_text(finding.evidence, PARAM_WIDTH)))
+    evidence = finding_evidence(finding, t)
+    if evidence:
+        lines.extend(_wrapped(t("scan.found"), safe_text(evidence, PARAM_WIDTH)))
     lines.extend(_wrapped(t("scan.why"), t(f"rules.{finding.rule_id}.why", **params)))
     lines.extend(_wrapped(t("scan.fix"), t(f"rules.{finding.rule_id}.fix", **params)))
     return lines
@@ -219,7 +244,7 @@ def _origin_kinds(report: ServerReport, t: Translator) -> str:
     return ", ".join(t(f"origin.{kind}") for kind in kinds)
 
 
-def coverage_line(report: ServerReport, t: Translator) -> str | None:
+def coverage_line(report: ServerReport, t: Translator, *, app: bool = False) -> str | None:
     collection = report.tools
     if collection is None:
         return None
@@ -230,10 +255,10 @@ def coverage_line(report: ServerReport, t: Translator) -> str | None:
             line += " · " + t("scan.capabilities", names=names)
         return line
     gap = collection.gap.value if collection.gap is not None else "not_found"
-    return t(f"gap.{gap}")
+    return t(f"gap.{gap}_app" if app and gap == "remote" else f"gap.{gap}")
 
 
-def coverage_summary(report: ScanReport, t: Translator) -> list[str]:
+def coverage_summary(report: ScanReport, t: Translator, *, app: bool = False) -> list[str]:
     if not report.tools_analyzed:
         return [t("scan.tools_skipped")]
     seen: set[int] = set()
@@ -254,7 +279,8 @@ def coverage_summary(report: ScanReport, t: Translator) -> list[str]:
     lines = [t("scan.coverage", servers=analyzed_servers, tools=tool_count)]
     if gaps:
         parts = ", ".join(f"{t('gap_short.' + gap)} {count}" for gap, count in sorted(gaps.items()))
-        lines.extend(textwrap.wrap(t("scan.coverage_gaps", parts=parts), WRAP_WIDTH))
+        key = "scan.coverage_gaps_app" if app else "scan.coverage_gaps"
+        lines.extend(textwrap.wrap(t(key, parts=parts), WRAP_WIDTH))
     return lines
 
 

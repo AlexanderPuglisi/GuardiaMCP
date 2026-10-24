@@ -11,6 +11,7 @@ from guardia.render.terminal import (
     baseline_line,
     coverage_line,
     coverage_summary,
+    finding_evidence,
     finding_params,
     ledger_line,
     severity_label,
@@ -63,7 +64,7 @@ def finding_view(finding: Finding, t: Translator, entry_id: str, entry_name: str
         "why": t(f"rules.{finding.rule_id}.why", **params),
         "fix": t(f"rules.{finding.rule_id}.fix", **params),
         "where": where,
-        "evidence": _text(finding.evidence, PARAM_WIDTH),
+        "evidence": _text(finding_evidence(finding, t), PARAM_WIDTH),
         "path": _text(location.path),
         "line": location.line,
         "entry_id": entry_id,
@@ -90,12 +91,18 @@ def entry_view(index: int, report: ServerReport, t: Translator) -> dict[str, Any
         "transport": server.transport.value if _entry_type(server) == "server" else "",
         "path": _text(server.source.path),
         "target": _text(server.display_target(), 200),
-        "risk": risk.label if risk is not None else "none",
+        "risk": risk.label if risk is not None else ("none" if report.incomplete else "ok"),
         "risk_rank": int(risk) if risk is not None else -1,
-        "risk_label": "?" if report.incomplete else severity_label(risk, t),
+        "risk_label": (
+            "?"
+            if report.incomplete
+            else severity_label(risk, t)
+            if risk is not None
+            else t("ui.risk_ok")
+        ),
         "incomplete": report.incomplete,
         "enabled": server.enabled,
-        "coverage": coverage_line(report, t) or "",
+        "coverage": coverage_line(report, t, app=True) or "",
         "capabilities": capabilities,
         "tools": len(tools.tools) if tools is not None else 0,
         "findings": [finding_view(f, t, entry_id, server.name) for f in report.findings],
@@ -129,7 +136,9 @@ def report_view(report: ScanReport, t: Translator, seconds: float) -> dict[str, 
         "file_findings": file_findings,
         "priority": priority,
         "has_rug_pull": any(f["rug_pull"] for f in [*findings, *file_findings]),
-        "coverage": coverage_summary(report, t),
+        "coverage": coverage_summary(report, t, app=True),
+        "coverage_gaps": not report.tools_analyzed
+        or any(entry.tools is not None and not entry.tools.analyzed for entry in report.servers),
         "baseline": {
             "active": baseline is not None and baseline.path is not None,
             "status": baseline.status if baseline is not None else "disabled",

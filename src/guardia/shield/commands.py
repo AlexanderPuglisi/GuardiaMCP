@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import difflib
 import json
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
@@ -9,16 +10,17 @@ from typing import Any, TextIO
 
 from guardia.display import safe_text
 from guardia.i18n import Translator
-from guardia.model import Scope
+from guardia.model import Scope, SourceRecord
 from guardia.safeio import SafeReadError
-from guardia.secure_store import Protector
+from guardia.secure_store import KeyStoreError, Protector
 from guardia.shield.activation import (
+    SUCCESSFUL,
     ActivationStore,
     Candidate,
-    Outcome,
     Support,
     editable,
     manual_snippet,
+    shield_names,
 )
 from guardia.shield.activation import Report as ActivationReport
 from guardia.shield.engine import Context, Engine, redact
@@ -101,7 +103,7 @@ def verify(ws: Workspace, file: Path | None) -> int:
     try:
         text = read_rules_text(path)
     except SafeReadError:
-        ws.write(ws.t("shield_rules.missing_file", path=ws.path(path)))
+        _missing_rules(ws, path, given=file is not None)
         return EXIT_USAGE
     result = parse_rules(text, ws.home)
     for issue in result.issues:
@@ -124,7 +126,12 @@ def _diff(previous: str | None, current: str, t: Translator) -> list[str]:
         return [t("shield_rules.diff_none")]
     lines = list(
         difflib.unified_diff(
-            previous.splitlines(), current.splitlines(), "approvate", "nuove", lineterm="", n=1
+            previous.splitlines(),
+            current.splitlines(),
+            t("shield_rules.diff_old"),
+            t("shield_rules.diff_new"),
+            lineterm="",
+            n=1,
         )
     )
     if not lines:
@@ -197,12 +204,17 @@ def example(ws: Workspace, save: bool) -> int:
     return EXIT_OK
 
 
+def _missing_rules(ws: Workspace, path: Path, *, given: bool) -> None:
+    key = "shield_rules.missing_given_file" if given else "shield_rules.missing_file"
+    ws.write(ws.t(key, path=ws.path(path)))
+
+
 def _ruleset(ws: Workspace, file: Path | None) -> RuleSet | None:
     if file is not None:
         try:
             result = parse_rules(read_rules_text(file), ws.home)
         except SafeReadError:
-            ws.write(ws.t("shield_rules.missing_file", path=ws.path(file)))
+            _missing_rules(ws, file, given=True)
             return None
         for issue in result.errors:
             ws.write(format_issue(issue, ws.t))
@@ -362,10 +374,11 @@ def _rewritable(candidate: Candidate) -> bool:
     return candidate.support is Support.PROTECTED and editable(candidate.server.source.path)
 
 
-def shield_list(ws: Workspace, found: list[Candidate]) -> int:
+def shield_list(ws: Workspace, found: list[Candidate], failed: Sequence[SourceRecord] = ()) -> int:
     servers = [c for c in found if c.server.source.scope is not Scope.SKILL]
     if not servers:
         ws.write(ws.t("shield_setup.no_servers"))
+        _unreadable(ws, failed)
         return EXIT_OK
     for path in sorted({str(c.server.source.path) for c in servers}):
         ws.write(ws.t("shield_setup.file", path=safe_text(path)))
@@ -374,6 +387,7 @@ def shield_list(ws: Workspace, found: list[Candidate]) -> int:
                 ws.write(_setup_line(ws, candidate))
     protected = sum(1 for c in servers if c.support is Support.PROTECTED)
     ws.write(ws.t("shield_setup.summary", protected=protected, total=len(servers)))
+    _unreadable(ws, failed)
     return EXIT_OK
 
 
@@ -392,15 +406,39 @@ def _confirm_flag(ws: Workspace) -> str:
     return "--conferma" if ws.t.language == "it" else "--confirm"
 
 
-def _report_changes(ws: Workspace, report: ActivationReport) -> int:
+def _report_changes(ws: Workspace, run: Callable[[], ActivationReport]) -> int:
+    try:
+        report = run()
+    except (OSError, KeyStoreError) as exc:
+        error = safe_text(getattr(exc, "strerror", None) or type(exc).__name__, 120)
+        ws.write(ws.t("shield_setup.store_failed", error=error))
+        return EXIT_FAILED
     failures = 0
     for change in report.changes:
         key = f"shield_setup.outcome_{change.outcome.value}"
         ws.write(ws.t(key, name=safe_text(change.server, 80), path=safe_text(str(change.file))))
-        failures += change.outcome is not Outcome.DONE
+        failures += change.outcome not in SUCCESSFUL
     for backup in report.backups:
         ws.write(ws.t("shield_setup.backup", path=safe_text(str(backup))))
     return EXIT_OK if report.changes and not failures else EXIT_INVALID
+
+
+def _unreadable(ws: Workspace, failed: Sequence[SourceRecord]) -> None:
+    for record in failed:
+        ws.write(
+            ws.t(
+                "shield_setup.unreadable_file",
+                path=safe_text(str(record.source.path)),
+                error=safe_text(record.error_detail or record.error_code or "", 160),
+            )
+        )
+
+
+def _missing(ws: Workspace, missing: list[str], failed: Sequence[SourceRecord]) -> None:
+    for name in missing:
+        ws.write(ws.t("shield_setup.unknown", name=safe_text(name, 80)))
+    if missing:
+        _unreadable(ws, failed)
 
 
 def shield_enable(
@@ -408,26 +446,30 @@ def shield_enable(
     found: list[Candidate],
     selection: tuple[list[str], bool, bool],
     store: ActivationStore,
+    failed: Sequence[SourceRecord] = (),
 ) -> int:
     names, everything, confirmed = selection
     if not names and not everything:
         ws.write(ws.t("shield_setup.need_selection"))
         return EXIT_USAGE
     chosen, missing = _selected(found, names, everything)
-    for name in missing:
-        ws.write(ws.t("shield_setup.unknown", name=safe_text(name, 80)))
+    _missing(ws, missing, failed)
     starter = launcher()
+    everyone = [c.server for c in found if c.server.source.scope is not Scope.SKILL]
+    unique = shield_names([c.server for c in chosen], everyone)
     automatic = [c for c in chosen if c.support is Support.AUTO]
     for candidate in chosen:
         if candidate.support in (Support.MANUAL_COMMENTS, Support.MANUAL_TOML):
             ws.write(_setup_line(ws, candidate))
             ws.write(ws.t("shield_setup.manual_hint"))
-            ws.write(manual_snippet(candidate.server, starter))
+            ws.write(manual_snippet(candidate.server, starter, unique[candidate.server.key]))
         elif candidate.support is not Support.AUTO:
             ws.write(_setup_line(ws, candidate))
     if not automatic:
-        ws.write(ws.t("shield_setup.nothing_to_do"))
-        return EXIT_INVALID
+        protected = bool(chosen) and not missing
+        protected = protected and all(c.support is Support.PROTECTED for c in chosen)
+        ws.write(ws.t("shield_setup.all_protected" if protected else "shield_setup.nothing_to_do"))
+        return EXIT_OK if protected else EXIT_INVALID
     if not confirmed:
         ws.write(ws.t("shield_setup.preview_title"))
         for candidate in automatic:
@@ -440,7 +482,8 @@ def shield_enable(
             )
         ws.write(ws.t("shield_setup.preview_hint", flag=_confirm_flag(ws)))
         return EXIT_OK
-    return _report_changes(ws, store.enable([c.server for c in automatic], starter))
+    servers = [c.server for c in automatic]
+    return _report_changes(ws, lambda: store.enable(servers, starter, unique))
 
 
 def shield_disable(
@@ -448,12 +491,13 @@ def shield_disable(
     found: list[Candidate],
     store: ActivationStore,
     selection: tuple[list[str], bool, bool],
+    failed: Sequence[SourceRecord] = (),
 ) -> int:
     names, everything, confirmed = selection
     if not names and not everything:
         ws.write(ws.t("shield_setup.need_selection"))
         return EXIT_USAGE
-    chosen, _ = _selected(found, names, everything)
+    chosen, absent = _selected(found, names, everything)
     protected = [c.server for c in chosen if _rewritable(c)]
     records = [r for r in store.records() if everything or r.get("server") in names]
     pending = sorted(
@@ -461,6 +505,7 @@ def shield_disable(
         | {(s.name, str(s.source.path)) for s in protected}
     )
     if not pending:
+        _missing(ws, absent, failed)
         ws.write(ws.t("shield_setup.nothing_recorded"))
         return EXIT_INVALID
     if not confirmed:
@@ -475,8 +520,12 @@ def shield_disable(
             )
         ws.write(ws.t("shield_setup.preview_hint", flag=_confirm_flag(ws)))
         return EXIT_OK
-    store.adopt(protected)
-    return _report_changes(ws, store.disable(None if everything else names))
+
+    def run() -> ActivationReport:
+        store.adopt(protected)
+        return store.disable(None if everything else names)
+
+    return _report_changes(ws, run)
 
 
 def shield_relink(
@@ -484,14 +533,14 @@ def shield_relink(
     found: list[Candidate],
     store: ActivationStore,
     selection: tuple[list[str], bool, bool],
+    failed: Sequence[SourceRecord] = (),
 ) -> int:
     names, everything, confirmed = selection
     if not names and not everything:
         ws.write(ws.t("shield_setup.need_selection"))
         return EXIT_USAGE
     chosen, missing = _selected(found, names, everything)
-    for name in missing:
-        ws.write(ws.t("shield_setup.unknown", name=safe_text(name, 80)))
+    _missing(ws, missing, failed)
     stale = [
         c
         for c in chosen
@@ -506,4 +555,5 @@ def shield_relink(
             ws.write(_setup_line(ws, candidate))
         ws.write(ws.t("shield_setup.preview_hint", flag=_confirm_flag(ws)))
         return EXIT_OK
-    return _report_changes(ws, store.relink([c.server for c in stale], launcher()))
+    servers = [c.server for c in stale]
+    return _report_changes(ws, lambda: store.relink(servers, launcher()))

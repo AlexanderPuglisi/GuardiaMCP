@@ -25,6 +25,7 @@ EXTRA_FILES = (
     "AUDIT.md",
     "TESTING.md",
     "CHANGELOG.md",
+    "CONTRIBUTING.md",
 )
 GUIDES = (
     "GUIDA.md",
@@ -34,6 +35,9 @@ GUIDES = (
     "REGOLE.md",
     "RULES.md",
     "IMPARA-MCP.md",
+    "banner.svg",
+    "demo-en.gif",
+    "demo-it.gif",
 )
 
 

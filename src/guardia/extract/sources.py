@@ -4,7 +4,7 @@ import os
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePath
 
 from guardia.extract.common import ExtractionError, dedupe
 from guardia.extract.dependencies import dependency_signals, installed_tree_signals
@@ -52,6 +52,40 @@ SKIPPED_DIRS = frozenset(
     }
 )
 DIRECTORY_FLAGS = frozenset({"--directory", "--cwd", "--prefix", "--project"})
+WORKSPACE_PLACEHOLDERS = ("${workspaceFolder}", "${workspaceRoot}", "${workspaceFolderBasename}")
+COMMAND_WORD = re.compile(r'"([^"]*)"|(\S+)')
+NPM_SHIM_TARGET = re.compile(r"node_modules[\\/]((?:@[^\\/\"\s]+[\\/])?[^\\/\"\s]+)")
+SHIM_SUFFIXES = ("", ".cmd", ".ps1")
+MAX_SHIM_BYTES = 64 * 1024
+PYTHON_PROGRAMS = frozenset({"python", "python3", "py", "pythonw"})
+SCRIPT_RUNNERS = frozenset(
+    {
+        "npx",
+        "uvx",
+        "node",
+        "python",
+        "python3",
+        "py",
+        "uv",
+        "bunx",
+        "pnpm",
+        "deno",
+        "bun",
+        "cmd",
+        "docker",
+    }
+)
+KNOWN_LAUNCHERS = SCRIPT_RUNNERS | {
+    "pythonw",
+    "pnpx",
+    "yarn",
+    "npm",
+    "powershell",
+    "pwsh",
+    "podman",
+    "wsl",
+    "pipx",
+}
 MAX_FILES = 400
 MAX_FILE_BYTES = 3 * 1024 * 1024
 MAX_TOTAL_BYTES = 40 * 1024 * 1024
@@ -150,7 +184,7 @@ class _Collector:
             return
         self.roots_seen.add(key)
         self.signals.extend(dependency_signals(root, check_lockfile=origin == "path"))
-        if origin == "npm-cache":
+        if origin in ("npm-cache", "npm-global"):
             self.signals.extend(installed_tree_signals(root))
 
 
@@ -158,6 +192,9 @@ def code_files(root: Path) -> Iterator[Path]:
     for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
         current = Path(dirpath)
         depth = len(current.relative_to(root).parts)
+        if depth and any(d.lower().endswith(".dist-info") for d in dirnames):
+            dirnames.clear()
+            continue
         dirnames[:] = sorted(
             d
             for d in real_dirs(dirpath, dirnames)
@@ -182,9 +219,31 @@ def server_base(server: ServerEntry) -> Path:
 
 def _expand(token: str, server: ServerEntry) -> str:
     base = str(server_base(server))
-    for placeholder in ("${__dirname}", "${CLAUDE_PLUGIN_ROOT}", "${extension_dir}"):
+    for placeholder in (
+        "${__dirname}",
+        "${CLAUDE_PLUGIN_ROOT}",
+        "${extension_dir}",
+        "${extensionPath}",
+    ):
         token = token.replace(placeholder, base)
+    project = server.source.project
+    if project is not None:
+        for placeholder in WORKSPACE_PLACEHOLDERS:
+            token = token.replace(placeholder, str(project))
     return token.strip().strip('"')
+
+
+def _working_dir(server: ServerEntry) -> Path | None:
+    if server.cwd:
+        cwd = _expand(server.cwd, server)
+        if not cwd or "${" in cwd or is_network_path(cwd):
+            return None
+        path = Path(cwd)
+        if path.is_absolute():
+            return path
+        base = server.source.project
+        return base / path if base is not None else None
+    return server.source.project
 
 
 def _as_path(token: str, server: ServerEntry) -> Path | None:
@@ -196,11 +255,35 @@ def _as_path(token: str, server: ServerEntry) -> Path | None:
     if not candidate.is_absolute():
         if server.source.scope in (Scope.EXTENSION, Scope.PLUGIN):
             candidate = server_base(server) / candidate
-        elif server.cwd and not is_network_path(server.cwd):
-            candidate = Path(server.cwd) / candidate
         else:
-            return None
+            base = _working_dir(server)
+            if base is None:
+                return None
+            candidate = base / candidate
     return candidate
+
+
+def _exists(path: Path | None) -> bool:
+    return path is not None and (_is_file(path) or _is_dir(path))
+
+
+def _whole(token: str, server: ServerEntry) -> bool:
+    if " " not in token:
+        return True
+    name, eq, value = token.partition("=")
+    if eq and name.lower() in DIRECTORY_FLAGS:
+        token = value
+    return _exists(_as_path(_expand(token, server), server))
+
+
+def _words(tokens: list[str], server: ServerEntry) -> list[str]:
+    words: list[str] = []
+    for token in tokens:
+        if _whole(token, server):
+            words.append(token)
+        else:
+            words.extend(quoted or plain for quoted, plain in COMMAND_WORD.findall(token))
+    return words
 
 
 def _is_file(path: Path) -> bool:
@@ -221,8 +304,7 @@ def code_roots(server: ServerEntry) -> list[Path]:
     roots: list[Path] = []
     if server.source.scope in (Scope.EXTENSION, Scope.PLUGIN):
         roots.append(server_base(server))
-    tokens = [server.command or "", *server.args]
-    words = [word for token in tokens for word in (token.split() if " " in token else [token])]
+    words = _words([server.command or "", *server.args], server)
     for index, word in enumerate(words):
         name, eq, value = word.partition("=")
         if eq and name.lower() in DIRECTORY_FLAGS:
@@ -243,8 +325,9 @@ def code_roots(server: ServerEntry) -> list[Path]:
         ):
             roots.append(candidate)
             roots.append(candidate.parent)
-    if server.cwd and not is_network_path(server.cwd) and _is_dir(Path(server.cwd)):
-        roots.append(Path(server.cwd))
+    working = _working_dir(server) if server.cwd else None
+    if working is not None and _is_dir(working):
+        roots.append(working)
     unique: list[Path] = []
     seen: set[str] = set()
     for root in roots:
@@ -353,23 +436,152 @@ def _mtime(path: Path) -> float:
 def _gap(server: ServerEntry) -> ToolGap:
     if server.transport in (Transport.HTTP, Transport.SSE, Transport.WEBSOCKET):
         return ToolGap.REMOTE
-    if server.command and program_name(server.command) not in (
-        "npx",
-        "uvx",
-        "node",
-        "python",
-        "python3",
-        "py",
-        "uv",
-        "bunx",
-        "pnpm",
-        "deno",
-        "bun",
-        "cmd",
-        "docker",
-    ):
+    if server.command and program_name(server.command) not in SCRIPT_RUNNERS:
         return ToolGap.BINARY
     return ToolGap.NOT_FOUND
+
+
+def _shim_files(command: str, env: HostEnvironment) -> list[Path]:
+    path = Path(command)
+    if path.is_absolute():
+        candidates = [path] if path.suffix else [Path(f"{path}{s}") for s in SHIM_SUFFIXES]
+    elif "/" in command or "\\" in command or env.platform != "windows":
+        return []
+    else:
+        candidates = [env.app_config / "npm" / f"{command}{s}" for s in SHIM_SUFFIXES]
+    return [candidate for candidate in candidates if _is_file(candidate)]
+
+
+def _npm_global_root(server: ServerEntry, env: HostEnvironment) -> Path | None:
+    for shim in _shim_files(server.command or "", env):
+        try:
+            text = read_text(shim, MAX_SHIM_BYTES)
+        except SafeReadError:
+            continue
+        match = NPM_SHIM_TARGET.search(text)
+        if match is None:
+            continue
+        package = shim.parent / "node_modules" / Path(*re.split(r"[\\/]", match.group(1)))
+        if _is_dir(package):
+            return package
+    return None
+
+
+def _tool_environments(env: HostEnvironment) -> Iterator[Path]:
+    for base in (
+        env.app_config / "uv" / "tools",
+        env.home / ".local" / "share" / "uv" / "tools",
+        env.home / "pipx" / "venvs",
+        env.home / ".local" / "pipx" / "venvs",
+    ):
+        yield from child_dirs(base, MAX_CACHE_DIRS)
+
+
+def _site_packages(environment: Path) -> Iterator[Path]:
+    windows_site = environment / "Lib" / "site-packages"
+    if _is_dir(windows_site):
+        yield windows_site
+    for lib in child_dirs(environment / "lib", 10):
+        if _is_dir(lib / "site-packages"):
+            yield lib / "site-packages"
+
+
+def _entry_point_module(site: Path, script: str) -> Path | None:
+    for info in child_dirs(site, 500):
+        if not info.name.lower().endswith(".dist-info"):
+            continue
+        try:
+            text = read_text(info / "entry_points.txt", MAX_SHIM_BYTES)
+        except SafeReadError:
+            continue
+        for line in text.splitlines():
+            name, eq, target = line.partition("=")
+            if eq and name.strip().lower() == script.lower():
+                return _module_path(site, target.strip().split(":", 1)[0])
+    return None
+
+
+def _module_path(site: Path, module: str) -> Path | None:
+    top = module.split(".", 1)[0].strip()
+    if not top.isidentifier():
+        return None
+    if _is_dir(site / top):
+        return site / top
+    if _is_file(site / f"{top}.py"):
+        return site / f"{top}.py"
+    return None
+
+
+def _tool_module(server: ServerEntry, env: HostEnvironment) -> Path | None:
+    script = PurePath((server.command or "").replace("\\", "/")).name
+    script = script[:-4] if script.lower().endswith(".exe") else script
+    if not script or program_name(script) in KNOWN_LAUNCHERS:
+        return None
+    for environment in _tool_environments(env):
+        launchers = (environment / "Scripts" / f"{script}.exe", environment / "bin" / script)
+        if not any(_is_file(item) for item in launchers):
+            continue
+        for site in _site_packages(environment):
+            module = _entry_point_module(site, script)
+            if module is not None:
+                return module
+    return None
+
+
+def _module_argument(args: tuple[str, ...]) -> str | None:
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        if arg == "-m":
+            return args[index + 1] if index + 1 < len(args) else None
+        if not arg.startswith("-"):
+            return None
+        index += 2 if arg in ("-X", "-W") else 1
+    return None
+
+
+def _python_module(server: ServerEntry, env: HostEnvironment) -> Path | None:
+    module = _module_argument(server.args)
+    if module is None or any(not part.isidentifier() for part in module.split(".")):
+        return None
+    working = _working_dir(server)
+    if working is not None:
+        local = working / Path(*module.split("."))
+        for candidate in (local, local.with_suffix(".py")):
+            if _exists(candidate):
+                return candidate
+    for site in _python_sites(server, env):
+        found = _module_path(site, module)
+        if found is not None:
+            return found
+    return None
+
+
+def _python_sites(server: ServerEntry, env: HostEnvironment) -> Iterator[Path]:
+    command = Path(server.command or "")
+    if command.is_absolute() and command.parent.name.lower() in ("scripts", "bin"):
+        yield from _site_packages(command.parent.parent)
+    for version in child_dirs(env.app_config / "Python", 50):
+        if _is_dir(version / "site-packages"):
+            yield version / "site-packages"
+    for version in child_dirs(env.local_app_data / "Programs" / "Python", 50):
+        yield from _site_packages(version)
+    yield from uv_site_packages(env)
+
+
+def installed_roots(server: ServerEntry, env: HostEnvironment) -> list[tuple[Path, str]]:
+    if not server.command or server.transport is not Transport.STDIO:
+        return []
+    if program_name(server.command) in PYTHON_PROGRAMS:
+        module = _python_module(server, env)
+        return [(module, "python-module")] if module is not None else []
+    if program_name(server.command) in KNOWN_LAUNCHERS:
+        return []
+    package = _npm_global_root(server, env)
+    if package is not None:
+        return [(package, "npm-global")]
+    module = _tool_module(server, env)
+    return [(module, "uv-tool")] if module is not None else []
 
 
 def skill_scripts(root: Path) -> Iterator[Path]:
@@ -451,6 +663,9 @@ def collect_tools(server: ServerEntry, env: HostEnvironment) -> ToolCollection:
             else:
                 for module in find_pypi_package(env, package.name, exact):
                     collector.scan_root(module, "uv-cache")
+    if not collector.origins:
+        for root, origin in installed_roots(server, env):
+            collector.scan_root(root, origin)
     gap = None if collector.origins else _gap(server)
     if server.source.scope is Scope.PATH and not collector.origins:
         gap = ToolGap.NO_SOURCE

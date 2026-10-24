@@ -55,7 +55,7 @@
     byId("details-title").textContent = ui.details;
     byId("details").textContent = data.details;
     byId("details-box").hidden = !data.details;
-    byId("remember-label").textContent = ui.remember;
+    byId("remember-label").textContent = data.tool ? ui.remember : ui.remember_method;
     byId("allow").textContent = ui.allow;
     byId("block").textContent = ui.block;
     byId("close").setAttribute("aria-label", ui.block);

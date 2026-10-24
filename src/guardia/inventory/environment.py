@@ -6,6 +6,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+def _variable(name: str) -> Path | None:
+    value = os.environ.get(name, "").strip()
+    return Path(value) if value and Path(value).is_absolute() else None
+
+
 @dataclass(frozen=True, slots=True)
 class HostEnvironment:
     platform: str
@@ -15,11 +20,17 @@ class HostEnvironment:
     managed_dir: Path
     cwd: Path
     data_dir: Path
+    codex_home: Path | None = None
+    claude_config_dir: Path | None = None
 
     @classmethod
     def from_os(cls) -> HostEnvironment:
         home = Path.home()
         cwd = Path.cwd()
+        homes = {
+            "codex_home": _variable("CODEX_HOME"),
+            "claude_config_dir": _variable("CLAUDE_CONFIG_DIR"),
+        }
         if sys.platform == "win32":
             local = Path(os.environ.get("LOCALAPPDATA") or home / "AppData" / "Local")
             return cls(
@@ -31,6 +42,7 @@ class HostEnvironment:
                 / "ClaudeCode",
                 cwd=cwd,
                 data_dir=local / "GuardiaMCP",
+                **homes,
             )
         if sys.platform == "darwin":
             support = home / "Library" / "Application Support"
@@ -42,6 +54,7 @@ class HostEnvironment:
                 managed_dir=Path("/Library/Application Support/ClaudeCode"),
                 cwd=cwd,
                 data_dir=support / "GuardiaMCP",
+                **homes,
             )
         config = Path(os.environ.get("XDG_CONFIG_HOME") or home / ".config")
         data = Path(os.environ.get("XDG_DATA_HOME") or home / ".local" / "share")
@@ -53,7 +66,26 @@ class HostEnvironment:
             managed_dir=Path("/etc/claude-code"),
             cwd=cwd,
             data_dir=data / "guardia-mcp",
+            **homes,
         )
+
+    def claude_dirs(self) -> list[Path]:
+        dirs = [self.home / ".claude"]
+        if self.claude_config_dir is not None and self.claude_config_dir != dirs[0]:
+            dirs.append(self.claude_config_dir)
+        return dirs
+
+    def claude_state_files(self) -> list[Path]:
+        files = [self.home / ".claude.json"]
+        if self.claude_config_dir is not None:
+            files.append(self.claude_config_dir / ".claude.json")
+        return files
+
+    def codex_dirs(self) -> list[Path]:
+        dirs = [self.home / ".codex"]
+        if self.codex_home is not None and self.codex_home != dirs[0]:
+            dirs.append(self.codex_home)
+        return dirs
 
     @classmethod
     def for_root(cls, root: Path, platform: str = "windows") -> HostEnvironment:

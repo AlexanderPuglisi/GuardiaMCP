@@ -11,6 +11,7 @@ from typing import Any
 from guardia.redact import REDACTED, SECRET_VALUE
 from guardia.shield.patterns import Leaf, hosts_in, leaves, normalize_path
 from guardia.shield.rules import (
+    RATE_PHASES,
     Action,
     ArgumentCondition,
     ContentCondition,
@@ -106,6 +107,39 @@ def content_matches(condition: ContentCondition, value: Any, size: int) -> bool:
     return _text_hits(condition.contains, condition.regex, found)
 
 
+def _words_hit(contains: tuple[str, ...], regex: tuple[re.Pattern[str], ...], text: str) -> bool:
+    lowered = text.lower()
+    return any(word in lowered for word in contains) or any(
+        pattern.search(text) for pattern in regex
+    )
+
+
+def argument_leaf_hit(condition: ArgumentCondition, leaf: Leaf, home: str) -> bool:
+    if not _selected(condition, [leaf]):
+        return False
+    hosts = list(hosts_in(leaf.text)) if condition.hosts or condition.hosts_not_in else []
+    checks = (
+        bool(condition.paths) and _path_hit(condition, leaf.text, home),
+        any(_any_name(condition.hosts, host) for host in hosts),
+        bool(condition.hosts_not_in) and any(_foreign_host(condition, host) for host in hosts),
+        _words_hit(condition.contains, condition.regex, leaf.text),
+    )
+    has_criteria = bool(
+        condition.paths
+        or condition.hosts
+        or condition.hosts_not_in
+        or condition.contains
+        or condition.regex
+    )
+    return any(checks) or not has_criteria
+
+
+def content_leaf_hit(condition: ContentCondition, leaf: Leaf) -> bool:
+    return (condition.secrets and bool(SECRET_VALUE.search(leaf.text))) or _words_hit(
+        condition.contains, condition.regex, leaf.text
+    )
+
+
 def conditions_match(rule: Rule, context: Context, home: str) -> bool:
     if rule.phases and context.phase not in rule.phases:
         return False
@@ -131,16 +165,18 @@ class Engine:
     _windows: dict[tuple[int, str], deque[float]] = field(default_factory=dict)
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
-    def _over_rate(self, rule: Rule, server: str, record: bool) -> bool:
+    def _over_rate(self, rule: Rule, context: Context, record: bool) -> bool:
         if rule.rate is None:
             return True
+        if context.phase not in RATE_PHASES:
+            return False
         now = self.clock()
         with self._lock:
-            window = self._windows.get((rule.index, server))
+            window = self._windows.get((rule.index, context.server))
             if window is None:
                 if len(self._windows) >= MAX_TRACKED_WINDOWS:
                     self._windows.clear()
-                window = self._windows.setdefault((rule.index, server), deque())
+                window = self._windows.setdefault((rule.index, context.server), deque())
             while window and now - window[0] > rule.rate.seconds:
                 window.popleft()
             if record:
@@ -152,8 +188,7 @@ class Engine:
         matched = [
             rule
             for rule in self.ruleset.rules
-            if conditions_match(rule, context, self.home)
-            and self._over_rate(rule, context.server, record)
+            if conditions_match(rule, context, self.home) and self._over_rate(rule, context, record)
         ]
         if not matched:
             default = Action.ALLOW if context.phase is Phase.RESULT else self.ruleset.default

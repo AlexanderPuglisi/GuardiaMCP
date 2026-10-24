@@ -6,12 +6,14 @@ import io
 import json
 import sys
 import textwrap
-from collections.abc import Sequence
-from pathlib import Path
+import traceback
+from collections.abc import Callable, Iterable, Sequence
+from pathlib import Path, PurePath
 from typing import Any, TextIO
 
 from guardia import __version__
 from guardia.analysis import AnalysisOptions, analyze
+from guardia.app.shield_view import event_details
 from guardia.display import safe_text
 from guardia.i18n import SUPPORTED_LANGUAGES, Translator, detect_language
 from guardia.inventory import DiscoveryOptions, HostEnvironment, discover
@@ -77,6 +79,8 @@ EXIT_OK = 0
 EXIT_FINDINGS = 1
 EXIT_USAGE = 2
 EXIT_INCOMPLETE = 3
+PACKAGE_RUNNERS = frozenset({"npx", "uvx", "bunx", "pnpx", "pipx", "pnpm", "yarn", "bun", "uv"})
+RUNNER_WORDS = frozenset({"dlx", "exec", "run", "tool", "x"})
 
 
 def peek_language(argv: Sequence[str]) -> str | None:
@@ -89,11 +93,28 @@ def peek_language(argv: Sequence[str]) -> str | None:
     return None
 
 
+def _flags(t: Translator, english: str, italian: str, short: str = "") -> list[str]:
+    ordered = [italian, english] if t.language == "it" else [english, italian]
+    return [short, *ordered] if short else ordered
+
+
+def _count_type(t: Translator) -> Callable[[str], int]:
+    def parse(text: str) -> int:
+        try:
+            value = int(text)
+        except ValueError:
+            value = 0
+        if value < 1:
+            raise argparse.ArgumentTypeError(t("cli.positive", value=safe_text(text, 20)))
+        return value
+
+    return parse
+
+
 def _language_options(t: Translator) -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument(
-        "--lang",
-        "--lingua",
+        *_flags(t, "--lang", "--lingua"),
         dest="lang",
         choices=SUPPORTED_LANGUAGES,
         default=argparse.SUPPRESS,
@@ -106,49 +127,205 @@ def _discovery_options(t: Translator) -> argparse.ArgumentParser:
     options = argparse.ArgumentParser(add_help=False)
     options.add_argument("--json", action="store_true", help=t("cli.json"))
     options.add_argument(
-        "-o", "--output", "--salva", dest="output", type=Path, help=t("cli.output")
+        *_flags(t, "--output", "--salva", "-o"),
+        dest="output",
+        type=Path,
+        metavar=t("cli.metavar_file"),
+        help=t("cli.output"),
     )
     options.add_argument(
-        "-p",
-        "--project",
-        "--progetto",
+        *_flags(t, "--project", "--progetto", "-p"),
         dest="projects",
         action="append",
         type=Path,
         default=[],
+        metavar=t("cli.metavar_folder"),
         help=t("cli.project"),
     )
     options.add_argument(
-        "--no-auto-projects",
-        "--senza-progetti-automatici",
+        *_flags(t, "--no-auto-projects", "--senza-progetti-automatici"),
         dest="auto_projects",
         action="store_false",
         help=t("cli.no_auto_projects"),
     )
     options.add_argument(
-        "--path",
-        "--percorso",
+        *_flags(t, "--path", "--percorso"),
         dest="paths",
         action="append",
         type=Path,
         default=[],
+        metavar=t("cli.metavar_path"),
         help=t("cli.path"),
     )
     options.add_argument(
-        "--no-skills",
-        "--senza-skill",
+        *_flags(t, "--no-skills", "--senza-skill"),
         dest="skills",
         action="store_false",
         help=t("cli.no_skills"),
     )
     options.add_argument(
-        "--no-tools",
-        "--senza-strumenti",
+        *_flags(t, "--no-tools", "--senza-strumenti"),
         dest="tools",
         action="store_false",
         help=t("cli.no_tools"),
     )
     return options
+
+
+def _scan_options(t: Translator, scan: argparse.ArgumentParser) -> None:
+    scan.add_argument(
+        *_flags(t, "--fail-on", "--fallisci-da"),
+        dest="fail_on",
+        choices=FAIL_LEVELS,
+        default="high",
+        help=t("cli.fail_on"),
+    )
+    scan.add_argument(
+        *_flags(t, "--no-baseline", "--senza-base"),
+        dest="baseline",
+        action="store_false",
+        help=t("cli.no_baseline"),
+    )
+    scan.add_argument(
+        *_flags(t, "--accept-changes", "--accetta-modifiche"),
+        dest="accept_changes",
+        action="store_true",
+        help=t("cli.accept_changes"),
+    )
+    scan.add_argument(
+        *_flags(t, "--format", "--formato"),
+        dest="format",
+        choices=FORMATS,
+        default="text",
+        help=t("cli.format"),
+    )
+    scan.add_argument(
+        *_flags(t, "--no-ledger", "--senza-registro"),
+        dest="ledger",
+        action="store_false",
+        help=t("cli.no_ledger"),
+    )
+
+
+def _shield_rules_options(t: Translator, shield_rules: argparse.ArgumentParser) -> None:
+    shield_rules.add_argument(
+        "action", choices=sorted(RULE_ACTIONS), help=t("shield_rules.cli_action")
+    )
+    shield_rules.add_argument(
+        "--file", type=Path, metavar=t("cli.metavar_file"), help=t("shield_rules.cli_file")
+    )
+    shield_rules.add_argument(
+        *_flags(t, "--server", "--nome"),
+        dest="test_server",
+        default="server",
+        metavar=t("cli.metavar_name"),
+        help=t("shield_rules.cli_server"),
+    )
+    for english, italian, dest, default, metavar, help_key in (
+        ("--phase", "--fase", "phase", "call", "cli.metavar_phase", "cli_phase"),
+        ("--method", "--metodo", "method", None, "cli.metavar_method", "cli_method"),
+        ("--tool", "--strumento", "tool", "", "cli.metavar_tool", "cli_tool"),
+        ("--arguments", "--argomenti", "arguments", None, "cli.metavar_json", "cli_arguments"),
+        ("--text", "--testo", "text", "", "cli.metavar_text", "cli_text"),
+    ):
+        shield_rules.add_argument(
+            *_flags(t, english, italian),
+            dest=dest,
+            default=default,
+            metavar=t(metavar),
+            help=t(f"shield_rules.{help_key}"),
+        )
+    shield_rules.add_argument(
+        *_flags(t, "--save", "--salva"),
+        dest="save",
+        action="store_true",
+        help=t("shield_rules.cli_save"),
+    )
+
+
+def _shield_setup_options(t: Translator, setup: argparse.ArgumentParser) -> None:
+    setup.add_argument(
+        *_flags(t, "--server", "--nome"),
+        dest="setup_servers",
+        action="append",
+        default=[],
+        metavar=t("cli.metavar_name"),
+        help=t("shield_setup.cli_server"),
+    )
+    setup.add_argument(
+        *_flags(t, "--all", "--tutti"),
+        dest="setup_all",
+        action="store_true",
+        help=t("shield_setup.cli_all"),
+    )
+    setup.add_argument(
+        *_flags(t, "--confirm", "--conferma"),
+        dest="setup_confirm",
+        action="store_true",
+        help=t("shield_setup.cli_confirm"),
+    )
+
+
+def _shield_tools_options(t: Translator, shield_tools: argparse.ArgumentParser) -> None:
+    shield_tools.add_argument(
+        "action", choices=sorted(TOOL_ACTIONS), help=t("shield_rules.tools_action")
+    )
+    shield_tools.add_argument(
+        *_flags(t, "--server", "--nome"),
+        dest="tools_server",
+        metavar=t("cli.metavar_name"),
+        help=t("shield_rules.tools_server"),
+    )
+    shield_tools.add_argument(
+        *_flags(t, "--tool", "--strumento"),
+        dest="tool_names",
+        action="append",
+        default=[],
+        metavar=t("cli.metavar_tool"),
+        help=t("shield_rules.tools_tool"),
+    )
+
+
+def _shield_parser(t: Translator, commands: Any, language: argparse.ArgumentParser) -> None:
+    shield = commands.add_parser(
+        "shield", aliases=["scudo"], help=t("shield.cli_help"), parents=[language]
+    )
+    shield.add_argument(
+        *_flags(t, "--server", "--nome"),
+        dest="server",
+        metavar=t("cli.metavar_name"),
+        help=t("shield.cli_server"),
+    )
+    shield.add_argument(
+        *_flags(t, "--no-ledger", "--senza-registro"),
+        dest="ledger",
+        action="store_false",
+        help=t("shield.cli_no_ledger"),
+    )
+    children = shield.add_subparsers(dest="shield_command")
+    _shield_rules_options(
+        t,
+        children.add_parser(
+            "rules", aliases=["regole"], help=t("shield_rules.cli_help"), parents=[language]
+        ),
+    )
+    for names, help_key in (
+        (("list", "elenco"), "shield_setup.cli_list"),
+        (("enable", "attiva"), "shield_setup.cli_enable"),
+        (("disable", "disattiva"), "shield_setup.cli_disable"),
+        (("relink", "ricollega"), "shield_setup.cli_relink"),
+    ):
+        setup = children.add_parser(
+            names[0], aliases=[names[1]], help=t(help_key), parents=[language]
+        )
+        if names[0] != "list":
+            _shield_setup_options(t, setup)
+    _shield_tools_options(
+        t,
+        children.add_parser(
+            "tools", aliases=["strumenti"], help=t("shield_rules.tools_help"), parents=[language]
+        ),
+    )
 
 
 def build_parser(t: Translator) -> argparse.ArgumentParser:
@@ -166,161 +343,87 @@ def build_parser(t: Translator) -> argparse.ArgumentParser:
         parents=[language, discovery],
     )
     inventory.add_argument(
-        "--all-sources",
-        "--tutte-le-fonti",
+        *_flags(t, "--all-sources", "--tutte-le-fonti"),
         dest="all_sources",
         action="store_true",
         help=t("cli.all_sources"),
     )
-    scan = commands.add_parser(
-        "scan", aliases=["scansiona"], help=t("cli.scan"), parents=[language, discovery]
-    )
-    scan.add_argument(
-        "--fail-on",
-        "--fallisci-da",
-        dest="fail_on",
-        choices=FAIL_LEVELS,
-        default="high",
-        help=t("cli.fail_on"),
-    )
-    scan.add_argument(
-        "--no-baseline",
-        "--senza-base",
-        dest="baseline",
-        action="store_false",
-        help=t("cli.no_baseline"),
-    )
-    scan.add_argument(
-        "--accept-changes",
-        "--accetta-modifiche",
-        dest="accept_changes",
-        action="store_true",
-        help=t("cli.accept_changes"),
-    )
-    scan.add_argument(
-        "--format",
-        "--formato",
-        dest="format",
-        choices=FORMATS,
-        default="text",
-        help=t("cli.format"),
-    )
-    scan.add_argument(
-        "--no-ledger",
-        "--senza-registro",
-        dest="ledger",
-        action="store_false",
-        help=t("cli.no_ledger"),
+    _scan_options(
+        t,
+        commands.add_parser(
+            "scan", aliases=["scansiona"], help=t("cli.scan"), parents=[language, discovery]
+        ),
     )
     ledger = commands.add_parser(
         "ledger", aliases=["registro"], help=t("cli.ledger"), parents=[language]
     )
     ledger.add_argument("action", choices=LEDGER_ACTIONS, help=t("cli.ledger_action"))
-    ledger.add_argument("--last", "--ultimi", dest="last", type=int, default=10, help=t("cli.last"))
-    ledger.add_argument("--anchor", "--ancora", dest="anchor", help=t("cli.anchor"))
-    shield = commands.add_parser(
-        "shield", aliases=["scudo"], help=t("shield.cli_help"), parents=[language]
+    ledger.add_argument(
+        *_flags(t, "--last", "--ultimi"),
+        dest="last",
+        type=_count_type(t),
+        default=10,
+        metavar=t("cli.metavar_number"),
+        help=t("cli.last"),
     )
-    shield.add_argument("--server", "--nome", dest="server", help=t("shield.cli_server"))
-    shield.add_argument(
-        "--no-ledger",
-        "--senza-registro",
-        dest="ledger",
-        action="store_false",
-        help=t("shield.cli_no_ledger"),
+    ledger.add_argument(
+        *_flags(t, "--anchor", "--ancora"),
+        dest="anchor",
+        metavar=t("cli.metavar_anchor"),
+        help=t("cli.anchor"),
     )
-    shield_commands_parser = shield.add_subparsers(dest="shield_command")
-    shield_rules = shield_commands_parser.add_parser(
-        "rules", aliases=["regole"], help=t("shield_rules.cli_help"), parents=[language]
-    )
-    shield_rules.add_argument(
-        "action", choices=sorted(RULE_ACTIONS), help=t("shield_rules.cli_action")
-    )
-    shield_rules.add_argument("--file", type=Path, help=t("shield_rules.cli_file"))
-    shield_rules.add_argument(
-        "--server", dest="test_server", default="server", help=t("shield_rules.cli_server")
-    )
-    shield_rules.add_argument(
-        "--fase", "--phase", dest="phase", default="call", help=t("shield_rules.cli_phase")
-    )
-    shield_rules.add_argument(
-        "--metodo", "--method", dest="method", help=t("shield_rules.cli_method")
-    )
-    shield_rules.add_argument(
-        "--strumento", "--tool", dest="tool", default="", help=t("shield_rules.cli_tool")
-    )
-    shield_rules.add_argument(
-        "--argomenti", "--arguments", dest="arguments", help=t("shield_rules.cli_arguments")
-    )
-    shield_rules.add_argument(
-        "--testo", "--text", dest="text", default="", help=t("shield_rules.cli_text")
-    )
-    shield_rules.add_argument(
-        "--salva", "--save", dest="save", action="store_true", help=t("shield_rules.cli_save")
-    )
-    shield_commands_parser.add_parser(
-        "confirm", aliases=["conferma"], help=argparse.SUPPRESS, parents=[language]
-    )
-    for names, help_key in (
-        (("list", "elenco"), "shield_setup.cli_list"),
-        (("enable", "attiva"), "shield_setup.cli_enable"),
-        (("disable", "disattiva"), "shield_setup.cli_disable"),
-        (("relink", "ricollega"), "shield_setup.cli_relink"),
-    ):
-        setup = shield_commands_parser.add_parser(
-            names[0], aliases=[names[1]], help=t(help_key), parents=[language]
-        )
-        if names[0] == "list":
-            continue
-        setup.add_argument(
-            "--server",
-            "--nome",
-            dest="setup_servers",
-            action="append",
-            default=[],
-            help=t("shield_setup.cli_server"),
-        )
-        setup.add_argument(
-            "--tutti",
-            "--all",
-            dest="setup_all",
-            action="store_true",
-            help=t("shield_setup.cli_all"),
-        )
-        setup.add_argument(
-            "--conferma",
-            "--confirm",
-            dest="setup_confirm",
-            action="store_true",
-            help=t("shield_setup.cli_confirm"),
-        )
-    shield_tools = shield_commands_parser.add_parser(
-        "tools", aliases=["strumenti"], help=t("shield_rules.tools_help"), parents=[language]
-    )
-    shield_tools.add_argument(
-        "action", choices=sorted(TOOL_ACTIONS), help=t("shield_rules.tools_action")
-    )
-    shield_tools.add_argument("--server", dest="tools_server", help=t("shield_rules.tools_server"))
-    shield_tools.add_argument(
-        "--strumento",
-        "--tool",
-        dest="tool_names",
-        action="append",
-        default=[],
-        help=t("shield_rules.tools_tool"),
-    )
+    _shield_parser(t, commands, language)
     rules = commands.add_parser(
         "rules", aliases=["regole"], help=t("guide.cli_help"), parents=[language]
     )
-    rules.add_argument("rule", nargs="?", help=t("guide.cli_rule"))
+    rules.add_argument("rule", nargs="?", metavar=t("cli.metavar_rule"), help=t("guide.cli_rule"))
     rules.add_argument("--markdown", action="store_true", help=t("guide.cli_markdown"))
-    rules.add_argument("-o", "--output", "--salva", dest="output", type=Path, help=t("cli.output"))
+    rules.add_argument(
+        *_flags(t, "--output", "--salva", "-o"),
+        dest="output",
+        type=Path,
+        metavar=t("cli.metavar_file"),
+        help=t("cli.output"),
+    )
+    _localize(parser, t, set())
     return parser
 
 
 def _prepare_stream(stream: TextIO) -> None:
     if isinstance(stream, io.TextIOWrapper):
-        stream.reconfigure(errors="backslashreplace")
+        if stream.isatty():
+            stream.reconfigure(errors="backslashreplace")
+        else:
+            stream.reconfigure(encoding="utf-8", errors="backslashreplace")
+
+
+def _localize(parser: argparse.ArgumentParser, t: Translator, seen: set[int]) -> None:
+    if id(parser) in seen:
+        return
+    seen.add(id(parser))
+    usage = t("cli.usage") + " "
+
+    class Formatter(argparse.HelpFormatter):
+        def add_usage(
+            self,
+            usage_text: str | None,
+            actions: Iterable[argparse.Action],
+            groups: Iterable[argparse._MutuallyExclusiveGroup],
+            prefix: str | None = None,
+        ) -> None:
+            super().add_usage(usage_text, actions, groups, usage if prefix is None else prefix)
+
+    parser.formatter_class = Formatter
+    parser._optionals.title = t("cli.options")
+    parser._positionals.title = t("cli.positionals")
+    for action in parser._actions:
+        if isinstance(action, argparse._HelpAction):
+            action.help = t("cli.help")
+        elif isinstance(action, argparse._VersionAction):
+            action.help = t("cli.version")
+        elif isinstance(action, argparse._SubParsersAction):
+            for child in action.choices.values():
+                _localize(child, t, seen)
 
 
 def _analysis_options(args: argparse.Namespace, *, scanning: bool) -> AnalysisOptions:
@@ -344,12 +447,24 @@ def _missing_paths(args: argparse.Namespace) -> list[Path]:
     return [path for path in getattr(args, "paths", []) if not path.exists()]
 
 
-def _emit(text: str, args: argparse.Namespace, t: Translator, out: TextIO) -> None:
-    if args.output is not None:
-        args.output.write_text(text, encoding="utf-8")
-        out.write(t("inventory.saved", path=str(args.output)) + "\n")
-    else:
+def _emit(text: str, args: argparse.Namespace, t: Translator, out: TextIO) -> int:
+    if args.output is None:
         out.write(text)
+        return EXIT_OK
+    try:
+        args.output.write_bytes(text.encode("utf-8", "backslashreplace"))
+    except OSError as exc:
+        out.write(
+            t(
+                "cli.output_failed",
+                path=safe_text(str(args.output)),
+                error=safe_text(exc.strerror or type(exc).__name__, 120),
+            )
+            + "\n"
+        )
+        return EXIT_USAGE
+    out.write(t("inventory.saved", path=str(args.output)) + "\n")
+    return EXIT_OK
 
 
 def _as_json(data: dict[str, Any]) -> str:
@@ -374,8 +489,7 @@ def run_inventory(
         text = _as_json(data)
     else:
         text = render_inventory(inventory, t, all_sources=args.all_sources, report=report)
-    _emit(text, args, t, out)
-    return EXIT_OK
+    return _emit(text, args, t, out)
 
 
 def scan_exit_code(report: ScanReport, fail_on: str) -> int:
@@ -402,8 +516,8 @@ def render_report(report: ScanReport, output_format: str, t: Translator, base: P
 def run_scan(args: argparse.Namespace, t: Translator, env: HostEnvironment, out: TextIO) -> int:
     report = analyze(env, _analysis_options(args, scanning=True))
     output_format = "json" if args.json else FORMAT_ALIASES.get(args.format, args.format)
-    _emit(render_report(report, output_format, t, env.cwd), args, t, out)
-    return scan_exit_code(report, args.fail_on)
+    written = _emit(render_report(report, output_format, t, env.cwd), args, t, out)
+    return written if written != EXIT_OK else scan_exit_code(report, args.fail_on)
 
 
 def _ledger_status(verification: Verification, ledger: Ledger, t: Translator) -> list[str]:
@@ -432,19 +546,22 @@ def run_ledger(args: argparse.Namespace, t: Translator, env: HostEnvironment, ou
     verification = ledger.verify(args.anchor if action == "verify" else None)
     lines = [t("app.banner", version=__version__)]
     if action == "show":
-        records = list(ledger.records())[-max(args.last, 0) :] if args.last else []
+        records = list(ledger.records())[-args.last :]
         for record in records:
             data = record.get("data", {})
             summary = data.get("summary") if isinstance(data, dict) else None
             counts = summary if isinstance(summary, dict) else {}
-            details = " · ".join(
-                f"{severity_label(Severity[name.upper()], t)} "
-                f"{safe_text(str(counts.get(name, 0)), 20)}"
-                for name in ("critical", "high", "medium", "low")
-            )
+            if record.get("event") == "scan":
+                details = " · ".join(
+                    f"{severity_label(Severity[name.upper()], t)} "
+                    f"{safe_text(str(counts.get(name, 0)), 20)}"
+                    for name in ("critical", "high", "medium", "low")
+                )
+            else:
+                details = event_details(record, t)
             lines.append(
                 t(
-                    "ledger.show_line",
+                    "ledger.show_line" if details else "ledger.show_line_short",
                     seq=record.get("seq"),
                     time=safe_text(str(record.get("time", ""))),
                     event=safe_text(str(record.get("event", ""))),
@@ -472,8 +589,7 @@ def run_rules(args: argparse.Namespace, t: Translator, out: TextIO) -> int:
         text = render_rules_markdown(t)
     else:
         text = render_rules_list(t)
-    _emit(text, args, t, out)
-    return EXIT_OK
+    return _emit(text, args, t, out)
 
 
 def _report_stderr(line: str) -> None:
@@ -493,9 +609,7 @@ def run_shield_command(
     if not command:
         _report_stderr(t("shield.no_command"))
         return EXIT_USAGE
-    options = ShieldOptions(
-        server=args.server or Path(command[0]).stem or command[0], command=tuple(command)
-    )
+    options = ShieldOptions(server=args.server or default_name(command), command=tuple(command))
     home = home_text(str(env.home))
     ledger = Ledger(env.data_dir) if args.ledger else None
     inspector = RulesInspector(
@@ -550,11 +664,12 @@ def run_shield_tools(
     action = TOOL_ACTIONS[args.action]
     ws = shield_commands.Workspace(t, env.data_dir, home_text(str(env.home)), out)
     store = PinStore(env.data_dir, None, Ledger(env.data_dir))
+    server = args.tools_server or args.server
     if action == "list":
         return shield_commands.tools_list(ws, store)
     if action == "approve":
-        return shield_commands.tools_approve(ws, store, args.tools_server, args.tool_names)
-    return shield_commands.tools_forget(ws, store, args.tools_server)
+        return shield_commands.tools_approve(ws, store, server, args.tool_names)
+    return shield_commands.tools_forget(ws, store, server)
 
 
 def run_shield_confirm() -> int:
@@ -581,15 +696,17 @@ def run_shield_setup(
     ws = shield_commands.Workspace(t, env.data_dir, home_text(str(env.home)), out)
     store = ActivationStore(env.data_dir, Ledger(env.data_dir))
     action = args.shield_command
-    found = candidates(discover(env, DiscoveryOptions(skills=False)))
+    inventory = discover(env, DiscoveryOptions(skills=False))
+    found = candidates(inventory)
+    failed = inventory.failed_sources
     if action in ("list", "elenco"):
-        return shield_commands.shield_list(ws, found)
+        return shield_commands.shield_list(ws, found, failed)
     selection = (args.setup_servers, args.setup_all, args.setup_confirm)
     if action in ("disable", "disattiva"):
-        return shield_commands.shield_disable(ws, found, store, selection)
+        return shield_commands.shield_disable(ws, found, store, selection, failed)
     if action in ("relink", "ricollega"):
-        return shield_commands.shield_relink(ws, found, store, selection)
-    return shield_commands.shield_enable(ws, found, selection, store)
+        return shield_commands.shield_relink(ws, found, store, selection, failed)
+    return shield_commands.shield_enable(ws, found, selection, store, failed)
 
 
 def dispatch_shield(
@@ -599,8 +716,6 @@ def dispatch_shield(
     env: HostEnvironment,
     out: TextIO,
 ) -> int:
-    if getattr(args, "shield_command", None) in ("confirm", "conferma"):
-        return run_shield_confirm()
     if getattr(args, "shield_command", None) in SETUP_COMMANDS:
         return run_shield_setup(args, t, env, out)
     if getattr(args, "shield_command", None) in ("tools", "strumenti"):
@@ -626,6 +741,46 @@ def main(
     stdout: TextIO | None = None,
 ) -> int:
     arguments, command = split_command(list(sys.argv[1:] if argv is None else argv))
+    if arguments[:2] in (["scudo", "conferma"], ["shield", "confirm"]):
+        return run_shield_confirm()
+    try:
+        return _run(arguments, command, env, stdout)
+    except Exception as exc:
+        _report_crash(exc, arguments)
+        return EXIT_INCOMPLETE
+
+
+def _report_crash(exc: Exception, arguments: list[str]) -> None:
+    stream = sys.stderr
+    if stream is None:
+        return
+    t = Translator(detect_language(peek_language(arguments)))
+    with contextlib.suppress(OSError, ValueError):
+        traceback.print_exception(exc, file=stream)
+        stream.write(t("cli.crash", error=safe_text(type(exc).__name__, 80)) + "\n")
+        stream.flush()
+
+
+def default_name(command: Sequence[str]) -> str:
+    program = PurePath(command[0].replace("\\", "/")).stem
+    if program.lower() not in PACKAGE_RUNNERS:
+        return program or command[0]
+    for part in command[1:]:
+        if part.startswith("-") or part in RUNNER_WORDS:
+            continue
+        package = part.split("==", 1)[0]
+        cut = package.find("@", 1)
+        package = package if cut == -1 else package[:cut]
+        return PurePath(package.replace("\\", "/")).name or program
+    return program
+
+
+def _run(
+    arguments: list[str],
+    command: list[str],
+    env: HostEnvironment | None,
+    stdout: TextIO | None,
+) -> int:
     out = stdout if stdout is not None else sys.stdout
     _prepare_stream(out)
     t = Translator(detect_language(peek_language(arguments)))

@@ -8,12 +8,13 @@ from guardia.inventory import DiscoveryOptions, HostEnvironment, discover
 from guardia.ledger import Ledger
 from guardia.secure_store import Protector
 from guardia.shield.activation import (
+    SUCCESSFUL,
     Candidate,
-    Outcome,
     Support,
     candidates,
     editable,
     manual_snippet,
+    shield_names,
 )
 from guardia.shield.pins import PinError, PinStore
 from guardia.shield.policy import PolicyState, load_policy, rules_path
@@ -64,9 +65,9 @@ def _rules(env: HostEnvironment, t: Translator, protector: Protector | None) -> 
     return base | {"state": "none", "text": t("shield.state_none")}
 
 
-def _server(candidate: Candidate, t: Translator) -> dict[str, Any]:
+def _server(candidate: Candidate, t: Translator, name: str) -> dict[str, Any]:
     server = candidate.server
-    snippet = manual_snippet(server, launcher()) if candidate.support in MANUAL else ""
+    snippet = manual_snippet(server, launcher(), name) if candidate.support in MANUAL else ""
     protected = candidate.support is Support.PROTECTED
     writable = protected and editable(server.source.path)
     state = launcher_state(server.shield_launcher) if protected else None
@@ -107,6 +108,17 @@ def _event(record: dict[str, Any], t: Translator) -> dict[str, Any]:
         parts.append(", ".join(names[:8]))
     elif isinstance(data.get("servers"), list):
         parts.append(", ".join(str(item) for item in data["servers"][:8]))
+    elif event == "rules_approved":
+        parts.append(t("ui.event_rules_detail", count=_count(data.get("rules"))))
+    elif event == "shield_stop" and "forwarded" in data:
+        parts.append(
+            t(
+                "ui.event_shield_traffic",
+                forwarded=_count(data.get("forwarded")),
+                blocked=_count(data.get("blocked")),
+                dropped=_count(data.get("dropped")),
+            )
+        )
     return {
         "seq": record.get("seq"),
         "time": safe_text(str(record.get("time", "")), 40),
@@ -114,6 +126,15 @@ def _event(record: dict[str, Any], t: Translator) -> dict[str, Any]:
         "label": t(f"ui.event_{event}"),
         "details": safe_text(" · ".join(part for part in parts if part), 240),
     }
+
+
+def _count(value: object) -> int:
+    return value if isinstance(value, int) and not isinstance(value, bool) else 0
+
+
+def event_details(record: dict[str, Any], t: Translator) -> str:
+    details: str = _event(record, t)["details"]
+    return details
 
 
 def _events(
@@ -149,7 +170,9 @@ def shield_state(
     found: list[Candidate] | None = None,
 ) -> dict[str, Any]:
     servers = found if found is not None else server_candidates(env)
-    listed = [_server(c, t) for c in servers]
+    everyone = [c.server for c in servers]
+    names = shield_names(everyone, everyone)
+    listed = [_server(c, t, names[c.server.key]) for c in servers]
     return {
         "rules": _rules(env, t, protector),
         "servers": listed,
@@ -171,4 +194,4 @@ def outcome_lines(report_changes: list[Any], t: Translator) -> list[str]:
 
 
 def succeeded(report_changes: list[Any]) -> bool:
-    return bool(report_changes) and all(c.outcome is Outcome.DONE for c in report_changes)
+    return bool(report_changes) and all(c.outcome in SUCCESSFUL for c in report_changes)

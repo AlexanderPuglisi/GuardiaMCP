@@ -80,7 +80,8 @@ All four checks must be green before a pull request. `tests/test_shield_sdk.py` 
 Build tools (PyInstaller, Pillow) live in the separate `build` group and are pinned in `uv.lock`.
 
 ```powershell
-uv run --group build --extra app python scripts\build_exe.py
+uv run --exact --no-dev --group build --extra app python scripts\build_exe.py
+uv sync --extra app
 uv run --group build --extra app python scripts\demo.py --lang en -o docs\demo-en.gif
 uv run --group build --extra app python scripts\demo.py --lang it -o docs\demo-it.gif
 uv run --group build --extra app python scripts\make_icon.py
@@ -186,7 +187,8 @@ Gli strumenti di build (PyInstaller, Pillow) stanno nel gruppo separato `build` 
 bloccate in `uv.lock`.
 
 ```powershell
-uv run --group build --extra app python scripts\build_exe.py
+uv run --exact --no-dev --group build --extra app python scripts\build_exe.py
+uv sync --extra app
 uv run --group build --extra app python scripts\demo.py --lang en -o docs\demo-en.gif
 uv run --group build --extra app python scripts\demo.py --lang it -o docs\demo-it.gif
 uv run --group build --extra app python scripts\make_icon.py

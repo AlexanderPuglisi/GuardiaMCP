@@ -57,7 +57,7 @@ def confirm_page(language: str) -> str:
             else "GitHub: ask before deleting"
         ],
         "details": '{"repo": "demo/notes"}',
-        "seconds": 60,
+        "seconds": 45,
         "language": language,
         "ui": confirm_strings(Translator(language)),
     }
@@ -102,14 +102,8 @@ def build(language: str) -> None:
         data["state"]["settings"]["projects"] = scrub([str(project)])
         page = root / "app.html"
         page.write_text(demo.demo_page(data), encoding="utf-8")
-        editable = dict(
-            data, shield=dict(data["shield"], rules=dict(data["shield"]["rules"], exists=True))
-        )
-        editor = root / "editor.html"
-        editor.write_text(demo.demo_page(editable), encoding="utf-8")
         for name, view, height in SHOTS:
-            source = editor if view == "shield:editor" else page
-            shoot(source, view, TARGET / f"{language}-{name}.png", root / "profile", height)
+            shoot(page, view, TARGET / f"{language}-{name}.png", root / "profile", height)
         confirm = root / "confirm.html"
         confirm.write_text(confirm_page(language), encoding="utf-8")
         demo.SHOT_SIZE = CONFIRM_SIZE

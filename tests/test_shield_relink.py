@@ -174,8 +174,8 @@ class BrokenLedger:
 
 def test_notes_are_saved_even_if_the_ledger_fails(stale: HostEnvironment) -> None:
     store = ActivationStore(stale.data_dir, cast(Ledger, BrokenLedger()))
-    with pytest.raises(OSError, match="disk full"):
-        store.relink([github(stale).server], launcher())
+    report = store.relink([github(stale).server], launcher())
+    assert [c.outcome for c in report.changes] == [Outcome.DONE]
     assert entry(stale) == protected_by(launcher())
     records = ActivationStore(stale.data_dir).records()
     assert [r["wrapped"] for r in records] == [protected_by(launcher())]

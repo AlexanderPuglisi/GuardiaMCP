@@ -10,7 +10,9 @@ _NEWLINE = re.compile(r"\n")
 _WHITESPACE = re.compile(r"[ \t\r\n]*")
 _STRING = re.compile(r'"(?:[^"\\]|\\.)*"', re.DOTALL)
 _SCALAR = re.compile(r"[^,\]\}\s]+")
-_TOML_HEADER = re.compile(r"^[ \t]*\[(?P<name>[^\[\]\r\n]+)\][ \t]*(?:#.*)?$", re.MULTILINE)
+_TOML_HEADER = re.compile(
+    r"^[ \t]*\[(?P<name>[^\[\]\r\n]+)\][ \t]*(?:#[^\r\n]*)?\r?$", re.MULTILINE
+)
 
 
 class LineIndex:

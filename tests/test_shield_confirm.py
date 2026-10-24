@@ -97,7 +97,7 @@ def test_allowed_confirmation_forwards_the_call(tmp_path: Path) -> None:
         "it",
     )
     assert asked.reasons == ("Regola «confirm»",)
-    assert '"text": "ciao"' in asked.details
+    assert asked.details == "text: ciao"
     assert answers(ledger) == ["allow"]
     assert any("conferma per echo: consentito" in line for line in reports)
 

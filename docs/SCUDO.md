@@ -6,7 +6,7 @@ Lo Scudo è la parte di Guardia che lavora **mentre** l'AI usa i server MCP. L'a
 guarda i file e ti dice cosa c'è di rischioso; lo Scudo invece si mette in mezzo ai messaggi e può
 **bloccarli, nasconderli o oscurarli** seguendo regole scritte da te.
 
-> **Stato: versione 0.2.1.** Regole, protezioni di base, finestra di conferma, collegamento
+> **Stato: versione 0.2.2.** Regole, protezioni di base, finestra di conferma, collegamento
 > automatico dei client e vista «Scudo» nell'app. Provato con l'SDK Python ufficiale di MCP
 > (protocolli 2025-11-25 e 2026-07-28).
 
@@ -66,6 +66,7 @@ guardia scudo elenco
 guardia scudo attiva --server github
 guardia scudo attiva --server github --conferma
 guardia scudo disattiva --server github --conferma
+guardia scudo ricollega --tutti --conferma
 ```
 
 - **elenco** mostra tutti i server MCP del PC e, per ognuno, se è protetto dallo Scudo, se si può
@@ -73,7 +74,14 @@ guardia scudo disattiva --server github --conferma
 - **attiva** senza `--conferma` mostra solo cosa farebbe; con `--conferma` salva una copia di
   sicurezza del file nella cartella `backup` di Guardia, modifica solo la voce di quel server e
   annota la voce originale. `--tutti` collega tutti i server collegabili.
-- **disattiva** rimette la voce originale, ma solo se nel frattempo non l'hai cambiata tu.
+- **disattiva** rimette la voce originale. Se dopo averla protetta hai cambiato la voce (per
+  esempio una nuova chiave in `env`), toglie solo lo Scudo e tiene le tue modifiche.
+- **ricollega** serve quando la cartella di Guardia è stata spostata o rinominata: i server
+  protetti cercherebbero ancora il vecchio `guardia.exe`. Li fa puntare a questa copia di Guardia.
+  Nell'app il pulsante è **Ricollega a questa Guardia**.
+- Quando server di app diverse hanno lo stesso nome (per esempio `filesystem` in Claude e in
+  Cursor), Guardia dà a ognuno un nome di Scudo diverso, come `filesystem (cursor)`, così le loro
+  memorie degli strumenti restano separate.
 - Le stesse azioni sono nella sezione **Scudo** dell'app, con una conferma prima di ogni modifica.
 
 Prima di collegare un server **chiudi l'app AI**: alcune app riscrivono il proprio file di
@@ -83,18 +91,21 @@ mentre lavorava, non scrive nulla.
 | Dove sta il server | Cosa fa Guardia |
 |---|---|
 | File JSON normale (Claude Desktop, Claude Code, Cursor, `mcp.json` di VS Code, Windsurf, Gemini, Copilot) | Collegamento automatico |
-| File con commenti (per esempio `settings.json` di VS Code) o file TOML (Codex) | Ti mostra il testo esatto da incollare, per non toccare i tuoi commenti |
+| File con commenti (per esempio `settings.json` di VS Code) o file TOML (Codex) | Ti mostra il testo esatto da incollare (in TOML per Codex), per non toccare i tuoi commenti |
 | Estensioni di Claude Desktop, plugin, configurazioni gestite dall'amministratore | Non collegabili: le gestiscono le app |
 | Server remoti (HTTP) | Non ancora protetti dallo Scudo |
 
 Un server collegato continua a essere analizzato dalla scansione della v1 con il suo **comando
-originale**: la protezione non nasconde nulla all'analisi.
+originale**: la protezione non nasconde nulla all'analisi. Se una voce passa da un programma
+`guardia` che non è questa installazione, la scansione lo segnala (regola G12-008); se la cartella
+di Guardia è stata spostata e quel programma non esiste più, segnala che l'app AI non riesce ad
+avviare il server (G12-009).
 
 ## Le regole in cinque minuti
 
-**Dall'app**, senza terminale: sezione **Scudo** → **Crea le regole d'esempio** →
-**Modifica le regole** → cambia il testo → **Salva e approva**. Guardia controlla il testo
-prima di salvarlo: se c'è un errore ti mostra la riga e non salva niente.
+**Dall'app**, senza terminale: sezione **Scudo** → **Crea le regole d'esempio**: si apre
+l'editor con l'esempio, non ancora salvato → cambia il testo → **Salva e approva**. Guardia
+controlla il testo prima di salvarlo: se c'è un errore ti mostra la riga e non salva niente.
 
 **Da riga di comando:**
 
@@ -130,16 +141,19 @@ sempre in primo piano, che mostra:
 
 - quale server vuole fare cosa (strumento o richiesta);
 - **perché** te lo chiede (la regola o la protezione);
-- i dettagli della richiesta, con i segreti già oscurati;
+- i dettagli della richiesta, già aperti: prima i campi che hanno fatto scattare la regola, ogni
+  valore tagliato a 300 caratteri, con i segreti già oscurati;
 - i pulsanti **Blocca** (già selezionato, per sicurezza) e **Consenti**, e la casella «ricorda la
   scelta per 10 minuti» per quello strumento;
-- un conto alla rovescia: **se non rispondi entro 60 secondi, blocca**. Anche `Esc` e il cerchietto
+- un conto alla rovescia: **se non rispondi entro 45 secondi, blocca**. Anche `Esc` e il cerchietto
   di chiusura bloccano.
 
 Mentre aspetta la tua risposta, lo Scudo continua a far passare gli altri messaggi. La finestra è
 un processo separato di Guardia che parla con lo Scudo su un canale privato: **l'AI e il server non
 possono rispondere al posto tuo**. Se la finestra non si può mostrare, la richiesta viene bloccata.
-Ogni risposta finisce nel registro.
+Ogni risposta finisce nel registro. Se il client annulla la richiesta mentre la finestra è aperta
+(per esempio perché ha smesso di aspettare), la finestra si chiude e la richiesta non viene
+eseguita.
 
 `chiedi` vale per le **chiamate** e per le **richieste del server**. Su risultati ed elenchi non ha
 senso chiedere (l'azione è già avvenuta o non è ancora stata richiesta): lì vale come `registra`.
@@ -157,7 +171,7 @@ del server.
 | `risultati` | Cerca prompt injection e istruzioni nascoste nei risultati degli strumenti | `"avvisa"` | `"avvisa"`, `"blocca"`, `"spento"` |
 | `segreti_in_uscita` | Un segreto (chiave, token) negli argomenti di una chiamata | `"chiedi"` | `"chiedi"`, `"blocca"`, `"registra"`, `"spento"` |
 | `segreti_nei_risultati` | Segreti nei risultati: vengono sostituiti da `[REDACTED]` | `"oscura"` | `"oscura"`, `"spento"` |
-| `richieste_credenziali` | Un server chiede password, OTP, chiavi, frasi di recupero o dati della carta | `"blocca"` | `"blocca"`, `"chiedi"`, `"registra"`, `"spento"` |
+| `richieste_credenziali` | Un server ti chiede, in un modulo (elicitation), password, OTP, codici PIN, chiavi, frasi di recupero o dati della carta | `"blocca"` | `"blocca"`, `"chiedi"`, `"registra"`, `"spento"` |
 
 `avvisa` lascia passare il risultato ma lo segnala nel registro e nel log del client.
 
@@ -165,6 +179,9 @@ del server.
 ricordava da prima, o perché il client ha tenuto in memoria un vecchio elenco), lo Scudo blocca
 la chiamata e spiega perché. Per lo stesso motivo blocca le chiamate a strumenti che **non ha mai
 visto** in un elenco: un client normale chiede sempre l'elenco prima di usare uno strumento.
+Quando approvi regole nuove che nascondono uno strumento, lo Scudo le applica subito anche alle
+chiamate, anche se il client tiene ancora in memoria il vecchio elenco, e avvisa i client che lo
+supportano di ricaricare l'elenco.
 
 Le protezioni si allentano **solo** nel file delle regole, quindi solo con la tua approvazione
 firmata. `verifica` mostra un avviso per ogni protezione allentata:
@@ -266,7 +283,7 @@ l'intestazione: in tutto il file usa `[[regola]]` oppure `[[rule]]`, non entramb
 | `contenuto` | `content` | Condizioni su tutto il testo del messaggio | `contenuto.segreti = true` |
 | `segreti` | `secrets` | Chiavi e token riconosciuti (GitHub, GitLab, Slack, AWS, Google, OpenAI, Anthropic, JWT) | `contenuto.segreti = true` |
 | `dimensione_max` | `max_size` | Scatta quando il messaggio supera questi byte | `contenuto.dimensione_max = 1000000` |
-| `frequenza` | `rate` | Limite di chiamate nel tempo | `frequenza = { massimo = 30, secondi = 60 }` |
+| `frequenza` | `rate` | Limite di chiamate e richieste del server nel tempo (non blocca mai i risultati) | `frequenza = { massimo = 30, secondi = 60 }` |
 | `massimo` | `max` | Numero massimo nella finestra di tempo | |
 | `secondi` | `seconds` | Durata della finestra di tempo | |
 | `protezioni` | `protections` | Sezione che regola le protezioni di base | `[protezioni]` |
@@ -296,7 +313,7 @@ Le condizioni su `argomento` valgono solo nella fase `chiamata`.
 | `consenti` | `allow` | Il messaggio passa |
 | `registra` | `log` | Passa e viene scritto nel registro |
 | `oscura` | `redact` | Passa, ma le parti che corrispondono diventano `[REDACTED]` |
-| `chiedi` | `ask` | Si apre la finestra di conferma; senza risposta in 60 secondi **blocca** |
+| `chiedi` | `ask` | Si apre la finestra di conferma; senza risposta in 45 secondi **blocca** |
 | `blocca` | `block` | Il messaggio non passa; chi l'ha inviato riceve un errore con il nome della regola |
 
 **Se più regole scattano insieme, vince la più severa**: blocca > chiedi > oscura > registra >
@@ -317,7 +334,8 @@ altro). Con `predefinito = "blocca"` ottieni una **lista bianca**: passa solo ci
   - i passaggi `..` vengono risolti;
   - gli indirizzi `file:///` diventano percorsi;
   - le scritture Windows che aprono lo stesso file diventano il percorso normale: `\\?\C:\…`,
-    `\\.\C:\…`, `\\localhost\C$\…`, i punti finali (`.ssh.`) e i flussi (`.env::$DATA`).
+    `\\.\C:\…`, `\\localhost\C$\…`, i punti finali (`.ssh.`) e i flussi (`.env::$DATA`);
+  - i nomi brevi di Windows delle cartelle esistenti (come `PROGRA~1`) diventano il nome completo.
 
   `~/progetti/../.ssh/id_rsa` diventa quindi `~/.ssh/id_rsa`. Negli schemi, `*` non attraversa le
   cartelle mentre `**` sì: `**/.env` colpisce `.env` in qualsiasi cartella.
@@ -437,7 +455,8 @@ era senza conservarne il contenuto.
 Gli argomenti e i risultati **non** vengono mai scritti nel registro. Ci sono anche gli eventi
 `shield_start` e `shield_stop` per ogni sessione, `rules_approved` per ogni approvazione delle
 regole, e `tools_pinned`, `tools_pending`, `tools_approved`, `tools_forgotten` per la memoria degli
-strumenti, e `shield_enabled`, `shield_disabled` quando Guardia collega o scollega un server.
+strumenti, e `shield_enabled`, `shield_disabled`, `shield_relinked` quando Guardia collega,
+scollega o ricollega un server.
 
 ## Cosa vede l'AI quando un messaggio è bloccato
 
@@ -463,8 +482,10 @@ Così sia tu sia l'AI capite cosa è successo e perché.
 - La memoria degli strumenti si fida della **prima volta**: un server già malevolo al primo
   incontro viene giudicato solo dall'analisi e dalle tue regole.
 - Il controllo dei risultati guarda il primo milione di caratteri di ogni risultato.
-- Le richieste di credenziali vengono riconosciute da parole chiave in italiano e inglese: una
-  richiesta formulata in modo diverso può sfuggire.
+- Le richieste di credenziali vengono riconosciute da parole chiave in italiano e inglese, e solo
+  nei moduli che ti chiedono dei dati (elicitation): una richiesta formulata in modo diverso, o una
+  richiesta di sampling, può sfuggire. Per controllare il sampling scrivi una regola per la fase
+  `richiesta_server`.
 - Dopo che approvi uno strumento, il client lo vede solo quando richiede di nuovo l'elenco.
 - Con Claude Desktop installato dal Microsoft Store, se il primo a creare la cartella dei dati
   di Guardia è lo Scudo avviato da Claude, Windows la mette nella cartella privata di Claude
@@ -472,7 +493,13 @@ Così sia tu sia l'AI capite cosa è successo e perché.
   Apri Guardia una volta dalla sua icona prima di proteggere i server.
 - Un'app AI che riscrive il proprio file di configurazione può togliere il collegamento allo
   Scudo: `guardia scudo elenco` mostra sempre lo stato attuale.
-- Su Windows, i programmi avviati a loro volta da un server (per esempio `node` avviato da `npx`)
-  possono restare attivi se il server viene chiuso a forza.
+- Su Windows il server gira dentro un job: quando lo Scudo si ferma, viene chiuso o va in crash,
+  finisce anche tutto l'albero di programmi avviati dal server (per esempio `node` avviato da
+  `npx`). Un programma avviato nel primissimo istante, prima che il job venga applicato, potrebbe
+  sfuggire; se Windows rifiuta il job, lo Scudo chiude solo il processo che ha avviato.
+- I comandi che sono file `.cmd` o `.bat` (come `npx`) passano i loro argomenti attraverso
+  `cmd.exe`: lo Scudo li mette tra virgolette in modo che caratteri come `&` e `|` arrivino
+  intatti e rifiuta gli argomenti con un a capo, ma, esattamente come quando il server lo avvia il
+  client, `cmd.exe` espande comunque `%NOME%`.
 
 Tutti i limiti di Guardia sono in [SECURITY.md](../SECURITY.md).

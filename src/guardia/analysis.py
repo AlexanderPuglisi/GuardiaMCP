@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
@@ -17,16 +18,18 @@ from guardia.model import (
     Scope,
     ServerEntry,
     ToolCollection,
+    ToolGap,
     Transport,
     canonical_json,
     frozen_mapping,
     sha256_hex,
 )
 from guardia.scanner import BaselineSummary, ScanContext, ScanReport, scan_inventory
-from guardia.scanner.baseline import run_baseline
+from guardia.scanner.baseline import BASELINE_FILE, BaselineResult, BaselineStatus, run_baseline
 from guardia.scanner.engine import LedgerSummary
 from guardia.scanner.rules import RULES
 from guardia.secure_store import KeyStoreError, Protector
+from guardia.shield.wrapping import LauncherState, launcher_state
 
 MAX_LEDGER_FINDINGS = 500
 
@@ -64,6 +67,13 @@ def _collection_key(server: ServerEntry) -> tuple[object, ...]:
     return (anchor, server.command, server.args, server.cwd, server.url, server.transport)
 
 
+def _collect(server: ServerEntry, env: HostEnvironment) -> ToolCollection:
+    try:
+        return collect_tools(server, env)
+    except Exception as exc:
+        return ToolCollection(gap=ToolGap.ERROR, notes=(f"error:{type(exc).__name__}",))
+
+
 def collect_all(
     servers: tuple[ServerEntry, ...], env: HostEnvironment
 ) -> dict[str, ToolCollection]:
@@ -72,9 +82,52 @@ def collect_all(
     for server in servers:
         key = _collection_key(server)
         if key not in cache:
-            cache[key] = collect_tools(server, env)
+            cache[key] = _collect(server, env)
         collections[server.key] = cache[key]
     return collections
+
+
+def launcher_findings(servers: Sequence[ServerEntry]) -> dict[str, list[Finding]]:
+    found: dict[str, list[Finding]] = {}
+    for server in servers:
+        if not server.shielded:
+            continue
+        state = launcher_state(server.shield_launcher)
+        if state is LauncherState.CURRENT:
+            continue
+        rule = "G12-008" if state is LauncherState.OTHER else "G12-009"
+        program = server.shield_launcher[0] if server.shield_launcher else ""
+        found[server.key] = [
+            Finding(
+                rule_id=rule,
+                severity=RULES[rule].severity,
+                location=server.location,
+                evidence=program,
+                params=frozen_mapping({"server": server.name, "program": program}),
+            )
+        ]
+    return found
+
+
+def _baseline(
+    env: HostEnvironment,
+    options: AnalysisOptions,
+    servers: list[ServerEntry],
+    collections: dict[str, ToolCollection] | None,
+) -> tuple[BaselineResult, str | None]:
+    directory = env.data_dir if options.baseline else None
+    try:
+        result = run_baseline(
+            directory,
+            servers,
+            collections or {},
+            accept=options.accept_changes,
+            write=options.write_baseline,
+        )
+    except Exception as exc:
+        path = directory / BASELINE_FILE if directory is not None else None
+        return BaselineResult(path=path, status=BaselineStatus.ERROR), type(exc).__name__
+    return result, None
 
 
 def ledger_findings(ledger: Ledger, verification: Verification) -> list[Finding]:
@@ -131,13 +184,7 @@ def analyze(env: HostEnvironment, options: AnalysisOptions | None = None) -> Sca
         )
     collections = collect_all(inventory.entries, env) if options.tools else None
     configured = [s for s in inventory.entries if s.source.client is not Client.MANUAL]
-    result = run_baseline(
-        env.data_dir if options.baseline else None,
-        configured,
-        collections or {},
-        accept=options.accept_changes,
-        write=options.write_baseline,
-    )
+    result, baseline_error = _baseline(env, options, configured, collections)
     summary = BaselineSummary(
         str(result.path) if result.path is not None else None, result.status, result.written
     )
@@ -146,14 +193,19 @@ def analyze(env: HostEnvironment, options: AnalysisOptions | None = None) -> Sca
     extra_file_findings = list(result.file_findings)
     if ledger is not None and verification is not None:
         extra_file_findings.extend(ledger_findings(ledger, verification))
+    extra: dict[str, list[Finding]] = {key: list(items) for key, items in result.findings.items()}
+    for key, items in launcher_findings(configured).items():
+        extra.setdefault(key, []).extend(items)
     report = scan_inventory(
         inventory,
         ScanContext(home=env.home),
         tools=collections,
-        extra_findings=result.findings,
+        extra_findings=extra,
         extra_file_findings=extra_file_findings,
         baseline=summary,
     )
+    if baseline_error is not None:
+        report = replace(report, errors=(*report.errors, f"baseline: {baseline_error}"))
     if ledger is None or verification is None:
         return report
     recorded = False
@@ -161,7 +213,7 @@ def analyze(env: HostEnvironment, options: AnalysisOptions | None = None) -> Sca
         try:
             ledger.append("scan", scan_event(report))
             recorded = True
-        except (OSError, KeyStoreError):
+        except (OSError, KeyStoreError, ValueError, TypeError):
             recorded = False
     after = ledger.verify() if recorded else verification
     return replace(

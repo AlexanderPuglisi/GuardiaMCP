@@ -7,22 +7,22 @@
 ## English
 
 A security tool is only worth what its tests prove. This page lists what was actually run on
-version 0.2.1, how, and what is **not** covered. Nothing here was run against real malware or
+version 0.2.2, how, and what is **not** covered. Nothing here was run against real malware or
 anyone else's systems: every "attack" is a fake server or fake file written for the purpose.
 
 ### In numbers
 
 | | |
 |---|---|
-| Automated tests | **645**, all passing (`uv run pytest`) |
-| Test files | 27 |
+| Automated tests | **845**, all passing (`uv run pytest`) |
+| Test files | 35 |
 | Fake samples (configurations, servers, code, skills) | 84 files in `tests/corpus/` |
-| Static rules, each with at least one malicious and one harmless fake case | 88 |
+| Static rules, each with at least one malicious and one harmless fake case | 90 |
 | Lint and types | `ruff` and `mypy --strict`: no issues |
 
 ### What the tests cover
 
-- **Scanner.** Every one of the 88 rules is tested on a malicious fake case and on a harmless case
+- **Scanner.** Every one of the 90 rules is tested on a malicious fake case and on a harmless case
   that looks similar on purpose, to keep false alarms down. The tests also cover hostile input:
   huge or deeply nested files, duplicate JSON keys, `NaN`/`Infinity`, invisible Unicode, very large
   numbers.
@@ -54,11 +54,16 @@ anyone else's systems: every "attack" is a fake server or fake file written for 
   a normal call passed, an attempt to read an SSH key was blocked, and the confirmation window
   opened from the executable and returned the answer. The command line gave the same results as the
   Python version on a real PC (read only).
+- **Windows executables of 0.2.2.** Built without the development tools. The release zip was
+  extracted and every file marked as downloaded from the Internet, as Windows does. From there,
+  on a fake user folder: the command line scanned, the Shield protected a fake server and passed
+  a request through the protected entry, the confirmation window opened and blocked by itself at
+  the end of its countdown, and the app opened its window and closed normally.
 - **Real window.** On a real screen, the maximized window covered exactly the work area
   computed by Windows (2560×1386, taskbar excluded) and went back to the same place when restored.
 - **Speed.** The Shield adds about 0.06 ms per message.
 
-### Independent review
+### First review (version 0.2.0)
 
 Before release, a separate Claude Code session reviewed the whole project from scratch, without
 the context of the session that wrote it. It found **11 real bugs**. Each one got a test that
@@ -77,6 +82,41 @@ failed first, then a fix, then the same test passing:
 11. "remember for 10 minutes" did not cover calls that were already waiting.
 
 The documentation was corrected in the same pass wherever it promised more than the code did.
+
+### Second review (version 0.2.2)
+
+After the first public release, four more Claude Code sessions reviewed the project from
+scratch, each on one area and each with fake data only:
+
+- **the scanner on realistic setups** (paths with spaces, OneDrive folders, global npm and uv
+  installs, VS Code profiles, Codex and Copilot files): **20** problems, mostly false alarms;
+- **the Shield and the command line**, driven like a real client: **19** problems;
+- **the desktop app**, screen by screen: **21** problems;
+- **the documentation**, read as a beginner would: **14** problems.
+
+73 of these 74 problems are fixed in 0.2.2. The code fixes come with automated tests (200 new
+tests since 0.2.1); the app was also checked on screenshots in both languages and at two window
+sizes, and the documentation by hand. The one problem left is a known limit, written in
+[SECURITY.md](SECURITY.md): code that lists sensitive paths only to block them can be reported
+as if it read them.
+
+Among the most important fixes:
+
+1. names like `GIT_AUTHOR_NAME` or `--auth-mode` were reported as exposed secrets, and ordinary
+   skill and tool texts as tool poisoning; the default Shield then hid useful tools such as
+   `send_email`;
+2. a path with a space (for example `C:\Users\Mario Rossi\…`) switched off the code analysis,
+   so a poisoned server could look clean;
+3. one malformed Unicode character in a configuration or in a server's code stopped the whole
+   scan;
+4. any program named `guardia.exe` counted as "protected", and its real command was not
+   analyzed;
+5. the Shield could crash when the server closed first, and a rate limit could block the result
+   of a call that had already run;
+6. on Windows, stopping a server could leave its own child programs (such as `node` started by
+   `npx`) running;
+7. a request cancelled by the AI app while waiting for your confirmation was still carried out;
+8. protecting servers could stop halfway on a read-only file, leaving nothing to undo with.
 
 ### Found after release
 
@@ -109,22 +149,22 @@ uv run mypy
 ## Italiano
 
 Uno strumento di sicurezza vale quanto dimostrano i suoi test. Qui c'è cosa è stato eseguito
-davvero sulla versione 0.2.1, come, e cosa **non** è coperto. Niente è stato provato con malware
+davvero sulla versione 0.2.2, come, e cosa **non** è coperto. Niente è stato provato con malware
 vero o su sistemi di altri: ogni «attacco» è un server finto o un file finto scritto apposta.
 
 ### In numeri
 
 | | |
 |---|---|
-| Test automatici | **645**, tutti passati (`uv run pytest`) |
-| File di test | 27 |
+| Test automatici | **845**, tutti passati (`uv run pytest`) |
+| File di test | 35 |
 | Esempi finti (configurazioni, server, codice, skill) | 84 file in `tests/corpus/` |
-| Regole statiche, ognuna con almeno un caso finto malevolo e uno innocuo | 88 |
+| Regole statiche, ognuna con almeno un caso finto malevolo e uno innocuo | 90 |
 | Stile e tipi | `ruff` e `mypy --strict`: nessun problema |
 
 ### Cosa coprono i test
 
-- **Scanner.** Ognuna delle 88 regole è provata su un caso finto malevolo e su un caso innocuo che
+- **Scanner.** Ognuna delle 90 regole è provata su un caso finto malevolo e su un caso innocuo che
   gli somiglia apposta, per tenere bassi i falsi allarmi. I test coprono anche input ostili: file
   enormi o annidati, chiavi JSON doppie, `NaN`/`Infinity`, Unicode invisibile, numeri giganti.
 - **Scudo in tempo reale.** Un server MCP finto (`tests/corpus/shield/fake_server.py`) si comporta
@@ -158,12 +198,18 @@ vero o su sistemi di altri: ogni «attacco» è un server finto o un file finto 
   2026-07-28, una chiamata normale passata, un tentativo di leggere una chiave SSH bloccato, e la
   finestra di conferma aperta dall'eseguibile che ha restituito la risposta. La riga di comando ha
   dato gli stessi risultati della versione Python su un PC reale, in sola lettura.
+- **Eseguibili Windows della 0.2.2.** Costruiti senza gli strumenti di sviluppo. Lo zip della
+  versione è stato estratto e ogni file segnato come scaricato da Internet, come fa Windows. Da
+  lì, su una cartella utente finta: la riga di comando ha fatto la scansione, lo Scudo ha protetto
+  un server finto e ha fatto passare una richiesta dalla voce protetta, la finestra di conferma si
+  è aperta e ha bloccato da sola alla fine del conto alla rovescia, e l'app ha aperto la sua
+  finestra e si è chiusa normalmente.
 - **Finestra vera.** Su uno schermo reale, la finestra ingrandita ha coperto
   esattamente l'area di lavoro calcolata da Windows (2560×1386, barra delle applicazioni esclusa)
   ed è tornata allo stesso posto quando è stata ripristinata.
 - **Velocità.** Lo Scudo aggiunge circa 0,06 ms per messaggio.
 
-### Revisione indipendente
+### Prima revisione (versione 0.2.0)
 
 Prima della pubblicazione, una sessione separata di Claude Code ha rivisto tutto il progetto da
 zero, senza il contesto della sessione che l'aveva scritto. Ha trovato **11 bug veri**. Per ognuno
@@ -187,6 +233,44 @@ prima un test che falliva, poi la correzione, poi lo stesso test che passa:
 
 Nello stesso passaggio la documentazione è stata corretta dove prometteva più di quello che il
 codice fa.
+
+### Seconda revisione (versione 0.2.2)
+
+Dopo la prima pubblicazione, altre quattro sessioni di Claude Code hanno rivisto il progetto da
+zero, ognuna su una parte e sempre con dati finti:
+
+- **lo scanner su configurazioni realistiche** (percorsi con spazi, cartelle OneDrive,
+  installazioni globali di npm e uv, profili di VS Code, file di Codex e Copilot): **20**
+  problemi, soprattutto falsi allarmi;
+- **lo Scudo e la riga di comando**, usati come farebbe un client vero: **19** problemi;
+- **l'app desktop**, schermata per schermata: **21** problemi;
+- **la documentazione**, letta come la leggerebbe un principiante: **14** problemi.
+
+73 di questi 74 problemi sono corretti nella 0.2.2. Le correzioni al codice hanno i loro test
+automatici (200 test nuovi dalla 0.2.1); l'app è stata controllata anche sulle schermate, in
+tutte e due le lingue e con due dimensioni di finestra, e la documentazione a mano. L'unico
+problema rimasto è un limite noto, scritto in [SECURITY.md](SECURITY.md): il codice che elenca
+percorsi sensibili solo per bloccarli può essere segnalato come se li leggesse.
+
+Tra le correzioni più importanti:
+
+1. nomi come `GIT_AUTHOR_NAME` o `--auth-mode` venivano segnalati come segreti esposti, e testi
+   normali di skill e strumenti come tool poisoning; lo Scudo predefinito nascondeva poi
+   strumenti utili come `send_email`;
+2. un percorso con uno spazio (per esempio `C:\Users\Mario Rossi\…`) spegneva l'analisi del
+   codice, così un server avvelenato poteva sembrare pulito;
+3. un solo carattere Unicode malformato in una configurazione o nel codice di un server fermava
+   tutta la scansione;
+4. qualsiasi programma chiamato `guardia.exe` contava come «protetto», e il suo comando vero non
+   veniva analizzato;
+5. lo Scudo poteva andare in crash quando il server si chiudeva per primo, e un limite di
+   frequenza poteva bloccare il risultato di una chiamata già eseguita;
+6. su Windows, fermare un server poteva lasciare attivi i programmi avviati da lui (come `node`
+   avviato da `npx`);
+7. una richiesta annullata dall'app AI mentre aspettava la tua conferma veniva eseguita lo
+   stesso;
+8. proteggere i server poteva fermarsi a metà su un file in sola lettura, senza lasciare niente
+   con cui tornare indietro.
 
 ### Trovato dopo la pubblicazione
 

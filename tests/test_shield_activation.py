@@ -98,7 +98,12 @@ def test_unwrap_recognizes_only_shield_wrappers() -> None:
 
 
 def test_launcher_uses_the_running_guardia(monkeypatch: pytest.MonkeyPatch) -> None:
-    assert launcher() == [sys.executable, "-m", "guardia"]
+    assert launcher() == [sys.executable, "-I", "-m", "guardia"]
+    command, args = wrap(launcher(), "github", "npx", ["-y", "server"])
+    wrapped = unwrap(command, args)
+    assert wrapped is not None
+    assert wrapped.launcher == (sys.executable, "-I", "-m", "guardia")
+    assert (wrapped.command, wrapped.args) == ("npx", ("-y", "server"))
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     assert launcher() == [str(Path(sys.executable).with_name("guardia.exe"))]
 
@@ -193,12 +198,34 @@ def test_user_edits_are_never_overwritten(
     activations.enable(servers(env, "github"), ["guardia"])
     document = json.loads(desktop_config(env).read_text(encoding="utf-8"))
     document["mcpServers"]["github"]["args"].append("--my-change")
+    document["mcpServers"]["github"]["env"] = {"GITHUB_TOKEN": "${input:rotated}"}
     desktop_config(env).write_text(json.dumps(document), encoding="utf-8")
     report = activations.disable(["github"])
-    assert [c.outcome for c in report.changes] == [Outcome.CHANGED]
-    assert "--my-change" in desktop_config(env).read_text(encoding="utf-8")
-    assert len(activations.records()) == 1
+    assert [c.outcome for c in report.changes] == [Outcome.DONE]
+    restored = json.loads(desktop_config(env).read_text(encoding="utf-8"))["mcpServers"]["github"]
+    assert restored["command"] == "npx"
+    assert restored["args"][-1] == "--my-change"
+    assert "scudo" not in restored["args"]
+    assert restored["env"] == {"GITHUB_TOKEN": "${input:rotated}"}
+    assert activations.records() == []
     assert [c.outcome for c in activations.disable(["nope"]).changes] == [Outcome.NOT_RECORDED]
+
+
+def test_disable_forgets_entries_unwrapped_by_hand(
+    env: HostEnvironment, write_json: WriteJson, write_text: WriteText
+) -> None:
+    setup(env, write_json, write_text)
+    activations, _ = store(env)
+    activations.enable(servers(env, "github"), ["guardia"])
+    document = json.loads(desktop_config(env).read_text(encoding="utf-8"))
+    document["mcpServers"]["github"] = {"command": "npx", "args": ["-y", "by-hand"]}
+    desktop_config(env).write_text(json.dumps(document), encoding="utf-8")
+    before = desktop_config(env).read_bytes()
+    report = activations.disable(["github"])
+    assert [c.outcome for c in report.changes] == [Outcome.ALREADY]
+    assert desktop_config(env).read_bytes() == before
+    assert activations.records() == []
+    assert activations.disable(["github"]).changes[0].outcome is Outcome.NOT_RECORDED
 
 
 def test_stale_plan_is_not_written(
@@ -230,7 +257,7 @@ def test_v1_still_scans_the_original_command(
     )
     original = servers(env, "github")[0].fingerprint
     activations, _ = store(env)
-    activations.enable(servers(env, "github"), [sys.executable, "-m", "guardia"])
+    activations.enable(servers(env, "github"), launcher())
     after = sorted(
         f.rule_id for f in analyze(env, options).findings if f.params.get("server") == "github"
     )

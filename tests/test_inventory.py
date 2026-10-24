@@ -314,7 +314,7 @@ def test_invalid_entries_and_duplicates_produce_warnings(
     warnings = inventory.loaded_sources[0].warnings
     assert "invalid_args:/mcpServers/good/args" in warnings
     assert "invalid_entry:/mcpServers/bad" in warnings
-    assert "duplicate_key:dup" in warnings
+    assert "duplicate_key:/mcpServers/dup" in warnings
 
 
 def test_utf16_file_written_by_old_powershell_is_read(env: HostEnvironment) -> None:

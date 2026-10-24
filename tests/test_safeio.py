@@ -53,7 +53,7 @@ def test_strict_json_does_not_accept_comments() -> None:
 def test_duplicate_keys_are_reported() -> None:
     parsed = parse_json('{"a": 1, "a": 2, "b": {"c": 1, "c": 3}}')
     assert parsed.value == {"a": 2, "b": {"c": 3}}
-    assert sorted(parsed.duplicate_keys) == ["a", "c"]
+    assert parsed.duplicate_keys == ["/a", "/b/c"]
 
 
 @pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity"])

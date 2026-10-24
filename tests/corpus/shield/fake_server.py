@@ -80,7 +80,7 @@ def handle(message):
     if method == "initialize":
         value = {
             "protocolVersion": "2025-11-25",
-            "capabilities": {"tools": {}},
+            "capabilities": {"tools": {"listChanged": "--list-changed" in FLAGS}},
             "serverInfo": {"name": "fake", "version": "1.0.0"},
         }
         if "--instructions" in FLAGS:

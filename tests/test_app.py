@@ -192,7 +192,7 @@ def test_api_exposes_only_intended_methods(env: HostEnvironment) -> None:
         "shield_approve_tools",
         "shield_approve_rules",
         "shield_rules_text",
-        "shield_rules_example",
+        "shield_rules_template",
         "shield_rules_save",
     }
 
@@ -507,5 +507,5 @@ def test_shield_events_are_labelled_in_the_ledger_view(env: HostEnvironment) -> 
     ledger.append("shield_stop", {"server": "github", "forwarded": 12, "blocked": 2, "dropped": 1})
     events = make_api(env).ledger(5)["events"]
     assert [event["label"] for event in events] == ["Scudo fermato", "Scudo avviato"]
-    assert events[0]["details"] == "github: 12 inoltrati, 2 bloccati, 1 scartati"
+    assert events[0]["details"] == "github · inoltrati 12 · bloccati 2 · scartati 1"
     assert events[1]["details"] == "github"

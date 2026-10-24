@@ -36,6 +36,7 @@ class BaselineStatus:
     COMPARED = "compared"
     ACCEPTED = "accepted"
     DAMAGED = "damaged"
+    ERROR = "error"
 
 
 @dataclass(slots=True)

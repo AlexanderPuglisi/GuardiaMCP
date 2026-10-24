@@ -20,9 +20,17 @@ from guardia.shield.messages import (
     error_response,
     parse_message,
 )
-from guardia.shield.session import Admission, Pending, Session
+from guardia.shield.session import (
+    Admission,
+    Pending,
+    PendingKey,
+    Session,
+    cancelled_request,
+    pending_key,
+)
 
 Report = Callable[[str], None]
+Resolver = Callable[[threading.Event], "Decision"]
 
 
 class Verdict(enum.Enum):
@@ -38,12 +46,15 @@ class Decision:
     replacement: Message | None = None
     reason: str = ""
     explanation: str = ""
-    resolve: Callable[[], Decision] | None = None
+    resolve: Resolver | None = None
 
 
 FORWARD = Decision(Verdict.FORWARD)
 INTERNAL_FAILURE = Decision(Verdict.REJECT, reason="internal")
+CANCELLED = Decision(Verdict.DROP, reason="cancelled")
 MAX_DEFERRED = 8
+
+WaitingKey = tuple[Direction, PendingKey]
 
 
 class Inspector(Protocol):
@@ -86,6 +97,21 @@ class Proxy:
         self.session = Session()
         self.stats: Counter[tuple[Direction, Outcome]] = Counter()
         self._deferred = 0
+        self._idle = threading.Condition(self._stats_lock)
+        self._waiting: dict[WaitingKey, threading.Event] = {}
+        self._detached: list[threading.Event] = []
+        self._settling = threading.Lock()
+
+    def send_to_client(self, message: Message) -> bool:
+        return self._writers[Direction.TO_CLIENT].write(message.encode())
+
+    def cancel_waiting(self, timeout: float) -> bool:
+        with self._stats_lock:
+            events = [*self._waiting.values(), *self._detached]
+        for event in events:
+            event.set()
+        with self._idle:
+            return self._idle.wait_for(lambda: self._deferred == 0, timeout)
 
     def total(self, *outcomes: Outcome) -> int:
         with self._stats_lock:
@@ -144,6 +170,7 @@ class Proxy:
             return pending
         if message.kind is MessageKind.NOTIFICATION:
             self.session.cancel(direction, message)
+            self._cancel(direction, message)
             return True
         admission = self.session.begin(direction, message)
         if admission is Admission.ACCEPTED:
@@ -175,31 +202,72 @@ class Proxy:
     def _release(self) -> None:
         with self._stats_lock:
             self._deferred -= 1
+            self._idle.notify_all()
+
+    def _cancel(self, direction: Direction, message: Message) -> None:
+        request_id = cancelled_request(message)
+        if request_id is None:
+            return
+        with self._settling:
+            with self._stats_lock:
+                event = self._waiting.get((direction, pending_key(request_id)))
+            if event is not None:
+                event.set()
+
+    def _track(
+        self, direction: Direction, message: Message
+    ) -> tuple[threading.Event, WaitingKey | None]:
+        cancelled = threading.Event()
+        if message.kind is not MessageKind.REQUEST or message.id is None:
+            with self._stats_lock:
+                self._detached.append(cancelled)
+            return cancelled, None
+        key = (direction, pending_key(message.id))
+        with self._stats_lock:
+            self._waiting[key] = cancelled
+        return cancelled, key
+
+    def _untrack(self, cancelled: threading.Event, key: WaitingKey | None) -> bool:
+        with self._stats_lock:
+            if key is None:
+                self._detached.remove(cancelled)
+            elif self._waiting.get(key) is cancelled:
+                del self._waiting[key]
+            return cancelled.is_set()
 
     def _defer(self, direction: Direction, message: Message, decision: Decision) -> bool:
         if decision.resolve is None or not self._reserve():
             self._report("shield.too_many_waiting", direction)
             return self._apply(direction, message, INTERNAL_FAILURE)
+        cancelled, key = self._track(direction, message)
         threading.Thread(
             target=self._settle,
-            args=(direction, message, decision.resolve),
+            args=(direction, message, decision.resolve, cancelled, key),
             name="guardia-shield-confirm",
             daemon=True,
         ).start()
         return True
 
     def _settle(
-        self, direction: Direction, message: Message, resolve: Callable[[], Decision]
+        self,
+        direction: Direction,
+        message: Message,
+        resolve: Resolver,
+        cancelled: threading.Event,
+        key: WaitingKey | None,
     ) -> None:
         try:
-            final = resolve()
+            final = resolve(cancelled)
         except Exception:
             self._report("shield.inspector_failed", direction)
             final = INTERNAL_FAILURE
         if not isinstance(final, Decision) or final.verdict is Verdict.DEFER:
             final = INTERNAL_FAILURE
         try:
-            self._apply(direction, message, final)
+            with self._settling:
+                if self._untrack(cancelled, key):
+                    final = CANCELLED
+                self._apply(direction, message, final)
         finally:
             self._release()
 

@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import contextlib
+import io
+import signal
+import sys
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import IO
 
@@ -11,13 +16,21 @@ from guardia.ledger import Ledger
 from guardia.redact import redact_args
 from guardia.secure_store import KeyStoreError
 from guardia.shield.framing import MAX_MESSAGE_BYTES, FrameWriter
-from guardia.shield.messages import Direction
-from guardia.shield.process import GRACE_SECONDS, LaunchError, ServerProcess
+from guardia.shield.messages import Direction, Message
+from guardia.shield.process import (
+    GRACE_SECONDS,
+    LaunchError,
+    ServerProcess,
+    UnsafeArgumentError,
+)
 from guardia.shield.proxy import Inspector, Outcome, Passthrough, Proxy, Report
 
 EXIT_SHIELD_FAILED = 3
 MAX_LOGGED_ARGS = 40
 NAME_WIDTH = 80
+WAIT_STEP_SECONDS = 0.25
+SETTLE_SECONDS = 5.0
+LARGEST_EXIT_CODE = 0x7FFFFFFF
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +64,47 @@ def _summary(proxy: Proxy, code: int, seconds: float) -> dict[str, object]:
     }
 
 
+def exit_status(code: int) -> int:
+    return code - (1 << 32) if code > LARGEST_EXIT_CODE else code
+
+
+def _private_reader(stream: IO[bytes]) -> IO[bytes]:
+    standard: object = getattr(sys.stdin, "buffer", None)
+    if stream is not standard:
+        return stream
+    try:
+        if stream.isatty():
+            return stream
+        descriptor = stream.fileno()
+    except (OSError, ValueError):
+        return stream
+    return io.BufferedReader(io.FileIO(descriptor, "rb", closefd=False))
+
+
+def _wait(finished: threading.Event) -> bool:
+    try:
+        while not finished.wait(WAIT_STEP_SECONDS):
+            pass
+    except KeyboardInterrupt:
+        with contextlib.suppress(ValueError):
+            signal.signal(signal.SIGINT, signal.SIG_IGN)
+        return True
+    return False
+
+
+def _launch(
+    options: ShieldOptions, t: Translator, report: Report, ledger: Ledger | None, name: str
+) -> ServerProcess | None:
+    try:
+        return ServerProcess.start(options.command)
+    except UnsafeArgumentError:
+        report(t("shield.unsafe_argument"))
+    except LaunchError as exc:
+        report(t("shield.launch_failed", error=safe_text(str(exc), 200)))
+    _record(ledger, "shield_stop", {"server": name, "launch_failed": True})
+    return None
+
+
 def run_shield(
     options: ShieldOptions,
     *,
@@ -69,33 +123,46 @@ def run_shield(
     if failure is not None:
         report(t("shield.ledger_failed", error=failure))
         return EXIT_SHIELD_FAILED
-    try:
-        process = ServerProcess.start(options.command)
-    except LaunchError as exc:
-        report(t("shield.launch_failed", error=safe_text(str(exc), 200)))
-        _record(ledger, "shield_stop", {"server": name, "launch_failed": True})
+    process = _launch(options, t, report, ledger, name)
+    if process is None:
         return EXIT_SHIELD_FAILED
     report(t("shield.started", server=name, pid=process.pid))
     started = time.monotonic()
+    to_client = FrameWriter(client_out)
     proxy = Proxy(
-        to_client=FrameWriter(client_out),
+        to_client=to_client,
         to_server=FrameWriter(process.stdin),
         inspector=inspector or Passthrough(),
         report=report,
         t=t,
         limit=options.limit,
     )
+    attach: Callable[[Callable[[Message], bool]], None] | None = getattr(inspector, "attach", None)
+    if attach is not None:
+        attach(proxy.send_to_client)
+    reader = _private_reader(client_in)
+    finished = threading.Event()
 
     def client_side() -> None:
-        proxy.pump(Direction.TO_SERVER, client_in)
+        proxy.pump(Direction.TO_SERVER, reader)
         process.stop(options.grace)
 
+    def server_side() -> None:
+        proxy.pump(Direction.TO_CLIENT, process.stdout)
+        finished.set()
+
     threading.Thread(target=client_side, name="guardia-shield-client", daemon=True).start()
-    proxy.pump(Direction.TO_CLIENT, process.stdout)
-    code = process.stop(options.grace)
+    threading.Thread(target=server_side, name="guardia-shield-server", daemon=True).start()
+    interrupted = _wait(finished)
+    code = process.stop(0 if interrupted else options.grace)
+    finished.wait(options.grace)
+    proxy.cancel_waiting(SETTLE_SECONDS)
+    to_client.close()
     summary = _summary(proxy, code, time.monotonic() - started)
+    if interrupted:
+        summary["interrupted"] = True
     failure = _record(ledger, "shield_stop", {"server": name, **summary})
     if failure is not None:
         report(t("shield.ledger_failed_stop", error=failure))
     report(t("shield.stopped", server=name, **summary))
-    return code
+    return exit_status(code)

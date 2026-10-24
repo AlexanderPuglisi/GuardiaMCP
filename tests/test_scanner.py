@@ -157,7 +157,7 @@ def test_file_level_findings(
     assert "il contenuto non è in un formato valido" in output
 
 
-def test_conflicting_definitions_across_clients(
+def test_conflicting_definitions_only_where_they_load_together(
     env: HostEnvironment, write_json: WriteJson
 ) -> None:
     write_json(
@@ -169,7 +169,18 @@ def test_conflicting_definitions_across_clients(
         {"mcpServers": {"docs": {"command": "uvx", "args": ["docs-mcp==2.0.0"]}}},
     )
     report = scan_inventory(discover(env))
-    assert all([f.rule_id for f in r.findings] == ["G12-003"] for r in report.servers)
+    assert all(f.rule_id != "G12-003" for r in report.servers for f in r.findings)
+    write_json(
+        env.cwd / ".cursor" / "mcp.json",
+        {"mcpServers": {"docs": {"command": "uvx", "args": ["docs-mcp==3.0.0"]}}},
+    )
+    report = scan_inventory(discover(env))
+    flagged = sorted(
+        (r.server.source.client.value, r.server.source.scope.value)
+        for r in report.servers
+        if [f.rule_id for f in r.findings] == ["G12-003"]
+    )
+    assert flagged == [("cursor", "project"), ("cursor", "user")]
 
 
 def test_json_lines_locates_nested_members() -> None:

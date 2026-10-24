@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import re
 import struct
 from pathlib import Path
 
@@ -41,6 +42,20 @@ def test_both_programs_ship_a_dotnet_config_for_downloaded_zips() -> None:
     build = (PROJECT / "scripts" / "build_exe.py").read_text(encoding="utf-8")
     assert 'PROGRAMS = ("guardia.exe", "GuardiaMCP.exe")' in build
     assert 'shutil.copy2(DOTNET_CONFIG, FOLDER / f"{program}.config")' in build
+
+
+def test_zip_carries_every_file_the_readme_links_to() -> None:
+    build = (PROJECT / "scripts" / "build_exe.py").read_text(encoding="utf-8")
+    shipped = {*ast.literal_eval(build.split("EXTRA_FILES = ", 1)[1].split(")", 1)[0] + ")")}
+    guides = ast.literal_eval(build.split("GUIDES = ", 1)[1].split(")", 1)[0] + ")")
+    shipped |= {f"docs/{name}" for name in guides}
+    readme = (PROJECT / "README.md").read_text(encoding="utf-8")
+    for target in re.findall(r"\]\(((?!https?:)[^)#]+)\)|src=\"([^\"]+)\"", readme):
+        link = next(part for part in target if part)
+        assert link in shipped, link
+    spec = (PACKAGING / "guardia.spec").read_text(encoding="utf-8")
+    for module in ("cryptography", "setuptools", "pkg_resources"):
+        assert f'"{module}"' in spec
 
 
 def test_icon_contains_small_and_large_sizes() -> None:
