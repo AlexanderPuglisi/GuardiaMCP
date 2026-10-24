@@ -49,7 +49,8 @@ def test_guide_escapes_markdown_from_rule_texts() -> None:
             assert not re.search(r"(?<!\\)<", body), line
 
 
-def test_list_shows_every_rule(env: HostEnvironment) -> None:
+def test_list_shows_every_rule(env: HostEnvironment, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GUARDIA_LANG", "it")
     code, output = run("regole", env=env)
     assert code == 0
     for rule_id in RULES:
