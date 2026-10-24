@@ -6,7 +6,7 @@
 
 **[Step-by-step guide with screenshots](docs/GUIDE.md)** · **[Guida passo passo con foto](docs/GUIDA.md)**
 
-[How it was tested](TESTING.md) · [Security](SECURITY.md) · [For reviewers](AUDIT.md) · [Guide (EN)](docs/SHIELD.md) · [Guida (IT)](docs/SCUDO.md)
+[![Tests](https://github.com/AlexanderPuglisi/guardia-mcp/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/AlexanderPuglisi/guardia-mcp/actions/workflows/tests.yml) · [How it was tested](TESTING.md) · [Security](SECURITY.md) · [For reviewers](AUDIT.md) · [Guide (EN)](docs/SHIELD.md) · [Guida (IT)](docs/SCUDO.md)
 
 > 🇬🇧 English below · 🇮🇹 Italiano più sotto
 

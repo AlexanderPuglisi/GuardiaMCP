@@ -38,7 +38,7 @@ uv run ruff check src tests scripts packaging
 uv run mypy
 ```
 
-All four checks must be green before a pull request. `tests/test_shield_sdk.py` runs the Shield between a client and a fake server made with the official MCP Python SDK (`mcp`, a development-only dependency pinned in `uv.lock`): the published Guardia has no runtime dependency on it.
+All four checks must be green before a pull request, and GitHub runs them again on every pull request ([Tests](https://github.com/AlexanderPuglisi/guardia-mcp/actions/workflows/tests.yml)), on a Windows set to English. A test that expects a language sets it with `GUARDIA_LANG`, so it passes on every computer. `tests/test_shield_sdk.py` runs the Shield between a client and a fake server made with the official MCP Python SDK (`mcp`, a development-only dependency pinned in `uv.lock`): the published Guardia has no runtime dependency on it.
 
 ### Where things are
 
@@ -144,7 +144,7 @@ uv run ruff check src tests scripts packaging
 uv run mypy
 ```
 
-Tutti e quattro i controlli devono essere verdi prima di una pull request. `tests/test_shield_sdk.py` fa passare dallo Scudo un client e un server finto costruiti con l'SDK Python ufficiale di MCP (`mcp`, dipendenza solo di sviluppo bloccata in `uv.lock`): Guardia pubblicato non dipende da lui.
+Tutti e quattro i controlli devono essere verdi prima di una pull request, e GitHub li ripete a ogni pull request ([Tests](https://github.com/AlexanderPuglisi/guardia-mcp/actions/workflows/tests.yml)), su un Windows in inglese. Un test che si aspetta una lingua la imposta con `GUARDIA_LANG`, così passa su ogni computer. `tests/test_shield_sdk.py` fa passare dallo Scudo un client e un server finto costruiti con l'SDK Python ufficiale di MCP (`mcp`, dipendenza solo di sviluppo bloccata in `uv.lock`): Guardia pubblicato non dipende da lui.
 
 ### Dove si trovano le cose
 
