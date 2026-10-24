@@ -7,14 +7,14 @@
 ## English
 
 A security tool is only worth what its tests prove. This page lists what was actually run on
-version 0.2.2, how, and what is **not** covered. Nothing here was run against real malware or
+version 0.2.3, how, and what is **not** covered. Nothing here was run against real malware or
 anyone else's systems: every "attack" is a fake server or fake file written for the purpose.
 
 ### In numbers
 
 | | |
 |---|---|
-| Automated tests | **845**, all passing (`uv run pytest`) |
+| Automated tests | **846**, all passing (`uv run pytest`) |
 | Test files | 35 |
 | Fake samples (configurations, servers, code, skills) | 84 files in `tests/corpus/` |
 | Static rules, each with at least one malicious and one harmless fake case | 90 |
@@ -54,7 +54,7 @@ anyone else's systems: every "attack" is a fake server or fake file written for 
   a normal call passed, an attempt to read an SSH key was blocked, and the confirmation window
   opened from the executable and returned the answer. The command line gave the same results as the
   Python version on a real PC (read only).
-- **Windows executables of 0.2.2.** Built without the development tools. The release zip was
+- **Windows executables of 0.2.3.** Built without the development tools. The release zip was
   extracted and every file marked as downloaded from the Internet, as Windows does. From there,
   on a fake user folder: the command line scanned, the Shield protected a fake server and passed
   a request through the protected entry, the confirmation window opened and blocked by itself at
@@ -127,6 +127,12 @@ marking every file of the release zip the same way, fixed in 0.2.1 with a `.exe.
 each program, and checked again: with the fix both the app and the confirmation window open, without
 it the same error comes back. A test keeps the configuration in the build.
 
+In version 0.2.2 the animated glowing border never appeared with the window maximized, which is
+how the app opens since that version, and when the window was smaller it was only a 1-pixel line.
+Version 0.2.3 replaces it with a soft red halo that travels along the edge in every window state.
+It was checked on the real app, with pictures of the window a few seconds apart, and a test keeps
+it visible.
+
 ### Not covered
 
 - **macOS and Linux**: the code paths exist, but they were not tried on real machines.
@@ -149,14 +155,14 @@ uv run mypy
 ## Italiano
 
 Uno strumento di sicurezza vale quanto dimostrano i suoi test. Qui c'è cosa è stato eseguito
-davvero sulla versione 0.2.2, come, e cosa **non** è coperto. Niente è stato provato con malware
+davvero sulla versione 0.2.3, come, e cosa **non** è coperto. Niente è stato provato con malware
 vero o su sistemi di altri: ogni «attacco» è un server finto o un file finto scritto apposta.
 
 ### In numeri
 
 | | |
 |---|---|
-| Test automatici | **845**, tutti passati (`uv run pytest`) |
+| Test automatici | **846**, tutti passati (`uv run pytest`) |
 | File di test | 35 |
 | Esempi finti (configurazioni, server, codice, skill) | 84 file in `tests/corpus/` |
 | Regole statiche, ognuna con almeno un caso finto malevolo e uno innocuo | 90 |
@@ -198,7 +204,7 @@ vero o su sistemi di altri: ogni «attacco» è un server finto o un file finto 
   2026-07-28, una chiamata normale passata, un tentativo di leggere una chiave SSH bloccato, e la
   finestra di conferma aperta dall'eseguibile che ha restituito la risposta. La riga di comando ha
   dato gli stessi risultati della versione Python su un PC reale, in sola lettura.
-- **Eseguibili Windows della 0.2.2.** Costruiti senza gli strumenti di sviluppo. Lo zip della
+- **Eseguibili Windows della 0.2.3.** Costruiti senza gli strumenti di sviluppo. Lo zip della
   versione è stato estratto e ogni file segnato come scaricato da Internet, come fa Windows. Da
   lì, su una cartella utente finta: la riga di comando ha fatto la scansione, lo Scudo ha protetto
   un server finto e ha fatto passare una richiesta dalla voce protetta, la finestra di conferma si
@@ -281,6 +287,12 @@ Il problema è stato riprodotto qui segnando allo stesso modo ogni file dello zi
 0.2.1 con un file `.exe.config` accanto a ogni programma, e ricontrollato: con la correzione si aprono
 sia l'app sia la finestra di conferma, senza torna lo stesso errore. Un test tiene la
 configurazione nella build.
+
+Nella versione 0.2.2 il bordo luminoso animato non compariva mai con la finestra ingrandita, che
+da quella versione è il modo in cui l'app si apre, e con la finestra più piccola era solo una linea
+di un pixel. La versione 0.2.3 lo sostituisce con un alone rosso morbido che scorre lungo il bordo
+in ogni stato della finestra. È stato controllato sull'app vera, con foto della finestra a pochi
+secondi di distanza, e un test lo tiene visibile.
 
 ### Non coperto
 

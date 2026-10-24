@@ -42,6 +42,33 @@ def test_confirm_window_says_what_is_remembered() -> None:
         assert messages["confirm.remember_method"] != messages["confirm.remember"]
 
 
+def css_rules(css: str, selector: str) -> list[str]:
+    return [
+        body
+        for selectors, body in re.findall(r"([^{}]+)\{([^{}]*)\}", css)
+        if selector in [part.strip() for part in selectors.split(",")]
+    ]
+
+
+def test_glow_travels_along_the_edge_in_every_window_state() -> None:
+    for name in ("app.css", "confirm.css"):
+        css = (WEB / name).read_text(encoding="utf-8")
+        light = " ".join(css_rules(css, ".glow i"))
+        assert "offset-path: inset(" in light, name
+        assert "animation: glow-orbit" in light, name
+        assert "display: none" not in light, name
+        keyframes = re.search(r"@keyframes glow-orbit \{(.*?)\}\s*\}", css, re.DOTALL)
+        assert keyframes is not None, name
+        assert "offset-distance: 0%" in keyframes.group(1)
+        assert "offset-distance: 100%" in keyframes.group(1)
+    css = (WEB / "app.css").read_text(encoding="utf-8")
+    assert all("display: none" not in body for body in css_rules(css, ".maximized .glow"))
+    assert all("display: none" not in body for body in css_rules(css, ".maximized .glow i"))
+    assert "display: none" in " ".join(css_rules(css, '[data-glow="off"] .glow i'))
+    page = build_page()
+    assert page.count('<div class="glow" aria-hidden="true"><i></i><i></i></div>') == 1
+
+
 def test_page_explains_a_program_that_does_not_answer() -> None:
     page = build_page()
     assert 'id="boot"' in page

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="340" viewBox="0 0 1280 340" role="img" aria-labelledby="title desc">
   <title id="title">Guardia MCP</title>
-  <desc id="desc">Free, offline security shield for AI agents that use the Model Context Protocol. Open source, no telemetry, 845 automated tests, reviewed from scratch by separate AI sessions, Apache 2.0. By Alexander Puglisi.</desc>
+  <desc id="desc">Free, offline security shield for AI agents that use the Model Context Protocol. Open source, no telemetry, 846 automated tests, reviewed from scratch by separate AI sessions, Apache 2.0. By Alexander Puglisi.</desc>
   <defs>
     <radialGradient id="glow" cx="0.16" cy="0.5" r="0.55">
       <stop offset="0" stop-color="#8e1b1b" stop-opacity="0.55"/>
@@ -31,7 +31,7 @@
       <rect x="633" y="228" width="156" height="32" rx="16" fill="#1d1d23" stroke="#c4332b"/>
       <text x="711" y="249" text-anchor="middle" fill="#ece9e6">NO TELEMETRY</text>
       <rect x="801" y="228" width="118" height="32" rx="16" fill="#1d1d23" stroke="#c4332b"/>
-      <text x="860" y="249" text-anchor="middle" fill="#ece9e6">845 TESTS</text>
+      <text x="860" y="249" text-anchor="middle" fill="#ece9e6">846 TESTS</text>
       <rect x="931" y="228" width="252" height="32" rx="16" fill="#1d1d23" stroke="#c4332b"/>
       <text x="1057" y="249" text-anchor="middle" fill="#ece9e6">REVIEWED FROM SCRATCH</text>
       <rect x="343" y="272" width="126" height="32" rx="16" fill="#1d1d23" stroke="#c4332b"/>

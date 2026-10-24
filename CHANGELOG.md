@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.3 — 24 October 2026
+
+- **Fixed**: the animated glowing border never appeared with the window maximized (how the app
+  opens since 0.2.2), and otherwise it was a 1-pixel line. It is now a soft red halo with two
+  gentle lights that travel slowly along the edge, full screen or not, and in the confirmation
+  window too. *Settings → Animated glowing border* turns it off; with Windows animations off the
+  lights stay still.
+
 ## 0.2.2 — 24 October 2026
 
 A careful pass on everything. Four separate reviews (scanner, Shield and command line, app,

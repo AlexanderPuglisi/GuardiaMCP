@@ -13,13 +13,13 @@ No programming needed. You need Windows (tested on Windows 11) and five minutes.
 ## 1. Download and check
 
 1. Open the [**Releases**](https://github.com/AlexanderPuglisi/guardia-mcp/releases/latest) page and
-   download two files: `GuardiaMCP-0.2.2-windows-x64.zip` and `SHA256SUMS.txt`.
+   download two files: `GuardiaMCP-0.2.3-windows-x64.zip` and `SHA256SUMS.txt`.
 2. Check that the zip is the right one. Open **PowerShell** (Start menu → type `PowerShell` →
    Enter), paste these two lines and press Enter:
 
    ```powershell
    $sum = ((Get-Content "$env:USERPROFILE\Downloads\SHA256SUMS.txt" | Select-String 'windows-x64.zip').Line -split '\s+')[0]
-   (Get-FileHash "$env:USERPROFILE\Downloads\GuardiaMCP-0.2.2-windows-x64.zip").Hash -eq $sum
+   (Get-FileHash "$env:USERPROFILE\Downloads\GuardiaMCP-0.2.3-windows-x64.zip").Hash -eq $sum
    ```
 
    It must print **True**. If it prints `False`, do not open the zip: download it again.
