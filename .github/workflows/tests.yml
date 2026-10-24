@@ -1,0 +1,39 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Windows · ruff, mypy, pytest
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+        with:
+          version: "0.11.7"
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install
+        run: uv sync --locked --extra app
+      - name: Lint
+        run: uv run --locked ruff check src tests scripts packaging
+      - name: Format
+        run: uv run --locked ruff format --check src tests scripts
+      - name: Types
+        run: uv run --locked mypy
+      - name: Tests
+        run: uv run --locked pytest -p no:cacheprovider
