@@ -2,7 +2,7 @@
   <img src="docs/banner.svg" alt="Guardia MCP: free, offline security shield for AI agents that use MCP, by Alexander Puglisi" width="100%">
 </p>
 
-**by Alexander Puglisi** · [alexanderpuglisiskilly.com](https://alexanderpuglisiskilly.com) · [Download](https://github.com/AlexanderPuglisi/guardia-mcp/releases/latest) · [✓ Claude Academy: Introduction to MCP](https://academy.claude.com/verify/5a6125d6ee0ea408559c3679d0ff2657)
+**by Alexander Puglisi** · [alexanderpuglisiskilly.com](https://alexanderpuglisiskilly.com) · [Download](https://github.com/AlexanderPuglisi/guardia-mcp/releases/latest) · [✓ Claude Academy: Introduction to MCP](https://academy.claude.com/verify/5a6125d6ee0ea408559c3679d0ff2657) · [✓ Claude Academy: MCP Advanced Topics](https://academy.claude.com/verify/d3957736dde1f145d365218c130d52fa)
 
 **[Step-by-step guide with screenshots](docs/GUIDE.md)** · **[Guida passo passo con foto](docs/GUIDA.md)**
 
@@ -253,7 +253,8 @@ Anthropic's AI coding agent, which is listed as a contributor: every commit carr
 Before writing any code I studied the protocol with Anthropic's official course
 ([Claude Academy badge: Introduction to Model Context Protocol](https://academy.claude.com/verify/5a6125d6ee0ea408559c3679d0ff2657)). Then I built Guardia in
 one intensive day, 23 October 2026: the static scanner (v1), the real-time Shield (v2.0 to v2.5) and
-finally the review from scratch.
+finally the review from scratch. The next day, while preparing version 0.2.2, I also completed the
+advanced course ([Claude Academy badge: Model Context Protocol: Advanced Topics](https://academy.claude.com/verify/d3957736dde1f145d365218c130d52fa)).
 
 — Alexander Puglisi
 
@@ -515,7 +516,8 @@ chi ha fatto cosa.
 Prima di scrivere codice ho studiato il protocollo con il corso ufficiale di Anthropic
 ([badge Claude Academy: Introduction to Model Context Protocol](https://academy.claude.com/verify/5a6125d6ee0ea408559c3679d0ff2657)). Poi ho costruito Guardia
 in una giornata intensa, il 23 ottobre 2026: lo scanner statico (v1), lo Scudo in tempo reale
-(dalla v2.0 alla v2.5) e infine la revisione da zero.
+(dalla v2.0 alla v2.5) e infine la revisione da zero. Il giorno dopo, mentre preparavo la versione
+0.2.2, ho completato anche il corso avanzato ([badge Claude Academy: Model Context Protocol: Advanced Topics](https://academy.claude.com/verify/d3957736dde1f145d365218c130d52fa)).
 
 — Alexander Puglisi
 
