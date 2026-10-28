@@ -36,6 +36,8 @@ Each guarantee below is enforced by an automated test, not only by a promise.
 | Secrets are not copied into reports | Known secret formats are replaced with `[REDACTED]`; secrets in environment variables are shown only as name and length. |
 | Defensive file reading | Size limits (128 MB per configuration file, 64 MB for other files), nesting limit, duplicate-key detection, rejection of `NaN`/`Infinity` and of numbers too large to handle. Unreadable files are reported as a finding (G12-006, G12-007) and mark the analysis as incomplete instead of silently passing. Network shares (`\\server\share`, `\\wsl.localhost\…`) and mapped network drives found in configurations are never opened automatically: only a folder you pass yourself with `--project` is read. |
 | Small attack surface | The CLI has **zero** runtime dependencies. Only the desktop app depends on `pywebview`, which on Windows brings `bottle`, `proxy-tools`, `typing-extensions`, `pythonnet`, `clr-loader`, `cffi` and `pycparser`. All versions are pinned in `uv.lock`, and the executables are built without the development tools (`--no-dev`). |
+| Canary tripwires | A decoy secret you plant (`guardia canary create`) is watched by the Shield in the live traffic: if a server reads it and sends it back, the message is blocked and recorded with the `canary` label (`tests/test_shield_canary.py`). The decoy value is bait and is written in clear; the list of canaries is stored encrypted with DPAPI. |
+| Encrypted rotating backups | `guardia backup create` writes an encrypted (DPAPI) snapshot of the ledger, approved rules and canaries, keeps the latest and deletes the old (`tests/test_backup.py`). |
 
 ### Honest limits
 
@@ -57,6 +59,14 @@ Guardia MCP is a useful layer, not a guarantee. Please read these limits before 
 - **Runtime behavior is invisible.** A server can show harmless descriptions on disk and different
   ones when running, or misbehave only on some inputs. The real-time Shield (version 2) addresses
   part of this, for the servers you connect to it.
+- **The canary catches traffic, not the filesystem.** The Shield trips on a decoy only when it
+  travels through a server connected to the Shield and appears within the scanned text. A server
+  that reads the bait without sending it back, or buries it in a huge or encoded blob, can be
+  missed. Plant the bait where a snooping server would read it, and treat a trip as a real signal.
+- **Backups are encrypted for this Windows user only.** DPAPI ties the snapshot to your account on
+  this PC: it cannot be decrypted on another machine or by another user. Carrying the copy off the
+  PC is a manual step, on purpose (Guardia never uses the network). On non-Windows the snapshot is
+  not encrypted.
 
 **Rules are patterns, not understanding.** There is no AI by design. Rules can produce false alarms
 and can miss new tricks. Because the project is open source, an attacker can read the rules and try
@@ -164,6 +174,8 @@ Ogni garanzia è verificata da un test automatico, non solo promessa.
 | I segreti non finiscono nei rapporti | I formati di segreto noti diventano `[REDACTED]`; i segreti nelle variabili d'ambiente compaiono solo come nome e lunghezza. |
 | Lettura difensiva dei file | Limiti di dimensione (128 MB per i file di configurazione, 64 MB per gli altri file), limite di annidamento, controllo delle chiavi duplicate, rifiuto di `NaN`/`Infinity` e dei numeri troppo grandi. I file illeggibili vengono segnalati come problema (G12-006, G12-007) e rendono l'analisi incompleta invece di passare in silenzio. Le cartelle di rete (`\\server\condivisione`, `\\wsl.localhost\…`) e i dischi di rete trovati nelle configurazioni non vengono mai aperti in automatico: si legge solo una cartella che indichi tu con `--progetto`. |
 | Poca superficie d'attacco | La CLI ha **zero** dipendenze. Solo l'app desktop dipende da `pywebview`, che su Windows porta con sé `bottle`, `proxy-tools`, `typing-extensions`, `pythonnet`, `clr-loader`, `cffi` e `pycparser`. Tutte le versioni sono bloccate in `uv.lock`, e gli eseguibili vengono costruiti senza gli strumenti di sviluppo (`--no-dev`). |
+| Esche-trappola (canary) | Un segreto civetta che pianti (`guardia esca crea`) è sorvegliato dallo Scudo nel traffico dal vivo: se un server lo legge e lo rimanda, il messaggio viene bloccato e registrato con l'etichetta `canary` (`tests/test_shield_canary.py`). Il valore dell'esca è un'esca ed è scritto in chiaro; l'elenco delle esche è salvato cifrato con DPAPI. |
+| Backup cifrati che ruotano | `guardia copia crea` scrive uno snapshot cifrato (DPAPI) di registro, regole approvate ed esche, tiene gli ultimi e cancella i vecchi (`tests/test_backup.py`). |
 
 ### Limiti, detti onestamente
 
@@ -189,6 +201,14 @@ trovato nulla.
 - **Il comportamento durante l'esecuzione non si vede.** Un server può avere descrizioni innocue sul
   disco e diverse quando è in funzione, o comportarsi male solo con certi input. Lo Scudo in tempo
   reale (versione 2) copre una parte di questo problema, per i server collegati a lui.
+- **L'esca scatta sul traffico, non sul disco.** Lo Scudo riconosce un'esca solo quando passa da un
+  server collegato allo Scudo e compare nel testo esaminato. Un server che legge l'esca senza
+  rimandarla indietro, o che la nasconde in un blocco enorme o codificato, può sfuggire. Pianta
+  l'esca dove un server curioso andrebbe a leggere, e considera uno scatto un segnale vero.
+- **I backup sono cifrati solo per questo utente di Windows.** DPAPI lega lo snapshot al tuo account
+  su questo PC: non si può decifrare su un'altra macchina o con un altro utente. Portare la copia
+  fuori dal PC è un passo manuale, per scelta (Guardia non usa mai la rete). Fuori da Windows lo
+  snapshot non è cifrato.
 
 **Le regole sono schemi, non comprensione.** Non c'è intelligenza artificiale, per scelta. Le
 regole possono dare falsi allarmi e non accorgersi di trucchi nuovi. Il progetto è open source,

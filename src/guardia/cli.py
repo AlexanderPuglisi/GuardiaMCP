@@ -11,9 +11,10 @@ from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path, PurePath
 from typing import Any, TextIO
 
-from guardia import __version__
+from guardia import __version__, backup
 from guardia.analysis import AnalysisOptions, analyze
 from guardia.app.shield_view import event_details
+from guardia.canary import CanaryError, CanaryStore, plant
 from guardia.display import safe_text
 from guardia.i18n import SUPPORTED_LANGUAGES, Translator, detect_language
 from guardia.inventory import DiscoveryOptions, HostEnvironment, discover
@@ -24,6 +25,7 @@ from guardia.render.rules_guide import render_rule_detail, render_rules_list, re
 from guardia.render.sarif import build_sarif
 from guardia.render.terminal import render_inventory, render_scan, severity_label
 from guardia.scanner import RULES, ScanReport
+from guardia.secure_store import KeyStoreError
 from guardia.shield import commands as shield_commands
 from guardia.shield.activation import ActivationStore, candidates
 from guardia.shield.confirm import (
@@ -43,6 +45,8 @@ from guardia.shield.runner import ShieldOptions, run_shield
 INVENTORY_COMMANDS = frozenset({"inventory", "inventario"})
 SCAN_COMMANDS = frozenset({"scan", "scansiona"})
 LEDGER_COMMANDS = frozenset({"ledger", "registro"})
+CANARY_COMMANDS = frozenset({"canary", "esca"})
+BACKUP_COMMANDS = frozenset({"backup", "copia"})
 RULES_COMMANDS = frozenset({"rules", "regole"})
 SHIELD_COMMANDS = frozenset({"shield", "scudo"})
 RULE_ACTIONS = {
@@ -73,6 +77,10 @@ FORMATS = ("text", "testo", "json", "html", "sarif")
 FORMAT_ALIASES = {"testo": "text"}
 LEDGER_ACTIONS = ("verify", "verifica", "show", "mostra", "anchor", "ancora")
 LEDGER_ALIASES = {"verifica": "verify", "mostra": "show", "ancora": "anchor"}
+CANARY_ACTIONS = ("create", "crea", "list", "elenco", "remove", "rimuovi")
+CANARY_ALIASES = {"crea": "create", "elenco": "list", "rimuovi": "remove"}
+BACKUP_ACTIONS = ("create", "crea", "list", "elenco", "extract", "estrai")
+BACKUP_ALIASES = {"crea": "create", "elenco": "list", "estrai": "extract"}
 LANG_FLAGS = ("--lang", "--lingua")
 FAIL_LEVELS = ("info", "low", "medium", "high", "critical", "never")
 EXIT_OK = 0
@@ -385,6 +393,39 @@ def build_parser(t: Translator) -> argparse.ArgumentParser:
         metavar=t("cli.metavar_file"),
         help=t("cli.output"),
     )
+    canary_cmd = commands.add_parser(
+        "canary", aliases=["esca"], help=t("cli.canary"), parents=[language]
+    )
+    canary_cmd.add_argument("action", choices=CANARY_ACTIONS, help=t("cli.canary_action"))
+    canary_cmd.add_argument("id", nargs="?", metavar=t("cli.metavar_id"), help=t("cli.canary_id"))
+    canary_cmd.add_argument(
+        "--file", dest="decoy", type=Path, metavar=t("cli.metavar_file"), help=t("cli.canary_file")
+    )
+    canary_cmd.add_argument(
+        *_flags(t, "--note", "--nota"),
+        dest="note",
+        default="",
+        metavar=t("cli.metavar_text"),
+        help=t("cli.canary_note"),
+    )
+    backup_cmd = commands.add_parser(
+        "backup", aliases=["copia"], help=t("cli.backup"), parents=[language]
+    )
+    backup_cmd.add_argument("action", choices=BACKUP_ACTIONS, help=t("cli.backup_action"))
+    backup_cmd.add_argument(
+        "archive", nargs="?", metavar=t("cli.metavar_file"), help=t("cli.backup_archive")
+    )
+    backup_cmd.add_argument(
+        "folder", nargs="?", metavar=t("cli.metavar_folder"), help=t("cli.backup_folder")
+    )
+    backup_cmd.add_argument(
+        *_flags(t, "--keep", "--tieni"),
+        dest="keep",
+        type=_count_type(t),
+        default=backup.DEFAULT_KEEP,
+        metavar=t("cli.metavar_number"),
+        help=t("cli.backup_keep"),
+    )
     _localize(parser, t, set())
     return parser
 
@@ -592,6 +633,97 @@ def run_rules(args: argparse.Namespace, t: Translator, out: TextIO) -> int:
     return _emit(text, args, t, out)
 
 
+def _note_event(env: HostEnvironment, event: str, data: dict[str, Any]) -> None:
+    with contextlib.suppress(OSError, KeyStoreError):
+        Ledger(env.data_dir).append(event, data)
+
+
+def run_canary(args: argparse.Namespace, t: Translator, env: HostEnvironment, out: TextIO) -> int:
+    store = CanaryStore(env.data_dir)
+    action = CANARY_ALIASES.get(args.action, args.action)
+    lines = [t("app.banner", version=__version__)]
+    try:
+        if action == "create":
+            canary = store.add(note=args.note, decoy=str(args.decoy) if args.decoy else "")
+            if args.decoy is not None:
+                plant(args.decoy, canary.token)
+            _note_event(env, "canary_create", {"id": canary.id})
+            lines.append(t("canary.created", id=canary.id))
+            if args.decoy is not None:
+                lines.append(t("canary.planted", path=safe_text(str(args.decoy))))
+            else:
+                lines.append(t("canary.token", token=canary.token))
+            lines.append(t("canary.hint"))
+        elif action == "remove":
+            if not args.id:
+                lines.append(t("canary.need_id"))
+                out.write("\n".join(lines) + "\n")
+                return EXIT_USAGE
+            removed = store.remove(args.id)
+            if removed is None:
+                lines.append(t("canary.unknown", id=safe_text(args.id, 40)))
+                out.write("\n".join(lines) + "\n")
+                return EXIT_USAGE
+            _note_event(env, "canary_remove", {"id": removed.id})
+            lines.append(t("canary.removed", id=removed.id))
+        else:
+            canaries = store.all()
+            if not canaries:
+                lines.append(t("canary.empty"))
+            for canary in canaries:
+                lines.append(
+                    t(
+                        "canary.row",
+                        id=canary.id,
+                        created=safe_text(canary.created[:19], 40),
+                        note=safe_text(canary.note, 60) or "-",
+                        where=safe_text(canary.decoy, 200) or "-",
+                    )
+                )
+    except CanaryError as exc:
+        lines.append(t("canary.failed", error=safe_text(str(exc), 200)))
+        out.write("\n".join(lines) + "\n")
+        return EXIT_INCOMPLETE
+    out.write("\n".join(lines) + "\n")
+    return EXIT_OK
+
+
+def run_backup(args: argparse.Namespace, t: Translator, env: HostEnvironment, out: TextIO) -> int:
+    action = BACKUP_ALIASES.get(args.action, args.action)
+    lines = [t("app.banner", version=__version__)]
+    try:
+        if action == "create":
+            archive = backup.create(env.data_dir, keep=args.keep)
+            _note_event(env, "backup_create", {"file": safe_text(archive.name, 120)})
+            lines.append(t("backup.created", path=safe_text(str(archive))))
+            lines.append(t("backup.hint"))
+        elif action == "extract":
+            if not args.archive or not args.folder:
+                lines.append(t("backup.need_args"))
+                out.write("\n".join(lines) + "\n")
+                return EXIT_USAGE
+            restored = backup.extract(Path(args.archive), Path(args.folder))
+            lines.append(
+                t("backup.extracted", count=len(restored), path=safe_text(str(args.folder)))
+            )
+        else:
+            found = backup.listing(env.data_dir)
+            if not found:
+                lines.append(t("backup.empty"))
+            for path in found:
+                try:
+                    size = path.stat().st_size
+                except OSError:
+                    size = 0
+                lines.append(t("backup.row", name=safe_text(path.name, 120), size=size))
+    except backup.BackupError as exc:
+        lines.append(t("backup.failed", error=safe_text(str(exc), 200)))
+        out.write("\n".join(lines) + "\n")
+        return EXIT_INCOMPLETE
+    out.write("\n".join(lines) + "\n")
+    return EXIT_OK
+
+
 def _report_stderr(line: str) -> None:
     stream = sys.stderr
     if stream is None:
@@ -599,6 +731,14 @@ def _report_stderr(line: str) -> None:
     with contextlib.suppress(OSError, ValueError):
         stream.write(f"{SHIELD_PREFIX} {line}\n")
         stream.flush()
+
+
+def _load_canaries(env: HostEnvironment, t: Translator) -> frozenset[str]:
+    try:
+        return CanaryStore(env.data_dir).tokens()
+    except CanaryError as exc:
+        _report_stderr(t("shield.canary_unreadable", error=safe_text(str(exc), 200)))
+        return frozenset()
 
 
 def run_shield_command(
@@ -621,6 +761,7 @@ def run_shield_command(
         report=_report_stderr,
         pins=PinStore(env.data_dir, None, ledger),
         confirm=WindowConfirmer(),
+        canaries=_load_canaries(env, t),
     )
     _report_stderr(inspector.describe())
     return run_shield(
@@ -802,6 +943,8 @@ def _run(
         (INVENTORY_COMMANDS, run_inventory),
         (SCAN_COMMANDS, run_scan),
         (LEDGER_COMMANDS, run_ledger),
+        (CANARY_COMMANDS, run_canary),
+        (BACKUP_COMMANDS, run_backup),
     )
     for names, handler in handlers:
         if args.command in names:

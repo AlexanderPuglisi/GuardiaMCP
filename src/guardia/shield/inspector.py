@@ -24,7 +24,7 @@ from guardia.shield.engine import (
     redact,
 )
 from guardia.shield.messages import Direction, Message, MessageKind
-from guardia.shield.patterns import MAX_WALK_DEPTH, Leaf
+from guardia.shield.patterns import MAX_WALK_DEPTH, Leaf, leaves
 from guardia.shield.pins import PinError, PinStore, ToolStatus
 from guardia.shield.policy import Policy, PolicyState
 from guardia.shield.protections import (
@@ -165,6 +165,7 @@ class RulesInspector:
         report: Report,
         pins: PinStore | None = None,
         confirm: Confirmer | None = None,
+        canaries: frozenset[str] = frozenset(),
     ) -> None:
         self._server = server
         self._confirm = confirm
@@ -175,6 +176,7 @@ class RulesInspector:
         self._t = t
         self._report = report
         self._pins = pins
+        self._canaries = canaries
         self._engine: Engine | None = None
         self._last_state: State | None = None
         self._known: dict[str, str | None] = {}
@@ -297,10 +299,31 @@ class RulesInspector:
         checks = self._result_checks(context, protections, result)
         return self._judge(engine, context, message, checks)
 
+    def _canary_hit(self, value: Any) -> str | None:
+        if not self._canaries:
+            return None
+        for leaf in leaves(value):
+            for token in self._canaries:
+                if token in leaf.text:
+                    return token
+        return None
+
     def _call_checks(
         self, engine: Engine, context: Context, protections: Protections
     ) -> list[Check]:
         found: list[Check] = []
+        if self._canary_hit(context.arguments) is not None:
+            found.append(
+                Check(
+                    Action.BLOCK,
+                    "canary",
+                    self._t(
+                        "shield.canary_outgoing",
+                        server=self._server,
+                        tool=context.tool or "-",
+                    ),
+                )
+            )
         reason = (
             self._call_block_reason(engine, protections, context.tool)
             if context.method == "tools/call"
@@ -387,6 +410,19 @@ class RulesInspector:
         self, context: Context, protections: Protections, result: Any
     ) -> list[Check]:
         found: list[Check] = []
+        if self._canary_hit(context.content) is not None:
+            found.append(
+                Check(
+                    Action.BLOCK,
+                    "canary",
+                    self._t(
+                        "shield.canary_triggered",
+                        server=self._server,
+                        tool=context.tool or "-",
+                    ),
+                    note=self._t("shield.canary_note", server=self._server),
+                )
+            )
         if (
             context.method in INSTRUCTION_METHODS
             and protections.analysis is not Sensitivity.OFF

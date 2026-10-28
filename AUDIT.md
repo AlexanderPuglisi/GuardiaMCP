@@ -25,6 +25,8 @@ con `uv run pytest`.
 | **Le regole cambiate di nascosto bloccano lo Scudo.** Il file delle regole è firmato con HMAC: se cambia senza approvazione, blocco totale. | `src/guardia/shield/policy.py` | `tests/test_shield_rules.py::test_live_lockdown_when_rules_are_not_approved` |
 | **Il registro rivela le manomissioni.** Catena SHA-256 firmata: righe cancellate, modificate o un registro sparito vengono segnalati. | `src/guardia/ledger.py` | `tests/test_ledger_reports.py` (per esempio `test_deleting_a_middle_line_is_detected`, `test_deleting_the_whole_ledger_is_detected`) |
 | **Le tue modifiche alle configurazioni non vengono mai sovrascritte.** Prima una copia di sicurezza, poi solo la voce di quel server. | `src/guardia/shield/activation.py` | `tests/test_shield_activation.py::test_user_edits_are_never_overwritten` |
+| **L'esca che scatta.** Se un server MCP legge il tuo segreto-trappola e lo rimanda, lo Scudo lo vede nel flusso, blocca e lo scrive nel registro con l'etichetta `canary`. | `src/guardia/canary.py`, `src/guardia/shield/inspector.py` | `tests/test_shield_canary.py::test_a_server_reading_the_bait_is_blocked` |
+| **Backup cifrati che ruotano.** Lo snapshot di registro, regole ed esche è cifrato (DPAPI); si tengono gli ultimi, si cancellano i vecchi. | `src/guardia/backup.py` | `tests/test_backup.py::test_backup_round_trip`, `tests/test_backup.py::test_rotation_keeps_only_the_newest` |
 
 I limiti veri, detti senza giri di parole, sono in [SECURITY.md](SECURITY.md). Come è stato
 costruito e provato Guardia è nel [README](README.md).
@@ -59,6 +61,8 @@ test that fails if someone breaks it: read it and run it with `uv run pytest`.
 | **Rules changed behind your back lock the Shield.** The rules file is signed with HMAC: if it changes without approval, everything is blocked. | `src/guardia/shield/policy.py` | `tests/test_shield_rules.py::test_live_lockdown_when_rules_are_not_approved` |
 | **The ledger reveals tampering.** A signed SHA-256 chain: deleted or changed lines, or a missing ledger, are reported. | `src/guardia/ledger.py` | `tests/test_ledger_reports.py` (for example `test_deleting_a_middle_line_is_detected`, `test_deleting_the_whole_ledger_is_detected`) |
 | **Your own configuration edits are never overwritten.** A backup first, then only that server's entry. | `src/guardia/shield/activation.py` | `tests/test_shield_activation.py::test_user_edits_are_never_overwritten` |
+| **The bait that trips.** If an MCP server reads your trap secret and sends it back, the Shield sees it in the stream, blocks and writes it in the ledger with the `canary` label. | `src/guardia/canary.py`, `src/guardia/shield/inspector.py` | `tests/test_shield_canary.py::test_a_server_reading_the_bait_is_blocked` |
+| **Encrypted rotating backups.** The snapshot of ledger, rules and canaries is encrypted (DPAPI); the latest are kept, the old ones deleted. | `src/guardia/backup.py` | `tests/test_backup.py::test_backup_round_trip`, `tests/test_backup.py::test_rotation_keeps_only_the_newest` |
 
 The real limits, stated plainly, are in [SECURITY.md](SECURITY.md). How Guardia was built and
 tested is in the [README](README.md).

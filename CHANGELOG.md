@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.3.0 — 28 October 2026
+
+Two new built-in defenses, from the INFINITY-SAND doctrine ([INFINITY-SAND.md](INFINITY-SAND.md)).
+
+**Canary (decoy)**
+- `guardia canary create` makes a trap secret with a recognizable prefix; `--file` also plants it in
+  a tempting fake secrets file. If any MCP server ever reads the bait and sends it back, the Shield
+  sees it in the traffic, blocks the message and records it in the ledger with the `canary` label —
+  whether it shows up in a server's reply or in a call heading out.
+- `guardia canary list` and `guardia canary remove` manage them. The list of canaries is stored
+  encrypted with DPAPI, like the ledger key.
+
+**Encrypted rotating backups**
+- `guardia backup create` makes an encrypted (DPAPI) snapshot of the ledger, approved rules and
+  canaries, keeps the latest ones and deletes the old ones (`--keep`, default 10). Copy the file to
+  a USB stick or another computer for a copy off this PC. `guardia backup extract <file> <folder>`
+  restores it into a folder you choose, never over the live data.
+- The safety copies made before a configuration edit are untouched and stay in clear text, so you
+  can always restore a configuration by hand.
+
+Both commands work in Italian too (`esca`, `copia`). 25 new automated tests; the full suite stays
+green. Still no network and no runtime dependency.
+
 ## 0.2.3 — 24 October 2026
 
 - **Fixed**: the animated glowing border never appeared with the window maximized (how the app

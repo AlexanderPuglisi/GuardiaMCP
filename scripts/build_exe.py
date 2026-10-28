@@ -23,6 +23,7 @@ EXTRA_FILES = (
     "README.md",
     "SECURITY.md",
     "AUDIT.md",
+    "INFINITY-SAND.md",
     "TESTING.md",
     "CHANGELOG.md",
     "CONTRIBUTING.md",

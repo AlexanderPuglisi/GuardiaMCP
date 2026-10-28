@@ -118,6 +118,31 @@ guardia shield rules approve
 
 Full guide: [docs/SHIELD.md](docs/SHIELD.md).
 
+### Canary and encrypted backups (0.3)
+
+Two built-in defenses from the [INFINITY-SAND](INFINITY-SAND.md) doctrine.
+
+**Canary** — a decoy secret that warns you if a server reads it:
+
+```
+guardia canary create --file "%USERPROFILE%\Documents\credentials.env"
+```
+
+This plants a tempting fake secrets file. If any MCP server behind the Shield ever reads the bait
+and sends it back, the Shield blocks the message and records it in the ledger with the `canary`
+label. See them with `guardia canary list`, remove one with `guardia canary remove <id>`.
+
+**Encrypted backups** — a snapshot of your ledger, approved rules and canaries, encrypted with
+Windows DPAPI and rotated (the oldest are deleted):
+
+```
+guardia backup create
+```
+
+Copy the file it writes to a USB stick or another computer: that is your copy off this PC (Guardia
+never uses the network). Restore it into a folder of your choice with
+`guardia backup extract <file> <folder>`.
+
 ### Getting started (no programming needed)
 
 Prefer pictures? Follow the [step-by-step guide with screenshots](docs/GUIDE.md).
@@ -375,6 +400,31 @@ guardia scudo regole approva
 Guida completa: [docs/SCUDO.md](docs/SCUDO.md).
 
 Vuoi capire MCP da zero? Leggi [docs/IMPARA-MCP.md](docs/IMPARA-MCP.md).
+
+### Esca (canary) e backup cifrati (0.3)
+
+Due difese di serie, dalla dottrina [INFINITY-SAND](INFINITY-SAND.md).
+
+**Esca** — un segreto civetta che ti avvisa se un server lo legge:
+
+```
+guardia esca crea --file "%USERPROFILE%\Documents\credenziali.env"
+```
+
+Pianta un finto file di segreti allettante. Se un server MCP dietro lo Scudo legge l'esca e la
+rimanda, lo Scudo blocca il messaggio e lo scrive nel registro con l'etichetta `canary`. Le vedi
+con `guardia esca elenco`, ne rimuovi una con `guardia esca rimuovi <id>`.
+
+**Backup cifrati** — uno snapshot di registro, regole approvate ed esche, cifrato con DPAPI di
+Windows e a rotazione (i più vecchi vengono cancellati):
+
+```
+guardia copia crea
+```
+
+Copia il file che crea su una chiavetta o un altro computer: quella è la tua copia fuori dal PC
+(Guardia non usa mai la rete). Ripristinalo in una cartella che scegli tu con
+`guardia copia estrai <file> <cartella>`.
 
 ### Primi passi (non serve saper programmare)
 
