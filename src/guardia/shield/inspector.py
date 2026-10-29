@@ -40,6 +40,7 @@ from guardia.shield.protections import (
     redact_secrets,
     result_findings,
     rule_ids,
+    scannable,
     tool_findings,
     tool_fingerprint,
 )
@@ -49,6 +50,7 @@ from guardia.shield.session import Pending
 
 TOOL_METHODS = frozenset({"tools/call", "prompts/get"})
 LOGGED_METHODS = frozenset({"tools/call", "resources/read", "prompts/get"})
+RESULT_METHODS = frozenset({"tools/call", "prompts/get", "resources/read"})
 INSTRUCTION_METHODS = frozenset({"initialize", "server/discover"})
 MAX_LOGGED_NAMES = 50
 REMEMBER_SECONDS = 600
@@ -437,11 +439,11 @@ class RulesInspector:
                         note=self._t("shield.instructions_removed", server=self._server, rules=ids),
                     )
                 )
-        if protections.results is not ResultMode.OFF and context.method == "tools/call":
+        if protections.results is not ResultMode.OFF and context.method in RESULT_METHODS:
             injected = result_findings(self._server, context.tool, context.content)
+            block = protections.results is ResultMode.BLOCK
             if injected:
                 ids = ", ".join(rule_ids(injected))
-                block = protections.results is ResultMode.BLOCK
                 found.append(
                     Check(
                         Action.BLOCK if block else Action.LOG,
@@ -452,6 +454,19 @@ class RulesInspector:
                             server=self._server,
                             tool=context.tool or "-",
                             rules=ids,
+                        ),
+                    )
+                )
+            elif not scannable(context.content):
+                found.append(
+                    Check(
+                        Action.BLOCK if block else Action.LOG,
+                        "protection:results_oversized",
+                        self._t("shield.protection_results_oversized"),
+                        note=self._t(
+                            "shield.result_oversized",
+                            server=self._server,
+                            tool=context.tool or "-",
                         ),
                     )
                 )

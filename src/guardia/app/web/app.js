@@ -167,6 +167,15 @@
     return el("div", { cls: "path-line" }, el("span", { cls, text: path }), copyButton(path));
   }
 
+  function info(key) {
+    const text = t(key);
+    return el("button", {
+      cls: "info", attrs: { type: "button", title: text, "aria-label": text },
+      on: { click: (event) => event.stopPropagation() },
+    }, el("span", { cls: "mark", attrs: { "aria-hidden": "true" }, text: "i" }),
+    el("span", { cls: "tip", attrs: { "aria-hidden": "true" }, text }));
+  }
+
   function cleanCopy(event) {
     const active = document.activeElement;
     if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) return;
@@ -293,7 +302,7 @@
       cards.append(el("div", { cls: "card sev-card" }, el("small", { text: item.label }), el("b", { text: num(item.count) }),
         el("div", { cls: "bar " + item.severity }, fill)));
     }
-    root.append(cards, el("h2", { text: t("priority_title") }));
+    root.append(cards, el("h2", {}, t("priority_title"), info("info_severity")));
     const list = el("div", { cls: "list" });
     if (!report.priority.length) list.append(el("div", { cls: "empty", text: t("priority_empty") }));
     for (const finding of report.priority) {
@@ -308,17 +317,17 @@
     const status = el("div", { cls: "grid status-cards" });
     const baseline = report.baseline;
     status.append(el("div", { cls: "card status-card" },
-      el("h3", {}, el("span", { cls: "led " + (baseline.active ? (report.has_rug_pull ? "warn" : "") : "off") }), t("baseline_title")),
+      el("h3", {}, el("span", { cls: "led " + (baseline.active ? (report.has_rug_pull ? "warn" : "") : "off") }), t("baseline_title"), info("info_baseline")),
       el("p", { text: baseline.line || t("baseline_off") })));
     const ledger = report.ledger;
     const ledgerRow = el("div", { cls: "row" },
       el("button", { cls: "btn", text: t("verify_now"), attrs: { type: "button" }, on: { click: () => show("ledger") } }),
       ledger.anchor ? el("button", { cls: "btn", text: t("copy_anchor"), attrs: { type: "button" }, on: { click: () => copy(ledger.anchor) } }) : null);
     status.append(el("div", { cls: "card status-card" },
-      el("h3", {}, el("span", { cls: "led " + (ledger.tampered ? "bad" : ledger.intact ? "" : "warn") }), t("ledger_title")),
+      el("h3", {}, el("span", { cls: "led " + (ledger.tampered ? "bad" : ledger.intact ? "" : "warn") }), t("ledger_title"), info("info_ledger")),
       el("p", { text: ledger.line }), ledgerRow));
     status.append(el("div", { cls: "card status-card" },
-      el("h3", {}, el("span", { cls: "led " + (report.coverage_gaps ? "warn" : "") }), t("coverage_title")),
+      el("h3", {}, el("span", { cls: "led " + (report.coverage_gaps ? "warn" : "") }), t("coverage_title"), info("info_coverage")),
       el("p", { text: report.coverage.join(" ") })));
     root.append(status);
     if (!report.complete) root.append(el("div", { cls: "note-box", text: t("incomplete", { count: report.errors }) }));

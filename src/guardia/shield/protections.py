@@ -19,7 +19,7 @@ from guardia.model import (
 )
 from guardia.redact import REDACTED, SECRET_VALUE
 from guardia.scanner.tool_checks import TOOL_CHECKS, ToolContext, check_text_fields
-from guardia.shield.patterns import leaves
+from guardia.shield.patterns import walk
 from guardia.shield.rules import Sensitivity
 
 SHIELD_SOURCE = Path("guardia-shield")
@@ -87,19 +87,24 @@ def instructions_findings(server: str, text: str) -> list[Finding]:
     ]
 
 
-def result_text(value: Any) -> str:
+def result_text(value: Any) -> tuple[str, bool]:
+    scan = walk(value, include_keys=True, deep=True)
     parts: list[str] = []
     size = 0
-    for leaf in leaves(value, include_keys=True):
+    for leaf in scan.leaves:
         parts.append(leaf.text)
         size += len(leaf.text) + 1
         if size >= MAX_RESULT_SCAN:
-            break
-    return "\n".join(parts)[:MAX_RESULT_SCAN]
+            return "\n".join(parts)[:MAX_RESULT_SCAN], False
+    return "\n".join(parts), scan.complete
+
+
+def scannable(value: Any) -> bool:
+    return result_text(value)[1]
 
 
 def result_findings(server: str, tool: str, value: Any) -> list[Finding]:
-    text = result_text(value)
+    text, _ = result_text(value)
     if not text.strip():
         return []
     entry = _server(server)
@@ -128,7 +133,10 @@ def rule_ids(findings: list[Finding], limit: int = 5) -> list[str]:
 
 
 def has_secret(value: Any) -> bool:
-    return any(SECRET_VALUE.search(leaf.text) for leaf in leaves(value, include_keys=True))
+    scan = walk(value, include_keys=True, deep=True)
+    if any(SECRET_VALUE.search(leaf.text) for leaf in scan.leaves):
+        return True
+    return not scan.complete
 
 
 def _field_words(name: str) -> str:

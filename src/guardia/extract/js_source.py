@@ -351,6 +351,18 @@ class _Parser:
             cursor -= 1
         return "?"
 
+    def _top_comma(self, start: int, end: int) -> int | None:
+        index = start
+        while index < end:
+            close = self.closing.get(index)
+            if close is not None:
+                index = close + 1
+                continue
+            if self.is_punct(index, ","):
+                return index
+            index += 1
+        return None
+
     def call_tools(self) -> list[ToolDefinition]:
         tools: list[ToolDefinition] = []
         for index, token in enumerate(self.tokens):
@@ -363,9 +375,14 @@ class _Parser:
                 continue
             call_end = self.closing.get(index + 1, len(self.tokens))
             name = self.string_at(index + 2)
-            if name is None or not self.is_punct(name[1], ","):
-                continue
-            cursor = name[1] + 1
+            if name is not None and self.is_punct(name[1], ","):
+                tool_name, name_end = name[0], name[1]
+            else:
+                comma = self._top_comma(index + 2, call_end)
+                if comma is None:
+                    continue
+                tool_name, name_end = "(dynamic)", comma
+            cursor = name_end + 1
             description = ""
             extra: list[TextField] = []
             described = self.string_at(cursor)
@@ -392,7 +409,7 @@ class _Parser:
                 else:
                     object_end = self.closing.get(cursor, call_end)
                     extra.extend(self.described_fields(cursor + 1, object_end))
-            tools.append(self._tool(kind, name[0], description, index, extra))
+            tools.append(self._tool(kind, tool_name, description, index, extra))
         return tools
 
     def object_tools(self) -> list[ToolDefinition]:

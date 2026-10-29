@@ -12,6 +12,9 @@ from guardia.shield.windows import long_path
 MAX_LEAVES = 10_000
 MAX_WALK_DEPTH = 64
 MAX_TEXT = 100_000
+DEEP_MAX_TEXT = 2_000_000
+MAX_SCAN_LEAVES = 200_000
+MAX_SCAN_CHARS = 2_000_000
 MAX_PATH_TEXT = 4096
 URL = re.compile(r"\b[a-z][a-z0-9+.-]{1,15}://[^\s\"'<>`]+", re.IGNORECASE)
 HOME_TOKENS = re.compile(
@@ -31,22 +34,57 @@ class Leaf:
     text: str
 
 
-def leaves(value: Any, *, include_keys: bool = False) -> list[Leaf]:
+def leaves(value: Any, *, include_keys: bool = False, deep: bool = False) -> list[Leaf]:
     found: list[Leaf] = []
     stack: list[tuple[Any, tuple[str, ...], int]] = [(value, (), 0)]
+    limit = DEEP_MAX_TEXT if deep else MAX_TEXT
     while stack and len(found) < MAX_LEAVES:
         current, keys, depth = stack.pop()
         if isinstance(current, str):
-            found.append(Leaf(keys, current[:MAX_TEXT]))
-        elif depth < MAX_WALK_DEPTH and isinstance(current, dict):
+            found.append(Leaf(keys, current[:limit]))
+        elif isinstance(current, dict) and (deep or depth < MAX_WALK_DEPTH):
             for key, item in current.items():
                 label = str(key)
                 stack.append((item, (*keys, label), depth + 1))
                 if include_keys:
                     stack.append((label, (*keys, label), depth + 1))
-        elif depth < MAX_WALK_DEPTH and isinstance(current, list):
+        elif isinstance(current, list) and (deep or depth < MAX_WALK_DEPTH):
             stack.extend((item, keys, depth + 1) for item in current)
     return found
+
+
+@dataclass(frozen=True, slots=True)
+class Scan:
+    leaves: list[Leaf]
+    complete: bool
+
+
+def walk(value: Any, *, include_keys: bool = False, deep: bool = False) -> Scan:
+    found: list[Leaf] = []
+    stack: list[tuple[Any, tuple[str, ...], int]] = [(value, (), 0)]
+    limit = DEEP_MAX_TEXT if deep else MAX_TEXT
+    scanned = 0
+    while stack:
+        if len(found) >= MAX_SCAN_LEAVES or scanned >= MAX_SCAN_CHARS:
+            return Scan(found, False)
+        current, keys, depth = stack.pop()
+        if isinstance(current, str):
+            text = current[:limit]
+            found.append(Leaf(keys, text))
+            scanned += len(text)
+        elif isinstance(current, dict):
+            if not deep and depth >= MAX_WALK_DEPTH:
+                return Scan(found, False)
+            for key, item in current.items():
+                label = str(key)
+                stack.append((item, (*keys, label), depth + 1))
+                if include_keys:
+                    stack.append((label, (*keys, label), depth + 1))
+        elif isinstance(current, list):
+            if not deep and depth >= MAX_WALK_DEPTH:
+                return Scan(found, False)
+            stack.extend((item, keys, depth + 1) for item in current)
+    return Scan(found, True)
 
 
 def _translate(pattern: str, *, separator: str | None) -> str:

@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.5.0 — 29 October 2026
+
+A second hardening pass, most of it from a fresh adversarial review (red-team) of the real-time
+Shield. Two more ways around the result checks closed, each with a regression test; the full
+suite stays green. No network, no runtime dependency.
+
+**Shield**
+- The result checks now cover `prompts/get` and `resources/read`, not only `tools/call`. A prompt
+  or a resource is just as much server-controlled text that reaches the model, so a hidden
+  instruction there is now caught the same way (before, only tool results were scanned for it).
+- The secret and prompt-injection scan no longer stops after a fixed number of fields. A result
+  padded with thousands of tiny items — enough to push the real payload past the old limit so it
+  was never looked at — is now scanned in full. When a result genuinely is too large or too deeply
+  nested to inspect completely, the Shield treats it cautiously (secrets redacted, the result
+  flagged) instead of letting it through unchecked. This is a fail-closed change: when in doubt, it
+  protects rather than passes.
+- Secrets and injections hidden past the old depth or after a very long filler string are scanned
+  (full-depth, untruncated), and a tool whose name is built at runtime in JavaScript is still
+  analyzed from its description.
+
+**App**
+- Small inline help marks (ⓘ) on the overview explain the terms that trip up a first-time user:
+  severity, the baseline, the ledger and analysis coverage. Hover or focus to read them.
+
 ## 0.4.0 — 29 October 2026
 
 A hardening pass driven by an independent adversarial review (red-team) of the whole tool.
