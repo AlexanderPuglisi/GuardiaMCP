@@ -90,7 +90,7 @@ def instructions_findings(server: str, text: str) -> list[Finding]:
 def result_text(value: Any) -> str:
     parts: list[str] = []
     size = 0
-    for leaf in leaves(value):
+    for leaf in leaves(value, include_keys=True):
         parts.append(leaf.text)
         size += len(leaf.text) + 1
         if size >= MAX_RESULT_SCAN:
@@ -128,7 +128,7 @@ def rule_ids(findings: list[Finding], limit: int = 5) -> list[str]:
 
 
 def has_secret(value: Any) -> bool:
-    return any(SECRET_VALUE.search(leaf.text) for leaf in leaves(value))
+    return any(SECRET_VALUE.search(leaf.text) for leaf in leaves(value, include_keys=True))
 
 
 def _field_words(name: str) -> str:
@@ -192,7 +192,10 @@ def redact_secrets(value: Any) -> Any:
     if isinstance(value, str):
         return SECRET_VALUE.sub(REDACTED, value)
     if isinstance(value, dict):
-        return {key: redact_secrets(item) for key, item in value.items()}
+        return {
+            (SECRET_VALUE.sub(REDACTED, key) if isinstance(key, str) else key): redact_secrets(item)
+            for key, item in value.items()
+        }
     if isinstance(value, list):
         return [redact_secrets(item) for item in value]
     return value

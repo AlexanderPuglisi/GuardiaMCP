@@ -102,7 +102,7 @@ def extract(archive: Path, destination: Path, protector: Protector | None = None
         raise BackupError("archive too large")
     destination.mkdir(parents=True, exist_ok=True)
     try:
-        with tarfile.open(fileobj=io.BytesIO(raw), mode="r") as tar:
+        with tarfile.open(fileobj=io.BytesIO(raw), mode="r:") as tar:
             tar.extractall(path=destination, filter="data")
     except (tarfile.TarError, OSError, ValueError) as exc:
         raise BackupError(str(exc)) from exc

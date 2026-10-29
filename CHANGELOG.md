@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.4.0 — 29 October 2026
+
+A hardening pass driven by an independent adversarial review (red-team) of the whole tool.
+Three real weaknesses closed, each with a regression test; the full suite stays green.
+
+**Shield**
+- The message walker now inspects dictionary **keys**, not only values: a secret, a
+  prompt-injection or a canary hidden in a JSON key is caught (it slipped through before).
+- The canary has its own full-depth, untruncated scan, so a decoy buried in deep nesting or
+  placed after a long filler string is still detected. Secret redaction now rewrites matching
+  keys too.
+
+**Backup**
+- `guardia backup extract` opens the archive as uncompressed only, closing a decompression-bomb
+  path where a tiny file could expand to fill the disk.
+
+**Scanner**
+- A path or URL hidden in an environment variable with a "secret-looking" name (for example
+  `API_KEY=~/.ssh/id_rsa`) is no longer skipped: it is scanned like any other value.
+
+**Legal**
+- A plain-language disclaimer in [SECURITY.md](SECURITY.md): no warranty, modified copies are not
+  official, and no liability — alongside the Apache 2.0 terms.
+
+More hardening (ledger anchor, further scanner evasions, a self-integrity check, in-app help
+tooltips) is planned for the next release.
+
 ## 0.3.0 — 28 October 2026
 
 Two new built-in defenses, from the INFINITY-SAND doctrine ([INFINITY-SAND.md](INFINITY-SAND.md)).

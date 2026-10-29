@@ -31,7 +31,7 @@ class Leaf:
     text: str
 
 
-def leaves(value: Any) -> list[Leaf]:
+def leaves(value: Any, *, include_keys: bool = False) -> list[Leaf]:
     found: list[Leaf] = []
     stack: list[tuple[Any, tuple[str, ...], int]] = [(value, (), 0)]
     while stack and len(found) < MAX_LEAVES:
@@ -39,7 +39,11 @@ def leaves(value: Any) -> list[Leaf]:
         if isinstance(current, str):
             found.append(Leaf(keys, current[:MAX_TEXT]))
         elif depth < MAX_WALK_DEPTH and isinstance(current, dict):
-            stack.extend((item, (*keys, str(key)), depth + 1) for key, item in current.items())
+            for key, item in current.items():
+                label = str(key)
+                stack.append((item, (*keys, label), depth + 1))
+                if include_keys:
+                    stack.append((label, (*keys, label), depth + 1))
         elif depth < MAX_WALK_DEPTH and isinstance(current, list):
             stack.extend((item, keys, depth + 1) for item in current)
     return found

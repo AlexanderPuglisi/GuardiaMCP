@@ -140,6 +140,16 @@ start with `Failed to resolve Python.Runtime.Loader.Initialize`). The setting ap
 Guardia's two programs, which load .NET libraries only from their own folder; anyone who can replace
 those files can already replace the program itself.
 
+### Disclaimer and liability
+
+Guardia MCP is free software provided **"as is", without any warranty**, under the Apache License 2.0 (see [LICENSE](LICENSE), sections 7–8). You use it at your own risk.
+
+- **No warranty.** There is no guarantee that it is free of errors or fit for any particular purpose, and it is not a guarantee of security: read [Honest limits](#honest-limits).
+- **Modified copies are not official.** Anyone is free to study and change the source — that is what open source means — but a modified copy is **not** Guardia MCP and is not supported by the author. If you change the code and it breaks, or breaks something else, that is not the author's responsibility.
+- **No liability.** To the extent allowed by law, the author is not liable for any damage arising from the use, misuse, or modification of this software, including data loss or problems caused by other software on your computer.
+
+Found a real problem in the official release? Report it privately (see above) — that is always welcome.
+
 ---
 
 ## Italiano
@@ -287,3 +297,13 @@ impostazione .NET si rifiuta di caricare la libreria della finestra che sta dent
 versione 0.2.0 non partiva, con l'errore `Failed to resolve Python.Runtime.Loader.Initialize`).
 L'impostazione vale solo per i due programmi di Guardia, che caricano librerie .NET soltanto dalla
 loro cartella; chi riesce a sostituire quei file può già sostituire il programma stesso.
+
+### Avvertenza e responsabilità
+
+Guardia MCP è software libero fornito **«così com'è», senza alcuna garanzia**, con licenza Apache 2.0 (vedi [LICENSE](LICENSE), sezioni 7–8). Lo usi a tuo rischio.
+
+- **Nessuna garanzia.** Non c'è garanzia che sia privo di errori o adatto a uno scopo particolare, e non è una garanzia di sicurezza: leggi i [limiti, detti onestamente](#limiti-detti-onestamente).
+- **Le copie modificate non sono ufficiali.** Chiunque è libero di studiare e cambiare il codice — è il senso dell'open source — ma una copia modificata **non** è Guardia MCP e non è supportata dall'autore. Se cambi il codice e si rompe, o rompe qualcos'altro, non è responsabilità dell'autore.
+- **Nessuna responsabilità.** Nei limiti consentiti dalla legge, l'autore non è responsabile di alcun danno derivante dall'uso, dall'uso improprio o dalla modifica di questo software, inclusa la perdita di dati o problemi causati da altri programmi sul tuo computer.
+
+Hai trovato un problema vero nella versione ufficiale? Segnalalo in privato (vedi sopra) — è sempre benvenuto.

@@ -21,6 +21,7 @@ TOKEN_BYTES = 16
 ID_BYTES = 4
 MAX_NOTE = 200
 MAX_CANARIES = 256
+MAX_SCAN_NODES = 1_000_000
 
 
 class CanaryError(Exception):
@@ -166,3 +167,27 @@ class CanaryStore:
 def plant(path: Path, token: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(decoy_text(token), encoding="utf-8")
+
+
+def find_canary(value: Any, tokens: frozenset[str]) -> str | None:
+    if not tokens:
+        return None
+    stack: list[Any] = [value]
+    seen = 0
+    while stack and seen < MAX_SCAN_NODES:
+        current = stack.pop()
+        seen += 1
+        if isinstance(current, str):
+            for token in tokens:
+                if token in current:
+                    return token
+        elif isinstance(current, dict):
+            for key, item in current.items():
+                if isinstance(key, str):
+                    for token in tokens:
+                        if token in key:
+                            return token
+                stack.append(item)
+        elif isinstance(current, list):
+            stack.extend(current)
+    return None

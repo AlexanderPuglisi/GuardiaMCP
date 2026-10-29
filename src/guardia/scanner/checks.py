@@ -21,7 +21,6 @@ from guardia.redact import (
     WEAK_SECRET,
     is_plain_value,
     is_secret_assignment,
-    is_secret_name,
     looks_random,
     redact_args,
     redact_free_text,
@@ -601,9 +600,8 @@ def _path_like_values(server: ServerEntry) -> Iterator[tuple[str, str, str]]:
     if server.cwd:
         yield f"{server.pointer}/cwd", server.cwd, "cwd"
     for name, value in server.env.items():
-        if not is_secret_name(name):
-            for part in re.split(r"[;,]", value):
-                yield env_pointer(server, name), part.strip().strip('"'), name.lower()
+        for part in re.split(r"[;,]", value):
+            yield env_pointer(server, name), part.strip().strip('"'), name.lower()
 
 
 def _certificate_file(value: str, owner: str) -> bool:
@@ -781,9 +779,8 @@ def collect_urls(server: ServerEntry) -> Iterator[tuple[str, str, str]]:
         for match in URL_IN_TEXT.finditer(arg):
             yield arg_pointer(server, index), match.group(0), ""
     for name, value in server.env.items():
-        if not is_secret_name(name):
-            for match in URL_IN_TEXT.finditer(value):
-                yield env_pointer(server, name), match.group(0), name
+        for match in URL_IN_TEXT.finditer(value):
+            yield env_pointer(server, name), match.group(0), name
 
 
 def _parse_ip(host: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -9,6 +10,7 @@ from guardia.canary import (
     CanaryError,
     CanaryStore,
     decoy_text,
+    find_canary,
     new_token,
     plant,
 )
@@ -80,3 +82,31 @@ def test_plant_writes_the_decoy(tmp_path: Path) -> None:
     target = tmp_path / "secrets" / ".env"
     plant(target, token)
     assert token in target.read_text(encoding="utf-8")
+
+
+def test_find_canary_in_a_value() -> None:
+    token = new_token()
+    assert find_canary({"content": [{"text": f"x {token} y"}]}, frozenset({token})) == token
+
+
+def test_find_canary_in_a_dict_key() -> None:
+    token = new_token()
+    assert find_canary({token: "exfil"}, frozenset({token})) == token
+
+
+def test_find_canary_deeply_nested() -> None:
+    token = new_token()
+    value: Any = token
+    for _ in range(200):
+        value = {"wrap": value}
+    assert find_canary(value, frozenset({token})) == token
+
+
+def test_find_canary_after_long_filler() -> None:
+    token = new_token()
+    assert find_canary("A" * 300000 + token, frozenset({token})) == token
+
+
+def test_find_canary_absent_or_no_tokens() -> None:
+    assert find_canary({"a": ["b", "c"]}, frozenset({new_token()})) is None
+    assert find_canary({"a": "b"}, frozenset()) is None

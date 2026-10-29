@@ -8,6 +8,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from guardia.canary import find_canary
 from guardia.display import safe_text
 from guardia.i18n import Translator
 from guardia.ledger import Ledger
@@ -24,7 +25,7 @@ from guardia.shield.engine import (
     redact,
 )
 from guardia.shield.messages import Direction, Message, MessageKind
-from guardia.shield.patterns import MAX_WALK_DEPTH, Leaf, leaves
+from guardia.shield.patterns import MAX_WALK_DEPTH, Leaf
 from guardia.shield.pins import PinError, PinStore, ToolStatus
 from guardia.shield.policy import Policy, PolicyState
 from guardia.shield.protections import (
@@ -300,13 +301,7 @@ class RulesInspector:
         return self._judge(engine, context, message, checks)
 
     def _canary_hit(self, value: Any) -> str | None:
-        if not self._canaries:
-            return None
-        for leaf in leaves(value):
-            for token in self._canaries:
-                if token in leaf.text:
-                    return token
-        return None
+        return find_canary(value, self._canaries)
 
     def _call_checks(
         self, engine: Engine, context: Context, protections: Protections

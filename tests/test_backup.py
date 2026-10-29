@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import io
+import tarfile
 from pathlib import Path
 
 import pytest
@@ -73,3 +75,17 @@ def test_unknown_format_is_rejected(tmp_path: Path) -> None:
 
 def test_listing_is_empty_without_backups(tmp_path: Path) -> None:
     assert listing(tmp_path / "data") == []
+
+
+def test_extract_rejects_a_compressed_archive(tmp_path: Path) -> None:
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
+        data = b"A" * 2_000_000
+        info = tarfile.TarInfo("big.bin")
+        info.size = len(data)
+        tar.addfile(info, io.BytesIO(data))
+    payload = RAW_PROTECTOR.magic + RAW_PROTECTOR.protect(buffer.getvalue())
+    archive = tmp_path / "bomb.gbk"
+    archive.write_bytes(payload)
+    with pytest.raises(BackupError):
+        extract(archive, tmp_path / "out", protector=RAW_PROTECTOR)
