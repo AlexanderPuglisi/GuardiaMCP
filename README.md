@@ -6,7 +6,7 @@
 
 **[Step-by-step guide with screenshots](docs/GUIDE.md)** · **[Guida passo passo con foto](docs/GUIDA.md)**
 
-[![Tests](https://github.com/AlexanderPuglisi/GuardiaMCP/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/AlexanderPuglisi/GuardiaMCP/actions/workflows/tests.yml) · [How it was tested](TESTING.md) · [Security](SECURITY.md) · [For reviewers](AUDIT.md) · [Guide (EN)](docs/SHIELD.md) · [Guida (IT)](docs/SCUDO.md)
+[![Tests](https://github.com/AlexanderPuglisi/GuardiaMCP/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/AlexanderPuglisi/GuardiaMCP/actions/workflows/tests.yml) · [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23814323.svg)](https://doi.org/10.5281/zenodo.23814323) · [How it was tested](TESTING.md) · [Security](SECURITY.md) · [For reviewers](AUDIT.md) · [Guide (EN)](docs/SHIELD.md) · [Guida (IT)](docs/SCUDO.md)
 
 > 🇬🇧 English below · 🇮🇹 Italiano più sotto
 
@@ -580,3 +580,22 @@ Da lì ho continuato a irrobustirlo alla luce del sole: la versione 0.3.0 ha agg
 — Alexander Puglisi
 
 Licenza: [Apache 2.0](LICENSE).
+
+---
+
+## Citation · Citazione
+
+If you use or reference GuardiaMCP, please cite the whitepaper. · Se usi o citi GuardiaMCP, cita il whitepaper.
+
+> Puglisi, A. (2026). *GuardiaMCP: A Free, Offline, Test-Verified Defensive Layer for the Model Context Protocol.* Zenodo. [https://doi.org/10.5281/zenodo.23814323](https://doi.org/10.5281/zenodo.23814323)
+
+```bibtex
+@techreport{puglisi2026guardiamcp,
+  author      = {Puglisi, Alexander},
+  title       = {{GuardiaMCP: A Free, Offline, Test-Verified Defensive Layer for the Model Context Protocol}},
+  institution = {Zenodo},
+  year        = {2026},
+  doi         = {10.5281/zenodo.23814323},
+  url         = {https://doi.org/10.5281/zenodo.23814323}
+}
+```
