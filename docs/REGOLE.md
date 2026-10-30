@@ -1,6 +1,6 @@
 # Guida alle regole di Guardia MCP
 
-Questa guida elenca tutte le 91 regole che Guardia usa per controllare server MCP e skill. Per ognuna trovi perché è un rischio e come correggerlo. La guida è generata dal programma stesso con `guardia regole --markdown`, quindi è sempre allineata al codice. Nei testi, «…» indica un valore che nel rapporto vero viene sostituito con il nome del server, del file o del campo trovato.
+Questa guida elenca tutte le 92 regole che Guardia usa per controllare server MCP e skill. Per ognuna trovi perché è un rischio e come correggerlo. La guida è generata dal programma stesso con `guardia regole --markdown`, quindi è sempre allineata al codice. Nei testi, «…» indica un valore che nel rapporto vero viene sostituito con il nome del server, del file o del campo trovato.
 
 ## I livelli di gravità
 
@@ -52,7 +52,7 @@ Le regole scritte da te in formato TOML guidano lo Scudo in tempo reale (vedi do
 - **G01** — Istruzioni nascoste e caratteri invisibili: 6 regole
 - **G02** — Prompt injection: 4 regole
 - **G03** — Modifiche nascoste (rug pull): 6 regole
-- **G04** — Interferenza tra server (shadowing): 6 regole
+- **G04** — Interferenza tra server (shadowing): 7 regole
 - **G05** — Comandi di sistema pericolosi: 11 regole
 - **G06** — Segreti esposti: 8 regole
 - **G07** — Accesso a file sensibili: 6 regole
@@ -203,6 +203,12 @@ Le regole scritte da te in formato TOML guidano lo Scudo in tempo reale (vedi do
 **Perché.** Lo strumento «…» usa lettere di un altro alfabeto che sembrano latine (…); lette come lettere normali il suo nome è «…». È un trucco con omoglifi: un nome fatto sembrare affidabile per passare inosservato all'AI o a chi approva le chiamate.
 
 **Come correggere.** Non usare il server: uno strumento legittimo si chiama con lettere normali.
+
+### G04-007 · ALTO — Nome del server sosia (omoglifo)
+
+**Perché.** Il server «…» ha un nome con lettere di un altro alfabeto che sembrano latine (…); lette come lettere normali il nome è «…». È un trucco con omoglifi: un nome fatto sembrare quello di un server di cui ti fidi.
+
+**Come correggere.** Rinomina il server con lettere normali, o rimuovilo se non l'hai aggiunto tu.
 
 ## G05 — Comandi di sistema pericolosi
 

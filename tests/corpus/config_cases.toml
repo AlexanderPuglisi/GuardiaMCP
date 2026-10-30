@@ -442,3 +442,17 @@ id = "unknown-transport"
 kind = "malicious"
 expected = ["G12-002"]
 server = { type = "carrier-pigeon", url = "https://mcp.example.com/mcp" }
+
+[[case]]
+id = "lookalike-server-name"
+kind = "malicious"
+expected = ["G04-007"]
+name = "gіthub"
+server = { command = "npx", args = ["-y", "@modelcontextprotocol/server-github@2025.4.8"] }
+
+[[case]]
+id = "accented-server-name"
+kind = "benign"
+expected = []
+name = "café-notes"
+server = { command = "npx", args = ["-y", "@modelcontextprotocol/server-github@2025.4.8"] }

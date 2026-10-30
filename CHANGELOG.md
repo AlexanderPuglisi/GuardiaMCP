@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.2 — 30 October 2026
+
+Follow-up to the look-alike rule: the same purple-team check now covers server names too. One new
+scanner rule, with a malicious and a harmless test case; the full suite stays green. No network, no
+runtime dependency.
+
+**Scanner**
+- New rule **G04-007**: a server configured under a name that hides Latin letters behind look-alikes
+  from another alphabet — for example a Cyrillic «і» in `gіthub` — is now flagged, with the name it
+  reads as in plain letters. This catches a server that impersonates one you trust in your MCP
+  config, the companion to the tool-name check (G04-006) added in 0.5.1.
+
 ## 0.5.1 — 30 October 2026
 
 A small hardening pass from a purple-team look at how a tool presents its name. One new scanner
