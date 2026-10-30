@@ -2,7 +2,7 @@
   <img src="docs/banner.svg" alt="Guardia MCP: free, offline security shield for AI agents that use MCP, by Alexander Puglisi" width="100%">
 </p>
 
-**by Alexander Puglisi** · [alexanderpuglisiskilly.com](https://alexanderpuglisiskilly.com) · [Download](https://github.com/AlexanderPuglisi/GuardiaMCP/releases/latest) · [✓ Claude Academy: Introduction to MCP](https://academy.claude.com/verify/5a6125d6ee0ea408559c3679d0ff2657) · [✓ Claude Academy: MCP Advanced Topics](https://academy.claude.com/verify/d3957736dde1f145d365218c130d52fa)
+**by Alexander Puglisi** · [Download](https://github.com/AlexanderPuglisi/GuardiaMCP/releases/latest) · [✓ Claude Academy: Introduction to MCP](https://academy.claude.com/verify/5a6125d6ee0ea408559c3679d0ff2657) · [✓ Claude Academy: MCP Advanced Topics](https://academy.claude.com/verify/d3957736dde1f145d365218c130d52fa)
 
 **[Step-by-step guide with screenshots](docs/GUIDE.md)** · **[Guida passo passo con foto](docs/GUIDA.md)**
 
@@ -40,7 +40,7 @@ asks you first.
 <sub>The demo runs on a fake PC made of fake servers and skills written for the purpose
 (`scripts/demo.py`): no real data, no real secrets.</sub>
 
-**Status: version 0.2.3 — v1 (static analysis) and v2 (real-time Shield for local stdio servers).**
+**Status: version 0.5.0 — v1 (static analysis) and v2 (real-time Shield for local stdio servers).**
 
 - `guardia inventory` — finds the MCP servers and skills configured on this PC in the supported apps
   (Claude Desktop, Claude Code, Cursor, VS Code, Windsurf, Gemini CLI, Codex, Copilot CLI) and lists
@@ -147,7 +147,7 @@ never uses the network). Restore it into a folder of your choice with
 
 Prefer pictures? Follow the [step-by-step guide with screenshots](docs/GUIDE.md).
 
-1. **Download** `GuardiaMCP-0.2.3-windows-x64.zip` and `SHA256SUMS.txt` from the project's
+1. **Download** `GuardiaMCP-0.5.0-windows-x64.zip` and `SHA256SUMS.txt` from the project's
    [**Releases**](https://github.com/AlexanderPuglisi/GuardiaMCP/releases/latest) page on GitHub
    and check the zip: the [guide](docs/GUIDE.md#1-download-and-check) has two PowerShell lines to
    paste, which must print `True`.
@@ -275,6 +275,8 @@ Anthropic's AI coding agent, which is listed as a contributor: every commit carr
   line, app, documentation): they reported 74 problems, and version 0.2.2 fixes 73 of them; the last
   one is written among the limits ([TESTING.md](TESTING.md)).
 
+*I apply a purple-team approach to my projects: adversarial red-team review to find the weaknesses, then defensive fixes verified with regression tests.*
+
 Before writing any code I studied the protocol with Anthropic's official course
 ([Claude Academy badge: Introduction to Model Context Protocol](https://academy.claude.com/verify/5a6125d6ee0ea408559c3679d0ff2657)). Then I built Guardia in
 one intensive day, 23 October 2026: the static scanner (v1), the real-time Shield (v2.0 to v2.5) and
@@ -315,7 +317,7 @@ conferma.
 <sub>La demo gira su un PC finto, fatto di server e skill finti scritti apposta
 (`scripts/demo.py`): nessun dato vero, nessun segreto vero.</sub>
 
-**Stato: versione 0.2.3 — v1 (analisi statica) e v2 (Scudo in tempo reale per i server locali stdio).**
+**Stato: versione 0.5.0 — v1 (analisi statica) e v2 (Scudo in tempo reale per i server locali stdio).**
 
 - `guardia inventario` — trova i server MCP e le skill configurati sul PC nelle app supportate
   (Claude Desktop, Claude Code, Cursor, VS Code, Windsurf, Gemini CLI, Codex, Copilot CLI) e li
@@ -430,7 +432,7 @@ Copia il file che crea su una chiavetta o un altro computer: quella è la tua co
 
 Preferisci le foto? Segui la [guida passo passo con le schermate](docs/GUIDA.md).
 
-1. **Scarica** `GuardiaMCP-0.2.3-windows-x64.zip` e `SHA256SUMS.txt` dalla pagina
+1. **Scarica** `GuardiaMCP-0.5.0-windows-x64.zip` e `SHA256SUMS.txt` dalla pagina
    [**Releases**](https://github.com/AlexanderPuglisi/GuardiaMCP/releases/latest) del progetto su
    GitHub e controlla lo zip: nella [guida](docs/GUIDA.md#1-scarica-e-controlla) ci sono due righe
    da incollare in PowerShell, che devono stampare `True`.
@@ -562,6 +564,8 @@ chi ha fatto cosa.
   la prima pubblicazione ho chiesto altre quattro revisioni da zero
   (scanner, Scudo e riga di comando, app, documentazione): hanno segnalato 74 problemi, e la versione
   0.2.2 ne corregge 73; l'ultimo è scritto tra i limiti ([TESTING.md](TESTING.md)).
+
+*Applico un approccio purple-team ai miei progetti: red-team adversariale per trovare le debolezze, poi fix difensivi verificati con test di regressione.*
 
 Prima di scrivere codice ho studiato il protocollo con il corso ufficiale di Anthropic
 ([badge Claude Academy: Introduction to Model Context Protocol](https://academy.claude.com/verify/5a6125d6ee0ea408559c3679d0ff2657)). Poi ho costruito Guardia
