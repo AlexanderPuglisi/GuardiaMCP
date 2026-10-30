@@ -1,0 +1,56 @@
+name: Bug report
+description: Report something that isn't working as expected.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please fill in what you can — it all helps.
+        _Grazie della segnalazione. Compila ciò che puoi: è tutto utile._
+  - type: textarea
+    id: summary
+    attributes:
+      label: What's wrong?
+      description: A clear, short description of the problem. / Descrizione chiara e breve del problema.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: How can it be reproduced? / Come si riproduce?
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect instead?
+      description: Il comportamento atteso.
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: Guardia version
+      placeholder: "0.5.0"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: "Windows 11 Pro 24H2"
+    validations:
+      required: false
+  - type: textarea
+    id: output
+    attributes:
+      label: Error output
+      description: Paste any error messages. Remove secrets first. / Incolla eventuali errori. Togli prima i segreti.
+      render: text
+    validations:
+      required: false
