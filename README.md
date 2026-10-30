@@ -283,6 +283,8 @@ one intensive day, 23 October 2026: the static scanner (v1), the real-time Shiel
 finally the review from scratch. The next day, while preparing version 0.2.2, I also completed the
 advanced course ([Claude Academy badge: Model Context Protocol: Advanced Topics](https://academy.claude.com/verify/d3957736dde1f145d365218c130d52fa)).
 
+From there I kept hardening it in the open: version 0.3.0 added two built-in defenses — a canary decoy and encrypted rotating backups ([INFINITY-SAND](INFINITY-SAND.md)) — and versions 0.4.0 and 0.5.0 were two more independent red-team passes, first on the whole tool and then on the Shield, closing five further weaknesses in all, each with its own regression test and the full suite kept green. Every version is recorded in the [CHANGELOG](CHANGELOG.md).
+
 — Alexander Puglisi
 
 License: [Apache 2.0](LICENSE).
@@ -572,6 +574,8 @@ Prima di scrivere codice ho studiato il protocollo con il corso ufficiale di Ant
 in una giornata intensa, il 23 ottobre 2026: lo scanner statico (v1), lo Scudo in tempo reale
 (dalla v2.0 alla v2.5) e infine la revisione da zero. Il giorno dopo, mentre preparavo la versione
 0.2.2, ho completato anche il corso avanzato ([badge Claude Academy: Model Context Protocol: Advanced Topics](https://academy.claude.com/verify/d3957736dde1f145d365218c130d52fa)).
+
+Da lì ho continuato a irrobustirlo alla luce del sole: la versione 0.3.0 ha aggiunto due difese di serie — un'esca (canary) e i backup cifrati a rotazione ([INFINITY-SAND](INFINITY-SAND.md)) — e le versioni 0.4.0 e 0.5.0 sono state altre due revisioni adversariali indipendenti (red-team), prima su tutto il tool e poi sullo Scudo, chiudendo in tutto cinque ulteriori debolezze, ognuna con il suo test di regressione e con l'intera suite sempre verde. Ogni versione è nel [CHANGELOG](CHANGELOG.md).
 
 — Alexander Puglisi
 
