@@ -928,9 +928,27 @@ def check_lookalike_server_name(server: ServerEntry, context: ScanContext) -> It
     yield emit("G04-007", server, server.pointer, server.name, skeleton=skeleton, scripts=scripts)
 
 
+def check_lookalike_command(server: ServerEntry, context: ScanContext) -> Iterator[Finding]:
+    if not server.command:
+        return
+    found = lookalike_name(server.command)
+    if found is None:
+        return
+    skeleton, scripts = found
+    yield emit(
+        "G04-008",
+        server,
+        f"{server.pointer}/command",
+        server.command,
+        skeleton=skeleton,
+        scripts=scripts,
+    )
+
+
 SERVER_CHECKS: tuple[Check, ...] = (
     check_hidden_characters,
     check_lookalike_server_name,
+    check_lookalike_command,
     check_shells_and_interpreters,
     check_command_patterns,
     check_secrets,

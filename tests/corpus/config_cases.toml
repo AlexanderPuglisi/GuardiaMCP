@@ -456,3 +456,15 @@ kind = "benign"
 expected = []
 name = "café-notes"
 server = { command = "npx", args = ["-y", "@modelcontextprotocol/server-github@2025.4.8"] }
+
+[[case]]
+id = "lookalike-command"
+kind = "malicious"
+expected = ["G04-008"]
+server = { command = "nоde", args = ["server.js"] }
+
+[[case]]
+id = "accented-command"
+kind = "benign"
+expected = []
+server = { command = "café-runner", args = ["server.js"] }
