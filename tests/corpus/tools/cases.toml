@@ -177,3 +177,13 @@ expected = []
 file = "benign_snapshot.json"
 kind = "benign"
 expected = []
+
+[[case]]
+file = "lookalike_name.py"
+kind = "malicious"
+expected = ["G04-006"]
+
+[[case]]
+file = "benign_accented.py"
+kind = "benign"
+expected = []

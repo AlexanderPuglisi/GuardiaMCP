@@ -47,6 +47,7 @@ RULES: dict[str, Rule] = {
         Rule("G04-003", _L),
         Rule("G04-004", _M),
         Rule("G04-005", _H),
+        Rule("G04-006", _H),
         Rule("G05-001", _H),
         Rule("G05-002", _C),
         Rule("G05-003", _H),

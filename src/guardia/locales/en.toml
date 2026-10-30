@@ -514,6 +514,11 @@ title = "Changes message recipients"
 why = "The text of \"{tool}\" asks to change or add recipients (email, phone, blind copy). This is how messages get diverted to an attacker."
 fix = "Remove the server."
 
+[rules.G04-006]
+title = "Look-alike (homoglyph) name"
+why = "The tool \"{tool}\" uses letters from another alphabet that look like Latin ones ({scripts}); read as ordinary letters its name is \"{skeleton}\". This is a homoglyph trick: a name made to look trusted so it slips past the AI or whoever approves calls."
+fix = "Do not use the server: a legitimate tool names itself with ordinary letters."
+
 [rules.G05-008]
 title = "Tool that can run commands or code"
 why = "The tool \"{tool}\" can run commands or code on your PC. That is not a problem in itself, but it is the most powerful tool the AI has: if the AI is tricked, this is where the damage happens."

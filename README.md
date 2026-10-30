@@ -40,12 +40,12 @@ asks you first.
 <sub>The demo runs on a fake PC made of fake servers and skills written for the purpose
 (`scripts/demo.py`): no real data, no real secrets.</sub>
 
-**Status: version 0.5.0 — v1 (static analysis) and v2 (real-time Shield for local stdio servers).**
+**Status: version 0.5.1 — v1 (static analysis) and v2 (real-time Shield for local stdio servers).**
 
 - `guardia inventory` — finds the MCP servers and skills configured on this PC in the supported apps
   (Claude Desktop, Claude Code, Cursor, VS Code, Windsurf, Gemini CLI, Codex, Copilot CLI) and lists
   them with a risk level.
-- `guardia scan` — checks them against 90 rules and explains every problem with the exact file and
+- `guardia scan` — checks them against 91 rules and explains every problem with the exact file and
   line, a plain-language explanation and how to fix it:
   - **configuration**: dangerous commands, plain-text secrets, sensitive files, excessive
     permissions, suspicious network, unpinned packages, typosquatting;
@@ -61,7 +61,7 @@ asks you first.
   key protected by Windows DPAPI. `guardia ledger verify | show | anchor`.
 - **Reports** — `--format text | json | html | sarif`. The HTML report is a single file with no
   scripts and a strict Content Security Policy; SARIF 2.1.0 works with GitHub code scanning.
-- **Rules guide** — `guardia rules` lists all 90 rules, `guardia rules G05-002` explains one.
+- **Rules guide** — `guardia rules` lists all 91 rules, `guardia rules G05-002` explains one.
   The full guide is in [docs/RULES.md](docs/RULES.md) (generated from the code, always up to date).
 - **Desktop app** — a borderless window with the sections centered at the top: overview, servers
   and skills, findings, Shield, ledger, reports and settings, each explained in one line, in Italian and English. It uses the same engine as the CLI, shows only text (never HTML from
@@ -147,7 +147,7 @@ never uses the network). Restore it into a folder of your choice with
 
 Prefer pictures? Follow the [step-by-step guide with screenshots](docs/GUIDE.md).
 
-1. **Download** `GuardiaMCP-0.5.0-windows-x64.zip` and `SHA256SUMS.txt` from the project's
+1. **Download** `GuardiaMCP-0.5.1-windows-x64.zip` and `SHA256SUMS.txt` from the project's
    [**Releases**](https://github.com/AlexanderPuglisi/GuardiaMCP/releases/latest) page on GitHub
    and check the zip: the [guide](docs/GUIDE.md#1-download-and-check) has two PowerShell lines to
    paste, which must print `True`.
@@ -319,12 +319,12 @@ conferma.
 <sub>La demo gira su un PC finto, fatto di server e skill finti scritti apposta
 (`scripts/demo.py`): nessun dato vero, nessun segreto vero.</sub>
 
-**Stato: versione 0.5.0 — v1 (analisi statica) e v2 (Scudo in tempo reale per i server locali stdio).**
+**Stato: versione 0.5.1 — v1 (analisi statica) e v2 (Scudo in tempo reale per i server locali stdio).**
 
 - `guardia inventario` — trova i server MCP e le skill configurati sul PC nelle app supportate
   (Claude Desktop, Claude Code, Cursor, VS Code, Windsurf, Gemini CLI, Codex, Copilot CLI) e li
   elenca con il livello di rischio.
-- `guardia scansiona` — li controlla con 90 regole e spiega ogni problema con file e riga esatti,
+- `guardia scansiona` — li controlla con 91 regole e spiega ogni problema con file e riga esatti,
   una spiegazione semplice e come correggerlo:
   - **configurazione**: comandi pericolosi, segreti in chiaro, file sensibili, permessi eccessivi,
     rete sospetta, pacchetti senza versione bloccata, typosquatting;
@@ -343,7 +343,7 @@ conferma.
   firmata con una chiave HMAC protetta da Windows DPAPI. `guardia registro verifica | mostra | ancora`.
 - **Rapporti** — `--formato testo | json | html | sarif`. Il rapporto HTML è un file unico, senza
   script e con una Content Security Policy rigida; SARIF 2.1.0 funziona con GitHub code scanning.
-- **Guida alle regole** — `guardia regole` elenca tutte le 90 regole, `guardia regole G05-002` ne
+- **Guida alle regole** — `guardia regole` elenca tutte le 91 regole, `guardia regole G05-002` ne
   spiega una. La guida completa è in [docs/REGOLE.md](docs/REGOLE.md) (generata dal codice,
   sempre aggiornata).
 - **App desktop** — una finestra senza bordi con le sezioni al centro in alto: panoramica, server e
@@ -434,7 +434,7 @@ Copia il file che crea su una chiavetta o un altro computer: quella è la tua co
 
 Preferisci le foto? Segui la [guida passo passo con le schermate](docs/GUIDA.md).
 
-1. **Scarica** `GuardiaMCP-0.5.0-windows-x64.zip` e `SHA256SUMS.txt` dalla pagina
+1. **Scarica** `GuardiaMCP-0.5.1-windows-x64.zip` e `SHA256SUMS.txt` dalla pagina
    [**Releases**](https://github.com/AlexanderPuglisi/GuardiaMCP/releases/latest) del progetto su
    GitHub e controlla lo zip: nella [guida](docs/GUIDA.md#1-scarica-e-controlla) ci sono due righe
    da incollare in PowerShell, che devono stampare `True`.

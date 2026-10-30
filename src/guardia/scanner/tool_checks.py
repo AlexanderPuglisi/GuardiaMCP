@@ -688,8 +688,68 @@ def check_capabilities(context: ToolContext) -> Iterator[Finding]:
         yield tool_finding("G04-004", context, None, tool.name)
 
 
+# Letters from other alphabets that look like Latin ones: the homoglyphs used to disguise a name.
+# A name can slip a Cyrillic or Greek letter in among Latin ones so it reads like a trusted tool
+# (for example the built-in "Read") while being a different string the exact-match check (G04-004)
+# never sees. Built from code points so the source itself carries no ambiguous characters.
+_LOOKALIKE_CODEPOINTS: dict[int, str] = {
+    # Cyrillic, lower case
+    0x0430: "a", 0x0435: "e", 0x043E: "o", 0x0440: "p", 0x0441: "c", 0x0443: "y", 0x0445: "x",
+    0x0456: "i", 0x0458: "j", 0x0455: "s", 0x0501: "d", 0x04BB: "h", 0x04CF: "l", 0x051B: "q",
+    0x051D: "w",
+    # Cyrillic, upper case
+    0x0410: "A", 0x0412: "B", 0x0415: "E", 0x041A: "K", 0x041C: "M", 0x041D: "H", 0x041E: "O",
+    0x0420: "P", 0x0421: "C", 0x0422: "T", 0x0423: "Y", 0x0425: "X", 0x0406: "I", 0x0408: "J",
+    0x0405: "S",
+    # Greek
+    0x03BF: "o", 0x03C1: "p", 0x03B1: "a", 0x03BD: "v",
+    0x0391: "A", 0x0392: "B", 0x0395: "E", 0x0396: "Z", 0x0397: "H", 0x0399: "I", 0x039A: "K",
+    0x039C: "M", 0x039D: "N", 0x039F: "O", 0x03A1: "P", 0x03A4: "T", 0x03A5: "Y", 0x03A7: "X",
+}
+LATIN_LOOKALIKES: dict[str, str] = {
+    chr(code): latin for code, latin in _LOOKALIKE_CODEPOINTS.items()
+}
+
+
+def _letter_script(char: str) -> str:
+    name = unicodedata.name(char, "")
+    for script in ("LATIN", "CYRILLIC", "GREEK"):
+        if name.startswith(script):
+            return script
+    return name.split(" ", 1)[0] if name else "OTHER"
+
+
+def lookalike_name(name: str) -> tuple[str, str] | None:
+    """When ``name`` disguises Latin letters as another alphabet, return (skeleton, scripts)."""
+    letters = [char for char in name if char.isalpha()]
+    if not any(char in LATIN_LOOKALIKES for char in letters):
+        return None
+    scripts = {_letter_script(char) for char in letters}
+    whole_word = len(letters) >= 3 and all(char in LATIN_LOOKALIKES for char in letters)
+    if "LATIN" not in scripts and not whole_word:
+        return None
+    skeleton = "".join(LATIN_LOOKALIKES.get(char, char) for char in name)
+    return skeleton, " + ".join(sorted(scripts))
+
+
+def check_lookalike_name(context: ToolContext) -> Iterator[Finding]:
+    found = lookalike_name(context.tool.name)
+    if found is None:
+        return
+    skeleton, scripts = found
+    builtin = any(name.lower() == skeleton.lower() for name in BUILTIN_TOOL_NAMES)
+    severity = Severity.CRITICAL if builtin else RULES["G04-006"].severity
+    yield tool_finding(
+        "G04-006", context, None, context.tool.name, severity, skeleton=skeleton, scripts=scripts
+    )
+
+
 ToolCheck = Callable[[ToolContext], Iterable[Finding]]
-TOOL_CHECKS: tuple[ToolCheck, ...] = (check_text_fields, check_capabilities)
+TOOL_CHECKS: tuple[ToolCheck, ...] = (
+    check_text_fields,
+    check_capabilities,
+    check_lookalike_name,
+)
 
 
 def collection_notes(server: ServerEntry, collection: ToolCollection) -> list[Finding]:
