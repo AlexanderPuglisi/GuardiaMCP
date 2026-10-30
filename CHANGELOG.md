@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.1 — 30 October 2026
+
+A small hardening pass from a purple-team look at how a tool presents its name. One new scanner
+rule, with a malicious and a harmless test case; the full suite stays green. No network, no runtime
+dependency.
+
+**Scanner**
+- New rule **G04-006**: a tool or skill whose name hides Latin letters behind look-alikes from
+  another alphabet — for example a Cyrillic «а» in `Reаd` — is now flagged, with the name it reads
+  as in plain letters. When that plain-letter name is a built-in client tool, the finding is raised
+  to critical: a homoglyph the exact-match check (G04-004) could never see. The same check runs in
+  the real-time Shield, so a look-alike tool is hidden there as well.
+
 ## 0.5.0 — 29 October 2026
 
 A second hardening pass, most of it from a fresh adversarial review (red-team) of the real-time

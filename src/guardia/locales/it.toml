@@ -514,6 +514,11 @@ title = "Cambia i destinatari dei messaggi"
 why = "Il testo di «{tool}» chiede di cambiare o aggiungere destinatari (email, telefono, copia nascosta). È la tecnica usata per deviare i messaggi verso l'attaccante."
 fix = "Rimuovi il server."
 
+[rules.G04-006]
+title = "Nome sosia (omoglifo)"
+why = "Lo strumento «{tool}» usa lettere di un altro alfabeto che sembrano latine ({scripts}); lette come lettere normali il suo nome è «{skeleton}». È un trucco con omoglifi: un nome fatto sembrare affidabile per passare inosservato all'AI o a chi approva le chiamate."
+fix = "Non usare il server: uno strumento legittimo si chiama con lettere normali."
+
 [rules.G05-008]
 title = "Strumento che può eseguire comandi o codice"
 why = "Lo strumento «{tool}» può eseguire comandi o codice sul tuo PC. Non è un problema in sé, ma è lo strumento più potente a disposizione dell'AI: se l'AI viene ingannata, è da qui che passa il danno."
