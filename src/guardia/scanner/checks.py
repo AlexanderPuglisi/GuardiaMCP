@@ -36,6 +36,7 @@ from guardia.scanner.commandline import (
     program_name,
 )
 from guardia.scanner.rules import RULES
+from guardia.scanner.tool_checks import lookalike_name
 
 
 @dataclass(frozen=True, slots=True)
@@ -919,8 +920,17 @@ def check_completeness(server: ServerEntry, context: ScanContext) -> Iterator[Fi
         yield emit("G12-001", server, server.pointer, "url")
 
 
+def check_lookalike_server_name(server: ServerEntry, context: ScanContext) -> Iterator[Finding]:
+    found = lookalike_name(server.name)
+    if found is None:
+        return
+    skeleton, scripts = found
+    yield emit("G04-007", server, server.pointer, server.name, skeleton=skeleton, scripts=scripts)
+
+
 SERVER_CHECKS: tuple[Check, ...] = (
     check_hidden_characters,
+    check_lookalike_server_name,
     check_shells_and_interpreters,
     check_command_patterns,
     check_secrets,
