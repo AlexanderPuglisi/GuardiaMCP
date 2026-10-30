@@ -524,6 +524,11 @@ title = "Look-alike (homoglyph) server name"
 why = "The server \"{server}\" is named with letters from another alphabet that look like Latin ones ({scripts}); read as ordinary letters its name is \"{skeleton}\". This is a homoglyph trick: a name made to look like a server you trust."
 fix = "Rename the server with ordinary letters, or remove it if you did not add it yourself."
 
+[rules.G04-008]
+title = "Look-alike (homoglyph) command"
+why = "The server \"{server}\" runs a command whose name uses letters from another alphabet that look like Latin ones ({scripts}); read as ordinary letters it is \"{skeleton}\". The config looks like it runs a trusted program, but the name is a different string."
+fix = "Use the real program name with ordinary letters, or remove the server if you did not set it up."
+
 [rules.G05-008]
 title = "Tool that can run commands or code"
 why = "The tool \"{tool}\" can run commands or code on your PC. That is not a problem in itself, but it is the most powerful tool the AI has: if the AI is tricked, this is where the damage happens."

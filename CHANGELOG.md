@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.3 — 30 October 2026
+
+Last step of the look-alike pass: the same check now also covers the command a server runs. One new
+scanner rule, with a malicious and a harmless test case; the full suite stays green. No network, no
+runtime dependency.
+
+**Scanner**
+- New rule **G04-008**: a server whose `command` (the program it launches) hides Latin letters
+  behind look-alikes from another alphabet — for example a Cyrillic «о» in `nоde` — is now flagged,
+  with the name it reads as in plain letters. Together with G04-006 (tools) and G04-007 (server
+  names), Guardia now checks every identifier a person reads in an MCP config for homoglyph
+  impersonation.
+
 ## 0.5.2 — 30 October 2026
 
 Follow-up to the look-alike rule: the same purple-team check now covers server names too. One new

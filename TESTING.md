@@ -18,12 +18,12 @@ anyone else's systems: every "attack" is a fake server or fake file written for 
 | Automatic check on GitHub | lint, types and all tests on a clean Windows machine, for every change ([Tests](https://github.com/AlexanderPuglisi/GuardiaMCP/actions/workflows/tests.yml)) |
 | Test files | 35 |
 | Fake samples (configurations, servers, code, skills) | 86 files in `tests/corpus/` |
-| Static rules, each with at least one malicious and one harmless fake case | 92 |
+| Static rules, each with at least one malicious and one harmless fake case | 93 |
 | Lint and types | `ruff` and `mypy --strict`: no issues |
 
 ### What the tests cover
 
-- **Scanner.** Every one of the 92 rules is tested on a malicious fake case and on a harmless case
+- **Scanner.** Every one of the 93 rules is tested on a malicious fake case and on a harmless case
   that looks similar on purpose, to keep false alarms down. The tests also cover hostile input:
   huge or deeply nested files, duplicate JSON keys, `NaN`/`Infinity`, invisible Unicode, very large
   numbers.
@@ -171,12 +171,12 @@ vero o su sistemi di altri: ogni «attacco» è un server finto o un file finto 
 | Controllo automatico su GitHub | stile, tipi e tutti i test su un Windows pulito, a ogni modifica ([Tests](https://github.com/AlexanderPuglisi/GuardiaMCP/actions/workflows/tests.yml)) |
 | File di test | 35 |
 | Esempi finti (configurazioni, server, codice, skill) | 86 file in `tests/corpus/` |
-| Regole statiche, ognuna con almeno un caso finto malevolo e uno innocuo | 92 |
+| Regole statiche, ognuna con almeno un caso finto malevolo e uno innocuo | 93 |
 | Stile e tipi | `ruff` e `mypy --strict`: nessun problema |
 
 ### Cosa coprono i test
 
-- **Scanner.** Ognuna delle 92 regole è provata su un caso finto malevolo e su un caso innocuo che
+- **Scanner.** Ognuna delle 93 regole è provata su un caso finto malevolo e su un caso innocuo che
   gli somiglia apposta, per tenere bassi i falsi allarmi. I test coprono anche input ostili: file
   enormi o annidati, chiavi JSON doppie, `NaN`/`Infinity`, Unicode invisibile, numeri giganti.
 - **Scudo in tempo reale.** Un server MCP finto (`tests/corpus/shield/fake_server.py`) si comporta
