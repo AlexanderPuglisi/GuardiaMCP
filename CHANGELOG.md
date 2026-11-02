@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.6 — 2 November 2026
+
+More alphabets behind the look-alike check. Until now Guardia only knew the Latin letters that
+Cyrillic and Greek borrow; an attacker could reach for Armenian or, worst of all, Cherokee — whose
+alphabet is full of capitals that are near-perfect twins of Latin ones (`Ꭺ`→A, `Ꭼ`→E, `Ꮐ`→G). The
+look-alike table now covers those two scripts as well, taken from the Unicode security confusables
+data (UTS #39), so every check that reads a name through it gets the wider coverage at once.
+
+**Scanner**
+- The look-alike table gains 51 Armenian and Cherokee letters. This strengthens the name checks
+  (G04-006 tools, G04-007 servers, G04-008 commands) and, since 0.5.5, the de-obfuscation of tool
+  text before the content patterns run — all of them share the one table.
+- New corpus case `cherokee_name.py`: a tool named with a Cherokee letter that reads as the built-in
+  `Grep` (flagged critical, like any look-alike of a built-in tool). The full suite stays green.
+
 ## 0.5.5 — 2 November 2026
 
 The look-alike work so far flagged a disguised *name*. This closes the matching hole in the other
