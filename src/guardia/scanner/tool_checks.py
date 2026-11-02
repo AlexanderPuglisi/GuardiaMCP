@@ -783,11 +783,67 @@ def check_lookalike_name(context: ToolContext) -> Iterator[Finding]:
     )
 
 
+# Compatibility letter forms: ordinary letters written as full-width, mathematical, ligature or
+# other presentation variants. NFKC folds every one of them back to a plain ASCII letter, so a name
+# like the full-width "Read" reads as "Read" yet stays a different string that the exact-match
+# (G04-004) and the cross-alphabet skeleton (G04-006) checks never see. The labels below are matched
+# against the Unicode character name only to describe the disguise in the report.
+_COMPAT_FORM_LABELS: tuple[tuple[str, str], ...] = (
+    ("FULLWIDTH", "full-width"),
+    ("HALFWIDTH", "half-width"),
+    ("MATHEMATICAL", "mathematical"),
+    ("LIGATURE", "ligature"),
+    ("SUPERSCRIPT", "modifier"),
+    ("MODIFIER LETTER", "modifier"),
+    ("SMALL CAPITAL", "small-capital"),
+)
+
+
+def _compat_form(char: str) -> str | None:
+    """Label the compatibility form of a letter that NFKC rewrites to a plain ASCII letter
+    (for example a full-width or mathematical letter), or None when it is already plain."""
+    if not char.isalpha():
+        return None
+    folded = unicodedata.normalize("NFKC", char)
+    if folded == char or not folded.isascii() or not folded.isalpha():
+        return None
+    name = unicodedata.name(char, "")
+    for marker, label in _COMPAT_FORM_LABELS:
+        if marker in name:
+            return label
+    return "compatibility"
+
+
+def compat_lookalike_name(name: str) -> tuple[str, str] | None:
+    """When ``name`` disguises plain letters as a compatibility form (full-width, mathematical,
+    ligature, …), return (skeleton, forms); otherwise None."""
+    if name.isascii():
+        return None
+    forms = sorted({label for char in name if (label := _compat_form(char))})
+    if not forms:
+        return None
+    skeleton = unicodedata.normalize("NFKC", name)
+    return skeleton, ", ".join(forms)
+
+
+def check_compat_lookalike_name(context: ToolContext) -> Iterator[Finding]:
+    found = compat_lookalike_name(context.tool.name)
+    if found is None:
+        return
+    skeleton, forms = found
+    builtin = any(name.lower() == skeleton.lower() for name in BUILTIN_TOOL_NAMES)
+    severity = Severity.CRITICAL if builtin else RULES["G04-009"].severity
+    yield tool_finding(
+        "G04-009", context, None, context.tool.name, severity, skeleton=skeleton, forms=forms
+    )
+
+
 ToolCheck = Callable[[ToolContext], Iterable[Finding]]
 TOOL_CHECKS: tuple[ToolCheck, ...] = (
     check_text_fields,
     check_capabilities,
     check_lookalike_name,
+    check_compat_lookalike_name,
 )
 
 

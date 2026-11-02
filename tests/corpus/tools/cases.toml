@@ -187,3 +187,8 @@ expected = ["G04-006"]
 file = "benign_accented.py"
 kind = "benign"
 expected = []
+
+[[case]]
+file = "fullwidth_name.py"
+kind = "malicious"
+expected = ["G04-009"]
