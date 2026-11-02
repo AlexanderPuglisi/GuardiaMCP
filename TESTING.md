@@ -17,7 +17,7 @@ anyone else's systems: every "attack" is a fake server or fake file written for 
 | Automated tests | **846**, all passing (`uv run pytest`) |
 | Automatic check on GitHub | lint, types and all tests on a clean Windows machine, for every change ([Tests](https://github.com/AlexanderPuglisi/GuardiaMCP/actions/workflows/tests.yml)) |
 | Test files | 35 |
-| Fake samples (configurations, servers, code, skills) | 87 files in `tests/corpus/` |
+| Fake samples (configurations, servers, code, skills) | 88 files in `tests/corpus/` |
 | Static rules, each with at least one malicious and one harmless fake case | 96 |
 | Lint and types | `ruff` and `mypy --strict`: no issues |
 
@@ -170,7 +170,7 @@ vero o su sistemi di altri: ogni «attacco» è un server finto o un file finto 
 | Test automatici | **846**, tutti passati (`uv run pytest`) |
 | Controllo automatico su GitHub | stile, tipi e tutti i test su un Windows pulito, a ogni modifica ([Tests](https://github.com/AlexanderPuglisi/GuardiaMCP/actions/workflows/tests.yml)) |
 | File di test | 35 |
-| Esempi finti (configurazioni, server, codice, skill) | 87 file in `tests/corpus/` |
+| Esempi finti (configurazioni, server, codice, skill) | 88 file in `tests/corpus/` |
 | Regole statiche, ognuna con almeno un caso finto malevolo e uno innocuo | 96 |
 | Stile e tipi | `ruff` e `mypy --strict`: nessun problema |
 

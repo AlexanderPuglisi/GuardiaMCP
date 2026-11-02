@@ -624,6 +624,18 @@ def _strongest(
     return None
 
 
+def _deobfuscate(text: str) -> str:
+    """Fold look-alike letters back to Latin (and drop tag-block smuggling) before the content
+    patterns run, so an instruction disguised with homoglyphs -- Cyrillic or Greek letters standing
+    in for Latin ones in a phrase like "ignore all previous instructions" -- is matched as what it
+    reads as. The raw text is still reported verbatim by the hidden-character and look-alike-name
+    checks; this only feeds the pattern matcher."""
+    folded = "".join(
+        LATIN_LOOKALIKES.get(char, char) for char in text if ord(char) not in TAG_BLOCK
+    )
+    return unicodedata.normalize("NFKC", folded)
+
+
 def check_text_fields(context: ToolContext) -> Iterator[Finding]:
     kind = context.tool.kind
     for field in context.tool.fields:
@@ -636,9 +648,7 @@ def check_text_fields(context: ToolContext) -> Iterator[Finding]:
         codes = hidden_codes(text)
         if codes:
             yield tool_finding("G01-001", context, field, codes, codes=codes)
-        normalized = unicodedata.normalize(
-            "NFKC", "".join(c for c in text if ord(c) not in TAG_BLOCK)
-        )
+        normalized = _deobfuscate(text)
         concealed = False
         for rule_id, pattern in PATTERN_RULES:
             source = _pattern_source(rule_id, normalized, kind, field.label)
