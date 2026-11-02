@@ -202,3 +202,8 @@ expected = ["G02-001"]
 file = "cherokee_name.py"
 kind = "malicious"
 expected = ["G04-006"]
+
+[[case]]
+file = "zero_width_injection.py"
+kind = "malicious"
+expected = ["G01-001", "G02-001"]

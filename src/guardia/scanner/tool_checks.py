@@ -625,15 +625,20 @@ def _strongest(
 
 
 def _deobfuscate(text: str) -> str:
-    """Fold look-alike letters back to Latin (and drop tag-block smuggling) before the content
-    patterns run, so an instruction disguised with homoglyphs -- Cyrillic or Greek letters standing
-    in for Latin ones in a phrase like "ignore all previous instructions" -- is matched as what it
-    reads as. The raw text is still reported verbatim by the hidden-character and look-alike-name
-    checks; this only feeds the pattern matcher."""
-    folded = "".join(
-        LATIN_LOOKALIKES.get(char, char) for char in text if ord(char) not in TAG_BLOCK
-    )
-    return unicodedata.normalize("NFKC", folded)
+    """Strip the disguises an instruction can hide behind before the content patterns run, so it is
+    matched as what it reads as: drop tag-block smuggling and the invisible format/control
+    characters (zero-width spaces, bidi controls, soft hyphens) that split a keyword like
+    "instru<zero-width>ctions", and fold look-alike letters -- Cyrillic, Greek, Armenian or Cherokee
+    standing in for Latin ones -- back to Latin. The raw text is still reported verbatim by the
+    hidden-character and look-alike-name checks; this only feeds the pattern matcher."""
+    kept: list[str] = []
+    for char in text:
+        if ord(char) in TAG_BLOCK:
+            continue
+        if char not in "\t\r\n" and unicodedata.category(char) in ("Cf", "Cc"):
+            continue
+        kept.append(LATIN_LOOKALIKES.get(char, char))
+    return unicodedata.normalize("NFKC", "".join(kept))
 
 
 def check_text_fields(context: ToolContext) -> Iterator[Finding]:
