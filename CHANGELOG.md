@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.5.4 — 2 November 2026
+
+A second look-alike pass, from the same purple-team angle. The homoglyph rules (G04-006…008) catch
+letters borrowed from another alphabet; they do not catch a letter written in a disguised
+presentation form — full-width, mathematical, a ligature — that reads as an ordinary letter but is a
+different code point. NFKC folds every one of those back to plain ASCII, so Guardia now flags them
+too, across the same three identifiers a person reads in an MCP config. Three new rules, each with a
+malicious and a harmless test case; the full suite stays green. No network, no runtime dependency.
+
+**Scanner**
+- New rule **G04-009**: a tool or skill whose name writes its letters in a disguised form — for
+  example the full-width «Ｒｅａｄ» or the mathematical «𝐑𝐞𝐚𝐝», both read as `Read` — is now flagged,
+  with the name it reads as in plain letters. CRITICAL when that plain name is a built-in client
+  tool.
+- New rule **G04-010**: the same disguise in a server name.
+- New rule **G04-011**: the same disguise in the `command` a server launches, so a config that looks
+  like it runs a trusted program but hides a different string is caught.
+- Together with the homoglyph rules from 0.5.1–0.5.3, Guardia now checks every identifier in an MCP
+  config for both cross-alphabet and compatibility-form impersonation. The check is letter-only, so
+  ordinary accented names (`café-notes`, `résumé_search`) and symbols like `™` stay clean.
+
 ## 0.5.3 — 30 October 2026
 
 Last step of the look-alike pass: the same check now also covers the command a server runs. One new

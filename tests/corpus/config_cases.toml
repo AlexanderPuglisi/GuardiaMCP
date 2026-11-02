@@ -468,3 +468,16 @@ id = "accented-command"
 kind = "benign"
 expected = []
 server = { command = "café-runner", args = ["server.js"] }
+
+[[case]]
+id = "compat-lookalike-server-name"
+kind = "malicious"
+expected = ["G04-010"]
+name = "ｇｉｔｈｕｂ"
+server = { command = "npx", args = ["-y", "@modelcontextprotocol/server-github@2025.4.8"] }
+
+[[case]]
+id = "compat-lookalike-command"
+kind = "malicious"
+expected = ["G04-011"]
+server = { command = "ｎｏｄｅ", args = ["server.js"] }
