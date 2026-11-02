@@ -197,3 +197,8 @@ expected = ["G04-009"]
 file = "homoglyph_injection.py"
 kind = "malicious"
 expected = ["G02-001"]
+
+[[case]]
+file = "cherokee_name.py"
+kind = "malicious"
+expected = ["G04-006"]

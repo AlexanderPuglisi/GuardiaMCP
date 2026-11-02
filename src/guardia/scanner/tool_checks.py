@@ -699,9 +699,11 @@ def check_capabilities(context: ToolContext) -> Iterator[Finding]:
 
 
 # Letters from other alphabets that look like Latin ones: the homoglyphs used to disguise a name.
-# A name can slip a Cyrillic or Greek letter in among Latin ones so it reads like a trusted tool
-# (for example the built-in "Read") while being a different string the exact-match check (G04-004)
-# never sees. Built from code points so the source itself carries no ambiguous characters.
+# A name can slip a Cyrillic, Greek, Armenian or Cherokee letter in among Latin ones so it reads
+# like a trusted tool (for example the built-in "Read") while being a different string the
+# exact-match check (G04-004) never sees. The Armenian and Cherokee code points are taken from the
+# Unicode security confusables data (UTS #39). Built from code points so the source itself carries
+# no ambiguous characters.
 _LOOKALIKE_CODEPOINTS: dict[int, str] = {
     # Cyrillic, lower case
     0x0430: "a",
@@ -754,6 +756,59 @@ _LOOKALIKE_CODEPOINTS: dict[int, str] = {
     0x03A4: "T",
     0x03A5: "Y",
     0x03A7: "X",
+    # Armenian
+    0x054D: "U",
+    0x054F: "S",
+    0x0555: "O",
+    0x0561: "w",
+    0x0563: "q",
+    0x0566: "q",
+    0x0570: "h",
+    0x0575: "j",
+    0x0578: "n",
+    0x057C: "n",
+    0x057D: "u",
+    0x0581: "g",
+    0x0582: "i",
+    0x0584: "f",
+    0x0585: "o",
+    # Cherokee
+    0x13A0: "D",
+    0x13A1: "R",
+    0x13A2: "T",
+    0x13A5: "i",
+    0x13A9: "Y",
+    0x13AA: "A",
+    0x13AB: "J",
+    0x13AC: "E",
+    0x13B3: "W",
+    0x13B7: "M",
+    0x13BB: "H",
+    0x13BD: "Y",
+    0x13C0: "G",
+    0x13C2: "h",
+    0x13C3: "Z",
+    0x13CF: "b",
+    0x13D2: "R",
+    0x13D4: "W",
+    0x13D5: "S",
+    0x13D9: "V",
+    0x13DA: "S",
+    0x13DE: "L",
+    0x13DF: "C",
+    0x13E2: "P",
+    0x13E6: "K",
+    0x13E7: "d",
+    0x13F3: "G",
+    0x13F4: "B",
+    0xAB75: "i",
+    0xAB81: "r",
+    0xAB83: "w",
+    0xAB93: "z",
+    0xABA4: "w",
+    0xABA9: "v",
+    0xABAA: "s",
+    0xABAF: "c",
 }
 LATIN_LOOKALIKES: dict[str, str] = {
     chr(code): latin for code, latin in _LOOKALIKE_CODEPOINTS.items()

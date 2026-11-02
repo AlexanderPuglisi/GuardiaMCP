@@ -40,7 +40,7 @@ asks you first.
 <sub>The demo runs on a fake PC made of fake servers and skills written for the purpose
 (`scripts/demo.py`): no real data, no real secrets.</sub>
 
-**Status: version 0.5.5 — v1 (static analysis) and v2 (real-time Shield for local stdio servers).**
+**Status: version 0.5.6 — v1 (static analysis) and v2 (real-time Shield for local stdio servers).**
 
 - `guardia inventory` — finds the MCP servers and skills configured on this PC in the supported apps
   (Claude Desktop, Claude Code, Cursor, VS Code, Windsurf, Gemini CLI, Codex, Copilot CLI) and lists
@@ -147,7 +147,7 @@ never uses the network). Restore it into a folder of your choice with
 
 Prefer pictures? Follow the [step-by-step guide with screenshots](docs/GUIDE.md).
 
-1. **Download** `GuardiaMCP-0.5.5-windows-x64.zip` and `SHA256SUMS.txt` from the project's
+1. **Download** `GuardiaMCP-0.5.6-windows-x64.zip` and `SHA256SUMS.txt` from the project's
    [**Releases**](https://github.com/AlexanderPuglisi/GuardiaMCP/releases/latest) page on GitHub
    and check the zip: the [guide](docs/GUIDE.md#1-download-and-check) has two PowerShell lines to
    paste, which must print `True`.
@@ -319,7 +319,7 @@ conferma.
 <sub>La demo gira su un PC finto, fatto di server e skill finti scritti apposta
 (`scripts/demo.py`): nessun dato vero, nessun segreto vero.</sub>
 
-**Stato: versione 0.5.5 — v1 (analisi statica) e v2 (Scudo in tempo reale per i server locali stdio).**
+**Stato: versione 0.5.6 — v1 (analisi statica) e v2 (Scudo in tempo reale per i server locali stdio).**
 
 - `guardia inventario` — trova i server MCP e le skill configurati sul PC nelle app supportate
   (Claude Desktop, Claude Code, Cursor, VS Code, Windsurf, Gemini CLI, Codex, Copilot CLI) e li
@@ -434,7 +434,7 @@ Copia il file che crea su una chiavetta o un altro computer: quella è la tua co
 
 Preferisci le foto? Segui la [guida passo passo con le schermate](docs/GUIDA.md).
 
-1. **Scarica** `GuardiaMCP-0.5.5-windows-x64.zip` e `SHA256SUMS.txt` dalla pagina
+1. **Scarica** `GuardiaMCP-0.5.6-windows-x64.zip` e `SHA256SUMS.txt` dalla pagina
    [**Releases**](https://github.com/AlexanderPuglisi/GuardiaMCP/releases/latest) del progetto su
    GitHub e controlla lo zip: nella [guida](docs/GUIDA.md#1-scarica-e-controlla) ci sono due righe
    da incollare in PowerShell, che devono stampare `True`.
