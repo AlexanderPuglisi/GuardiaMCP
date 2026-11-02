@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.5.7 — 2 November 2026
+
+The last gap in the de-obfuscation started in 0.5.5. Folding look-alike letters caught an
+instruction spelled in another alphabet, but not one broken up with invisible characters: a
+zero-width space inside `instru<zero-width>ctions`, or a bidi control, keeps the sentence readable
+while splitting the keyword the pattern looks for. The text now has those invisible format and
+control characters removed before the content patterns run, so the keyword rejoins and the
+instruction is matched. The raw text is still reported verbatim, so the hidden-character rule
+(G01-001) keeps flagging the characters themselves.
+
+**Scanner**
+- Tool and skill text is stripped of invisible format/control characters (zero-width spaces, bidi
+  controls, soft hyphens, and the like — ordinary whitespace is kept) before the content patterns
+  run, on top of the look-alike fold from 0.5.5. A prompt injection or exfiltration instruction cut
+  apart by invisible characters is now caught by its existing rule.
+- New corpus case `zero_width_injection.py`: an injection split by a zero-width space, undetected as
+  an instruction before this change and flagged afterwards (alongside G01-001 for the hidden
+  character itself). The full suite stays green.
+
 ## 0.5.6 — 2 November 2026
 
 More alphabets behind the look-alike check. Until now Guardia only knew the Latin letters that
