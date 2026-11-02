@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.5.5 — 2 November 2026
+
+The look-alike work so far flagged a disguised *name*. This closes the matching hole in the other
+direction: a disguised *instruction*. Guardia's content checks — prompt injection, shadowing,
+secret and context exfiltration, sensitive-file access — matched the plain-letter phrasing, so an
+attacker could slip the same instruction past them by spelling it with letters borrowed from another
+alphabet (a Cyrillic «о» in "ignоre all previous instructions"). The text now runs through the same
+look-alike fold before the patterns see it, so the instruction is matched as what it reads as. No
+new rule, no new dependency; the existing rules simply stop being fooled by the disguise.
+
+**Scanner**
+- Tool and skill text fields are de-obfuscated before the content patterns run: look-alike letters
+  are folded back to Latin (on top of the tag-character stripping that was already there). A prompt
+  injection or exfiltration instruction hidden behind homoglyphs is now caught by its existing rule
+  (for example **G02-001**), with the evidence shown as the plain phrase it decodes to.
+- New corpus case `homoglyph_injection.py`: an injection written with Cyrillic look-alikes that goes
+  undetected before this change and is flagged afterwards. The full suite stays green.
+
 ## 0.5.4 — 2 November 2026
 
 A second look-alike pass, from the same purple-team angle. The homoglyph rules (G04-006…008) catch

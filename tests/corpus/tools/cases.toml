@@ -192,3 +192,8 @@ expected = []
 file = "fullwidth_name.py"
 kind = "malicious"
 expected = ["G04-009"]
+
+[[case]]
+file = "homoglyph_injection.py"
+kind = "malicious"
+expected = ["G02-001"]
