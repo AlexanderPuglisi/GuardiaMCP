@@ -43,8 +43,11 @@ Non serve saper programmare. Ti servono Windows (provato su Windows 11) e cinque
 
 ## 3. Panoramica: com'è messo il tuo PC
 
-All'apertura Guardia fa da sola la prima scansione. Il riquadro in alto dà il verdetto in una frase;
-sotto, la **Panoramica** conta i problemi per gravità e mostra quelli da guardare per primi. La
+All'apertura Guardia fa da sola la prima scansione. In cima, il riquadro **Che cos'è GuardiaMCP**
+dice in una frase a cosa serve; **Come funziona, in parole semplici** apre la spiegazione completa,
+utile anche da mostrare a chi non l'ha mai usato. Sotto, il riquadro del verdetto dice in una frase
+com'è messo il PC; la **Panoramica** conta i problemi per gravità e mostra quelli da guardare per
+primi. La
 scansione non avvia mai i server e non cambia la loro configurazione: scrive soltanto i propri
 appunti (la base di confronto e il registro) nella cartella dei dati di Guardia.
 
@@ -164,6 +167,27 @@ qualcuno cancella o cambia una riga, Guardia se ne accorge.
    **Scudo** accanto ai server protetti compare **Ricollega a questa Guardia**: premilo, così
    partono dalla nuova cartella.
 
+## 11. Togliere GuardiaMCP dal computer
+
+GuardiaMCP non si installa, quindi non c'è niente da disinstallare: basta cancellare due cartelle.
+In **Impostazioni**, in fondo, la sezione **Rimuovere GuardiaMCP** ti guida passo per passo:
+
+1. Chiudi le app AI (Claude anche dall'area di notifica).
+2. Premi **Prepara la rimozione** e conferma. Toglie la protezione dello Scudo da tutti i server e
+   rimette le impostazioni delle app AI com'erano, così continuano a funzionare anche senza
+   Guardia. Prima di cambiare un file ne salva una copia. Se lo Scudo non protegge niente, non
+   cambia nulla.
+3. Premi **Copia percorso** accanto alla cartella dei dati, poi chiudi Guardia.
+4. Apri Esplora file, incolla il percorso nella barra in alto e premi Invio. Torna indietro di una
+   cartella con la freccia in su e cancella la cartella `GuardiaMCP`.
+5. Cancella anche la cartella dove avevi estratto lo zip, quella con `GuardiaMCP.exe`.
+
+Se usi Claude Desktop del Microsoft Store, la sezione mostra anche una seconda cartella dei dati
+dello Scudo: cancellala allo stesso modo. Se un server era protetto a mano (file TOML o con
+commenti), Guardia te lo dice: quello va rimesso com'era a mano.
+
+![Rimuovere GuardiaMCP](tutorial/it-09-removal.png)
+
 ---
 
 ## Se qualcosa non va
@@ -180,6 +204,6 @@ qualcuno cancella o cambia una riga, Guardia se ne accorge.
 | Accanto a un server compare **Ricollega a questa Guardia**, oppure il server non parte dopo **Proteggi** | La cartella di Guardia è stata spostata, rinominata o cancellata | Premi **Ricollega a questa Guardia**, poi riavvia l'app AI |
 | Le modifiche a un server protetto non hanno effetto | L'app AI era ancora aperta | Chiudi del tutto l'app AI (Claude anche dall'area di notifica) e riaprila |
 
-Per disinstallare, segui la sezione **Disinstallare** del [README](../README.md).
+Per togliere Guardia da PowerShell, segui la sezione **Disinstallare** del [README](../README.md).
 Domande o problemi: apri una *issue* su GitHub; per una vulnerabilità usa **Security → Report a
 vulnerability**.

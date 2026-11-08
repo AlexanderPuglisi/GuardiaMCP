@@ -239,6 +239,20 @@ select { background: var(--surface-2); border: 1px solid var(--line-2); border-r
 .dialog { width: min(500px, 100%); background: var(--surface-2); border: 1px solid var(--line-2); border-radius: 12px; padding: 20px 22px 18px; box-shadow: 0 24px 60px rgba(0, 0, 0, .55); }
 .dialog p { margin: 0 0 18px; font-size: 14px; line-height: 1.55; overflow-wrap: anywhere; }
 .dialog .row { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.about { margin-bottom: 14px; padding: 16px 20px; border-left: 3px solid var(--accent-strong); }
+.about h3 { margin: 0 0 6px; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.about h3 svg { width: 16px; height: 16px; flex: none; color: var(--accent-strong); }
+.about .lead { margin: 0; font-size: 14px; line-height: 1.55; }
+.about details { margin-top: 10px; }
+.about summary { cursor: pointer; width: max-content; max-width: 100%; color: var(--accent-strong); font-size: 13px; }
+.about details p { margin: 8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+.steps { margin: 0; padding-left: 22px; display: grid; gap: 10px; font-size: 13.5px; line-height: 1.5; }
+.steps .row { display: flex; gap: 8px; margin-top: 8px; }
+.note-box.result { white-space: pre-line; overflow-wrap: anywhere; color: var(--text); }
+.note-box.warn { border-left-color: var(--high); }
+.removal { margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--line); }
+.removal .folders { margin-top: 14px; }
+.removal .setting span { overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) { .spinner, .glow i { animation: none; } * { transition: none !important; } }
 
 @media (max-width: 1180px) {

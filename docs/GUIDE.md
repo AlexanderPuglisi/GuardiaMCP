@@ -43,8 +43,10 @@ No programming needed. You need Windows (tested on Windows 11) and five minutes.
 
 ## 3. Overview: how your PC is doing
 
-When it opens, Guardia runs the first scan by itself. The card at the top gives the verdict in one
-sentence; below, the **Overview** counts problems by severity and shows the ones to look at first.
+When it opens, Guardia runs the first scan by itself. At the top, the **What GuardiaMCP is** card
+says in one sentence what it is for; **How it works, in plain words** opens the full explanation,
+handy to show someone who has never used it. Below, the verdict card says in one sentence how your
+PC is doing; the **Overview** counts problems by severity and shows the ones to look at first.
 The scan never runs the servers and never changes their configuration: it only writes its own notes
 (the baseline and the ledger) in Guardia's data folder.
 
@@ -159,6 +161,26 @@ changes a line, Guardia notices.
    shows **Relink to this Guardia** next to protected servers: press it, so they start from the new
    folder.
 
+## 11. Remove GuardiaMCP from your computer
+
+GuardiaMCP is not installed, so there is nothing to uninstall: you only delete two folders. At the
+bottom of **Settings**, the **Removing GuardiaMCP** section walks you through it:
+
+1. Close the AI apps (Claude from the tray too).
+2. Press **Prepare removal** and confirm. It removes the Shield's protection from every server and
+   puts the AI apps' settings back as they were, so they keep working without Guardia. Before
+   changing a file it saves a copy of it. If the Shield protects nothing, nothing changes.
+3. Press **Copy path** next to the data folder, then close Guardia.
+4. Open File Explorer, paste the path into the bar at the top and press Enter. Go back one folder
+   with the up arrow and delete the `GuardiaMCP` folder.
+5. Also delete the folder where you extracted the zip, the one with `GuardiaMCP.exe`.
+
+If you use Claude Desktop from the Microsoft Store, the section also shows a second folder with the
+Shield's data: delete it the same way. If a server was protected by hand (a TOML file or one with
+comments), Guardia tells you: put that one back by hand.
+
+![Removing GuardiaMCP](tutorial/en-09-removal.png)
+
 ---
 
 ## If something goes wrong
@@ -175,6 +197,6 @@ changes a line, Guardia notices.
 | A server shows **Relink to this Guardia**, or does not start after **Protect** | Guardia's folder was moved, renamed or deleted | Press **Relink to this Guardia**, then restart the AI app |
 | A protected server's changes do not apply | The AI app was still running | Quit the AI app completely (Claude from the tray too) and open it again |
 
-To uninstall, follow the **Uninstall** section of the [README](../README.md).
+To remove Guardia from PowerShell, follow the **Uninstall** section of the [README](../README.md).
 Questions or problems: open an *issue* on GitHub; for a vulnerability use **Security → Report a
 vulnerability**.

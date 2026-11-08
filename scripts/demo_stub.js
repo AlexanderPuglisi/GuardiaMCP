@@ -27,6 +27,8 @@
     if (index > 0) document.querySelectorAll("#nav button")[index].click();
     if (detail === "hover") showControls();
     else if (detail === "editor") setTimeout(() => document.querySelector(".status-card .btn.primary").click(), 200);
+    else if (detail === "removal") setTimeout(() => document.querySelector(".removal").scrollIntoView(), 200);
+    else if (detail === "about") document.querySelector(".about summary").click();
     else if (detail) setTimeout(pickEntry, 50);
     document.getElementById("toast").hidden = view !== "overview";
   }
@@ -50,6 +52,7 @@
       shield: async () => DEMO.shield,
       shield_rules_text: async () => ({ exists: true, text: DEMO.rules_text }),
       shield_rules_template: async () => ({ text: DEMO.rules_text }),
+      prepare_removal: async () => DEMO.shield,
       window_minimize: async () => null,
       window_close: async () => null,
       window_state: async () => ({ maximized: detail === "max" }),

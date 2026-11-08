@@ -231,9 +231,10 @@ automatic start. Remove it in this order:
 
 1. Close the AI apps (Claude Desktop also from its tray icon → *Quit*) and **remove the Shield from
    every server**, otherwise the AI apps can no longer start those servers. The simplest way: open
-   Guardia, go to *Shield* and press **Remove protection** next to each protected server, until the
-   summary says 0. From PowerShell you can do it in one go (change the path if you extracted Guardia
-   somewhere else):
+   Guardia, go to *Settings* → *Removing GuardiaMCP* and press **Prepare removal**. It removes the
+   protection from every server in one go, puts the AI apps' settings back as they were (saving a
+   copy of each file first) and shows the data and program folders to delete. From PowerShell you
+   can do the same (change the path if you extracted Guardia somewhere else):
 
    ```powershell
    & "$env:USERPROFILE\GuardiaMCP\guardia.exe" shield disable --all --confirm
@@ -520,9 +521,11 @@ servizi, niente chiavi di registro, niente avvio automatico. Toglila in quest'or
 
 1. Chiudi le app AI (Claude Desktop anche dalla sua icona vicino all'orologio → *Esci*) e **togli lo
    Scudo da tutti i server**, altrimenti le app AI non riescono più ad avviarli. Il modo più
-   semplice: apri Guardia, vai in *Scudo* e premi **Togli protezione** accanto a ogni server
-   protetto, finché il riepilogo dice 0. Da PowerShell puoi farlo in un colpo solo (cambia il
-   percorso se hai estratto Guardia altrove):
+   semplice: apri Guardia, vai in *Impostazioni* → *Rimuovere GuardiaMCP* e premi **Prepara la
+   rimozione**. Toglie la protezione da tutti i server in un colpo solo, rimette le impostazioni
+   delle app AI com'erano (salvando prima una copia di ogni file) e ti mostra le cartelle dei dati e
+   del programma da cancellare. Da PowerShell puoi fare lo stesso (cambia il percorso se hai estratto
+   Guardia altrove):
 
    ```powershell
    & "$env:USERPROFILE\GuardiaMCP\guardia.exe" scudo disattiva --tutti --conferma
