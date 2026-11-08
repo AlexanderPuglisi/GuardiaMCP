@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.5.9 — 8 November 2026
+
+GuardiaMCP explains itself in plain words, and leaving it is as safe as trying it.
+
+**New**
+- The Overview opens with a "What GuardiaMCP is" card: one sentence anyone can follow, and a fold
+  with the longer explanation (what MCP servers are, what Guardia warns about, that everything
+  stays on the computer, how to use and remove it).
+- Settings ends with a "Removing GuardiaMCP" section: numbered steps, the data folder and the
+  program folder with *Copy path*, and a **Prepare removal** button. After a confirmation it removes
+  the Shield from every server it can rewrite and puts the AI apps' settings back as they were,
+  saving a copy of each file first, exactly like `shield disable --all`. Servers protected by hand
+  (TOML or files with comments) are named so they can be restored by hand. If the Shield data of
+  Claude from the Microsoft Store exists, that folder is listed too.
+
+**Security**
+- The new action refuses anything but an explicit confirmation, and new tests check that every
+  protection is undone, that nothing changes when nothing is protected and that a file with
+  comments is left byte-for-byte untouched. The windows' Content Security Policy is unchanged.
+
+**Docs**
+- The README and both guides describe the new removal; the guides gain a removal chapter with a
+  screenshot. The guides' download step named the 0.2.3 zip, so the check command failed for anyone
+  who copied it: it now names the current zip.
+
 ## 0.5.8 — 8 November 2026
 
 A visual release with a safety net under it. Before the report and the windows were redesigned,
