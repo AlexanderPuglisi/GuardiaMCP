@@ -19,13 +19,14 @@ from guardia.i18n import Translator
 
 TARGET = demo.PROJECT / "docs" / "tutorial"
 SHOTS = (
-    ("01-overview", "overview", 800),
+    ("01-overview", "overview:about", 1000),
     ("02-findings", "findings", 800),
     ("03-finding-detail", "inventory:github", 800),
     ("04-shield", "shield", 800),
     ("05-rules-editor", "shield:editor", 1000),
     ("06-settings", "settings", 1240),
     ("07-ledger", "ledger", 800),
+    ("09-removal", "settings:removal", 800),
 )
 CONFIRM_SIZE = (500, 470)
 CONFIRM_STUB = """"use strict";
@@ -100,6 +101,7 @@ def build(language: str) -> None:
         data = demo.record(env, language, scrub)
         data["history"] = scrub(history(env, language, project))
         data["state"]["settings"]["projects"] = scrub([str(project)])
+        data["state"]["program_dir"] = scrub(str(env.home / "Downloads" / "GuardiaMCP"))
         page = root / "app.html"
         page.write_text(demo.demo_page(data), encoding="utf-8")
         for name, view, height in SHOTS:

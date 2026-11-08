@@ -184,3 +184,79 @@ def test_rules_changed_during_save_are_not_approved(
     assert result["ok"] is False
     assert "è cambiato" in result["message"]
     assert result["rules"]["state"] == "locked"
+
+
+def test_prepare_removal_undoes_every_protection_after_confirmation(
+    configured: HostEnvironment, write_json: WriteJson
+) -> None:
+    cursor = configured.home / ".cursor" / "mcp.json"
+    write_json(cursor, {"mcpServers": {"github": {"command": "npx", "args": ["-y", "gh"]}}})
+    api = make_api(configured)
+    for server in api.shield()["servers"]:
+        assert api.shield_enable(server["key"], True)["ok"] is True
+    assert api.shield()["protected"] == 2
+    for confirmed in (False, 1, "true", None):
+        with pytest.raises(GuardiaUiError):
+            api.prepare_removal(confirmed)
+    assert api.shield()["protected"] == 2
+    state = api.prepare_removal(True)
+    assert state["ok"] is True
+    assert state["protected"] == 0
+    servers = config(configured)["mcpServers"]
+    assert isinstance(servers, dict)
+    github = {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"]}
+    assert servers["github"] == github
+    other = json.loads(cursor.read_text(encoding="utf-8"))["mcpServers"]["github"]
+    assert other == {"command": "npx", "args": ["-y", "gh"]}
+
+
+def test_prepare_removal_with_nothing_protected_changes_nothing(
+    configured: HostEnvironment,
+) -> None:
+    before = config(configured)
+    state = make_api(configured).prepare_removal(True)
+    assert state["ok"] is True
+    assert state["message"].splitlines() == [
+        "Lo Scudo non protegge nessun server: non c'è niente da rimettere a posto.",
+        "Ora premi «Copia percorso», chiudi GuardiaMCP e cancella le due cartelle.",
+    ]
+    assert config(configured) == before
+
+
+def test_prepare_removal_names_what_must_be_restored_by_hand(env: HostEnvironment) -> None:
+    path = env.app_config / "Code" / "User" / "settings.json"
+    path.parent.mkdir(parents=True)
+    wrapped = json.dumps([sys.executable, "-I", "-m", "guardia", "scudo", "--server", "v", "--"])
+    command, *rest = json.loads(wrapped)
+    args = json.dumps([*rest, "node", "v.js"])
+    original = (
+        "{\n  // c\n"
+        f'  "mcp": {{"servers": {{"v": {{"command": {json.dumps(command)}, "args": {args}}}}}}}\n'
+        "}\n"
+    )
+    path.write_text(original, encoding="utf-8")
+    state = make_api(env).prepare_removal(True)
+    assert state["ok"] is False
+    assert f"Da sistemare a mano: v in {path}." in state["message"]
+    assert "Ora premi" not in state["message"]
+    assert path.read_text(encoding="utf-8") == original
+
+
+def test_state_names_the_program_folder_only_for_the_built_app(
+    env: HostEnvironment, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    assert make_api(env).state()["program_dir"] == ""
+    exe = tmp_path / "GuardiaMCP" / "GuardiaMCP.exe"
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", str(exe))
+    assert make_api(env).state()["program_dir"] == str(exe.parent)
+
+
+def test_state_lists_the_shield_data_of_claude_from_the_store(env: HostEnvironment) -> None:
+    assert make_api(env).state()["store_data_dirs"] == []
+    packages = env.local_app_data / "Packages"
+    data = packages / "Claude_abc123" / "LocalCache" / "Local" / "GuardiaMCP"
+    data.mkdir(parents=True)
+    (packages / "Other_abc" / "LocalCache" / "Local" / "GuardiaMCP").mkdir(parents=True)
+    (packages / "Claude_empty" / "LocalCache" / "Local").mkdir(parents=True)
+    assert make_api(env).state()["store_data_dirs"] == [str(data)]

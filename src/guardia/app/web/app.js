@@ -13,7 +13,8 @@
   };
   const VIEWS = ["overview", "inventory", "findings", "shield", "ledger", "reports", "settings"];
   const state = {
-    ui: {}, settings: {}, report: null, view: "overview", version: "", dataDir: "", booted: false,
+    ui: {}, settings: {}, report: null, view: "overview", version: "", dataDir: "", programDir: "", booted: false,
+    storeDataDirs: [], aboutOpen: false, removal: null,
     entryId: null, entryType: "all", problemsOnly: false, entrySearch: "",
     findingLevel: "all", findingSearch: "", expanded: new Set(),
     ledger: null, shield: null, rulesEditor: null, settingsHistory: null,
@@ -202,6 +203,8 @@
     state.settings = next.settings;
     state.version = next.version;
     state.dataDir = next.data_dir;
+    state.programDir = next.program_dir || "";
+    state.storeDataDirs = next.store_data_dirs || [];
     if (next.report) state.report = next.report;
     document.documentElement.lang = next.language;
   }
@@ -261,8 +264,23 @@
     }
   }
 
+  function about() {
+    const more = el("details", { on: { toggle: (event) => { state.aboutOpen = event.currentTarget.open; } } },
+      el("summary", { text: t("about_more"), attrs: { "data-focus": "about:more" } }),
+      el("p", { text: t("about_parts") }),
+      el("p", { text: t("about_checks") }),
+      el("p", { text: t("about_local") }),
+      el("p", { text: t("about_use") }));
+    more.open = state.aboutOpen;
+    return el("div", { cls: "card about" },
+      el("h3", {}, icon("shield"), t("about_title")),
+      el("p", { cls: "lead", text: t("about_text") }),
+      more);
+  }
+
   function needScan() {
-    return el("div", { cls: "card empty", text: t("need_scan") });
+    const empty = el("div", { cls: "card empty", text: t("need_scan") });
+    return state.view === "overview" ? el("section", {}, about(), empty) : empty;
   }
 
   function verdict(report) {
@@ -293,7 +311,7 @@
 
   function overview(report) {
     const root = el("section");
-    root.append(verdict(report));
+    root.append(about(), verdict(report));
     const max = Math.max(1, ...report.summary.map((s) => s.count));
     const cards = el("div", { cls: "grid sev-cards" });
     for (const item of report.summary) {
@@ -908,8 +926,56 @@
       el("div", { cls: "note-box neutral", text: t("settings_note") }),
       el("h2", { text: t("settings_history_title") }),
       el("p", { cls: "muted", text: t("settings_history_hint") }),
-      settingsHistory());
+      settingsHistory(),
+      removalView());
     return root;
+  }
+
+  function folderRow(title, path) {
+    return settingRow(title, path,
+      el("button", { cls: "btn", text: t("copy_path"), attrs: { type: "button" }, on: { click: () => copy(path) } }));
+  }
+
+  function removalView() {
+    const root = el("section", { cls: "removal" });
+    const dataName = state.dataDir.split(/[\\/]/).filter(Boolean).pop() || "GuardiaMCP";
+    const prepare = el("button", {
+      cls: "btn danger", text: t("removal_button"), attrs: { type: "button", "data-focus": "removal:prepare" },
+      on: { click: prepareRemoval },
+    });
+    const store = state.storeDataDirs.length ? t("removal_data_store") : "";
+    const steps = el("ol", { cls: "steps" },
+      el("li", { text: t("removal_step_close") }),
+      el("li", {}, el("span", { text: t("removal_step_prepare") }), el("div", { cls: "row" }, prepare)),
+      store ? el("li", { text: t("removal_step_store", { label: store }) }) : null,
+      el("li", { text: t("removal_step_copy") }),
+      el("li", { text: t("removal_step_data", { name: dataName }) }),
+      el("li", { text: t("removal_step_program") }));
+    root.append(el("h2", { text: t("removal_title") }), el("p", { cls: "muted", text: t("removal_intro") }), steps);
+    if (state.removal) {
+      root.append(el("div", {
+        cls: "note-box result" + (state.removal.ok ? "" : " warn"), attrs: { role: "status" }, text: state.removal.message,
+      }));
+    }
+    root.append(el("div", { cls: "card card-plain folders" },
+      folderRow(t("removal_data"), state.dataDir),
+      ...state.storeDataDirs.map((path) => folderRow(store, path)),
+      state.programDir ? folderRow(t("removal_program"), state.programDir) : settingRow(t("removal_program"), t("removal_program_source"))));
+    return root;
+  }
+
+  async function prepareRemoval() {
+    if (!(await ask(t("removal_confirm"), t("removal_button")))) return;
+    busy(true, t("shield_working"));
+    try {
+      const next = await call("prepare_removal", true);
+      state.shield = next;
+      state.removal = { message: next.message, ok: next.ok };
+      toast(next.ok ? t("removal_next") : next.message);
+    } catch { } finally {
+      busy(false);
+      render();
+    }
   }
 
   function render() {
@@ -961,6 +1027,7 @@
     } catch {
       return;
     }
+    state.removal = null;
     render();
     refreshTranslated();
   }

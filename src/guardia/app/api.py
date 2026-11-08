@@ -4,9 +4,10 @@ import contextlib
 import json
 import math
 import re
+import sys
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
@@ -35,6 +36,7 @@ from guardia.app.viewmodel import report_view, ui_strings
 from guardia.display import safe_text
 from guardia.i18n import SUPPORTED_LANGUAGES, Translator
 from guardia.inventory import DiscoveryOptions, HostEnvironment
+from guardia.inventory.locations import child_dirs, linked
 from guardia.ledger import Ledger, write_atomic
 from guardia.model import ServerEntry, Severity, sha256_hex
 from guardia.render.html import render_html
@@ -66,6 +68,7 @@ MAX_HISTORY = 30
 SETTINGS_EVENT = "settings_changed"
 LANGUAGE_NAMES = {"it": "Italiano", "en": "English"}
 WINDOW_EDGES = frozenset({"n", "s", "e", "w", "ne", "nw", "se", "sw"})
+STORE_DATA = ("LocalCache", "Local", "GuardiaMCP")
 MIN_WINDOW_SIZE = 200
 MAX_WINDOW_SIZE = 20_000
 
@@ -97,6 +100,26 @@ def bounded(value: object, low: int, high: int) -> int:
     if not math.isfinite(value) or not low <= value <= high:
         raise ValueError("out of range")
     return round(value)
+
+
+def program_dir() -> str:
+    if getattr(sys, "frozen", False):
+        return str(Path(sys.executable).parent)
+    return ""
+
+
+def store_data_dirs(env: HostEnvironment) -> list[str]:
+    if env.platform != "windows":
+        return []
+    found = []
+    for package in child_dirs(env.local_app_data / "Packages"):
+        if not package.name.startswith("Claude_"):
+            continue
+        folder = package.joinpath(*STORE_DATA)
+        with contextlib.suppress(OSError):
+            if folder.is_dir() and not linked(folder):
+                found.append(safe_text(str(folder)))
+    return found
 
 
 def _no_save(_: str) -> str | None:
@@ -179,6 +202,8 @@ class GuardiaApi:
             "ui": ui_strings(t),
             "settings": self._settings.to_dict(),
             "data_dir": safe_text(str(self._env.data_dir)),
+            "program_dir": safe_text(program_dir()),
+            "store_data_dirs": store_data_dirs(self._env),
             "report": self._report_view(),
         }
 
@@ -444,15 +469,23 @@ class GuardiaApi:
         store = ActivationStore(self._env.data_dir, self._ledger())
         return self._apply(lambda: store.enable([server], launcher(), names))
 
-    def _apply(self, action: Callable[[], ActivationReport]) -> dict[str, Any]:
+    def _apply(
+        self,
+        action: Callable[[], ActivationReport],
+        empty: str | None = None,
+        notes: Sequence[str] = (),
+    ) -> dict[str, Any]:
         t = self._t()
         try:
             report = action()
         except (OSError, KeyStoreError) as exc:
             error = safe_text(getattr(exc, "strerror", None) or type(exc).__name__, 120)
             return self._shield_result(t("shield_setup.store_failed", error=error), False)
+        if not report.changes and empty is not None:
+            return self._shield_result("\n".join([empty, *notes]), not notes)
         lines = outcome_lines(report.changes, t)
-        return self._shield_result("\n".join(lines), succeeded(report.changes))
+        ok = succeeded(report.changes) and not notes
+        return self._shield_result("\n".join([*lines, *notes]), ok)
 
     def _protected(self, key: object) -> ServerEntry:
         if not isinstance(key, str):
@@ -477,6 +510,32 @@ class GuardiaApi:
             return store.disable([server.name], file=server.source.path)
 
         return self._apply(disable)
+
+    def prepare_removal(self, confirmed: object) -> dict[str, Any]:
+        if confirmed is not True:
+            raise self._fail("confirmation")
+        t = self._t()
+        found = [c for c in server_candidates(self._env) if c.support is Support.PROTECTED]
+        protected = [c.server for c in found if editable(c.server.source.path)]
+        by_hand = [
+            t(
+                "ui.removal_by_hand",
+                name=safe_text(c.server.name, 80),
+                path=safe_text(str(c.server.source.path)),
+            )
+            for c in found
+            if not editable(c.server.source.path)
+        ]
+        store = ActivationStore(self._env.data_dir, self._ledger())
+
+        def undo_all() -> ActivationReport:
+            store.adopt(protected)
+            return store.disable(None)
+
+        result = self._apply(undo_all, empty=t("ui.removal_nothing"), notes=by_hand)
+        if result["ok"]:
+            result["message"] = "\n".join([result["message"], t("ui.removal_next")])
+        return result
 
     def shield_relink(self, key: object, confirmed: object) -> dict[str, Any]:
         if confirmed is not True:
