@@ -709,6 +709,7 @@ generated = "Generato il {time}"
 flagged = "Server e skill con segnalazioni"
 clean_title = "Nessun problema trovato ({count})"
 coverage_title = "Copertura e verifiche"
+offline = "100% offline · nessun dato lascia questo computer"
 
 [rules.G13-001]
 title = "Registro manomesso"

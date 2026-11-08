@@ -709,6 +709,7 @@ generated = "Generated on {time}"
 flagged = "Servers and skills with findings"
 clean_title = "No problems found ({count})"
 coverage_title = "Coverage and checks"
+offline = "100% offline · no data leaves this computer"
 
 [rules.G13-001]
 title = "Ledger tampered with"
