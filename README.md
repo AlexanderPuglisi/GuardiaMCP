@@ -40,7 +40,7 @@ asks you first.
 <sub>The demo runs on a fake PC made of fake servers and skills written for the purpose
 (`scripts/demo.py`): no real data, no real secrets.</sub>
 
-**Status: version 0.5.7 — v1 (static analysis) and v2 (real-time Shield for local stdio servers).**
+**Status: version 0.5.8 — v1 (static analysis) and v2 (real-time Shield for local stdio servers).**
 
 - `guardia inventory` — finds the MCP servers and skills configured on this PC in the supported apps
   (Claude Desktop, Claude Code, Cursor, VS Code, Windsurf, Gemini CLI, Codex, Copilot CLI) and lists
@@ -147,7 +147,7 @@ never uses the network). Restore it into a folder of your choice with
 
 Prefer pictures? Follow the [step-by-step guide with screenshots](docs/GUIDE.md).
 
-1. **Download** `GuardiaMCP-0.5.7-windows-x64.zip` and `SHA256SUMS.txt` from the project's
+1. **Download** `GuardiaMCP-0.5.8-windows-x64.zip` and `SHA256SUMS.txt` from the project's
    [**Releases**](https://github.com/AlexanderPuglisi/GuardiaMCP/releases/latest) page on GitHub
    and check the zip: the [guide](docs/GUIDE.md#1-download-and-check) has two PowerShell lines to
    paste, which must print `True`.
@@ -156,7 +156,7 @@ Prefer pictures? Follow the [step-by-step guide with screenshots](docs/GUIDE.md)
    Protected servers start Guardia from this folder: if you move it, press **Relink to this
    Guardia** in the *Shield* section; if you want to delete it, first remove the protection (see
    *Uninstall*).
-3. **Open `GuardiaMCP.exe`** (the one with the red shield icon). The first time Windows SmartScreen
+3. **Open `GuardiaMCP.exe`** (the one with the steel-blue shield icon). The first time Windows SmartScreen
    may warn you, because the program is not code-signed yet: choose *More info* → *Run anyway*. The
    first scan starts by itself.
 4. **Read the results.** The card at the top gives the verdict in one sentence; *Findings* lists the
@@ -319,7 +319,7 @@ conferma.
 <sub>La demo gira su un PC finto, fatto di server e skill finti scritti apposta
 (`scripts/demo.py`): nessun dato vero, nessun segreto vero.</sub>
 
-**Stato: versione 0.5.7 — v1 (analisi statica) e v2 (Scudo in tempo reale per i server locali stdio).**
+**Stato: versione 0.5.8 — v1 (analisi statica) e v2 (Scudo in tempo reale per i server locali stdio).**
 
 - `guardia inventario` — trova i server MCP e le skill configurati sul PC nelle app supportate
   (Claude Desktop, Claude Code, Cursor, VS Code, Windsurf, Gemini CLI, Codex, Copilot CLI) e li
@@ -434,7 +434,7 @@ Copia il file che crea su una chiavetta o un altro computer: quella è la tua co
 
 Preferisci le foto? Segui la [guida passo passo con le schermate](docs/GUIDA.md).
 
-1. **Scarica** `GuardiaMCP-0.5.7-windows-x64.zip` e `SHA256SUMS.txt` dalla pagina
+1. **Scarica** `GuardiaMCP-0.5.8-windows-x64.zip` e `SHA256SUMS.txt` dalla pagina
    [**Releases**](https://github.com/AlexanderPuglisi/GuardiaMCP/releases/latest) del progetto su
    GitHub e controlla lo zip: nella [guida](docs/GUIDA.md#1-scarica-e-controlla) ci sono due righe
    da incollare in PowerShell, che devono stampare `True`.
@@ -443,7 +443,7 @@ Preferisci le foto? Segui la [guida passo passo con le schermate](docs/GUIDA.md)
    I server protetti avviano Guardia da questa cartella: se la sposti, premi **Ricollega a questa
    Guardia** nella sezione *Scudo*; se vuoi cancellarla, prima togli la protezione (vedi
    *Disinstallare*).
-3. **Apri `GuardiaMCP.exe`** (quello con l'icona dello scudo rosso). La prima volta Windows
+3. **Apri `GuardiaMCP.exe`** (quello con l'icona dello scudo azzurro acciaio). La prima volta Windows
    SmartScreen può mostrare un avviso, perché il programma non è ancora firmato digitalmente: scegli
    *Ulteriori informazioni* → *Esegui comunque*. La prima scansione parte da sola.
 4. **Leggi i risultati.** Il riquadro in alto dà il verdetto in una frase; *Problemi* elenca i

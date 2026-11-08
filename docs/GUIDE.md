@@ -30,7 +30,7 @@ No programming needed. You need Windows (tested on Windows 11) and five minutes.
    `C:\Users\YOUR-NAME`. A `GuardiaMCP` folder is created. Always extract first: the programs do not
    work when started from inside the zip.
 2. Inside there are two programs:
-   - **`GuardiaMCP.exe`**: the app with the window, the one you use (red shield icon, type
+   - **`GuardiaMCP.exe`**: the app with the window, the one you use (steel-blue shield icon, type
      *Application*). Next to it there is a small `GuardiaMCP.exe.config` file with the same name:
      leave it there, it is not the program;
    - **`guardia.exe`**: the command line; the Shield and the AI apps use it too, do not delete it.
@@ -169,7 +169,7 @@ changes a line, Guardia notices.
 | "Smart App Control blocked an app" | Windows 11 with Smart App Control on blocks unsigned programs, with no "Run anyway" | Install from source (see the README), or switch Smart App Control off in *Windows Security* → *App & browser control* (Windows lets you switch it back on only by reinstalling, so choose calmly) |
 | The antivirus deletes or blocks `guardia.exe` | Some antivirus products mistake programs built with PyInstaller for threats | Check the zip with step 1; if it prints **True**, report the false positive to your antivirus vendor, or install from source |
 | An error about `python312.dll` | The program was started from inside the zip | Extract the zip first (step 2) |
-| Double-clicking does nothing, or opens a text file | You opened `GuardiaMCP.exe.config` | Double-click **`GuardiaMCP.exe`**, the one with the red shield icon and type *Application* |
+| Double-clicking does nothing, or opens a text file | You opened `GuardiaMCP.exe.config` | Double-click **`GuardiaMCP.exe`**, the one with the steel-blue shield icon and type *Application* |
 | `Failed to resolve Python.Runtime.Loader.Initialize` | Only with version **0.2.0**: Windows blocked the libraries of the downloaded zip | Use the latest version |
 | Finding **G12-006** "Configuration file could not be analyzed" | Guardia could not read that file, so the servers in it were not checked and the analysis is marked incomplete. **Found** gives the line and what is wrong | Open the file and fix it. In Windows paths inside JSON files write `\\` (two backslashes) |
 | A server shows **Relink to this Guardia**, or does not start after **Protect** | Guardia's folder was moved, renamed or deleted | Press **Relink to this Guardia**, then restart the AI app |

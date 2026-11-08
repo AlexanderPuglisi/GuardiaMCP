@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.5.8 — 8 November 2026
+
+A visual release with a safety net under it. Before the report and the windows were redesigned,
+new tests locked in every protection they must keep; then GuardiaMCP moved to its new graphite
+identity.
+
+**Look**
+- The HTML report (`--format html`) is graphite with a steel accent: the shield mark and a
+  "100% offline" badge in the header, severity colours kept apart from the brand colour (red
+  critical, orange high, yellow medium), coloured summary cards with zero counts dimmed, a
+  severity border on every server, framed "found" values and a +/– hint on each entry. It follows
+  the system light theme on its own.
+- The app and the Shield confirmation window are graphite with a steel accent, and the glow that
+  circles the window border is now steel. Red now means only an alarm: problem and Shield
+  counters, danger buttons, error text, the reasons in a Shield warning, critical findings. High
+  findings are orange and medium ones yellow, as in the report.
+- A new program icon: a steel-blue shield.
+
+**Security**
+- New tests lock in what the redesign must not weaken: hostile server names, arguments and tool
+  descriptions reach the report only as text, never as markup; the report and both windows keep
+  exactly their strict Content Security Policies (no network, fonts, frames or inline code); no
+  stylesheet loads anything from outside. Nothing was loosened: the report still runs no scripts,
+  and Windows system fonts are used instead of web fonts so nothing is ever fetched.
+
+**Build**
+- `uv.lock` had fallen out of step with the version since 0.5.4, which stopped the CI install step
+  before any check ran. It is in sync again and CI is green.
+- The guides and their screenshots show the new look.
+
 ## 0.5.7 — 2 November 2026
 
 The last gap in the de-obfuscation started in 0.5.5. Folding look-alike letters caught an
