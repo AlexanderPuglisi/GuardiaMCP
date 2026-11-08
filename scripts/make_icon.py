@@ -8,9 +8,9 @@ PROJECT = Path(__file__).resolve().parent.parent
 TARGET = PROJECT / "src" / "guardia" / "app" / "guardia.ico"
 CANVAS = 1024
 SCALE = CANVAS / 32
-FILL = (29, 29, 35, 255)
-RED = (196, 51, 43, 255)
-WHITE = (236, 233, 230, 255)
+FILL = (31, 36, 43, 255)
+STEEL = (110, 169, 201, 255)
+WHITE = (233, 236, 240, 255)
 SIZES = [(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
 Point = tuple[float, float]
 
@@ -48,7 +48,9 @@ def draw_icon() -> Image.Image:
     draw = ImageDraw.Draw(image)
     outline = shield()
     draw.polygon(outline, fill=FILL)
-    draw.line([*outline, outline[0], outline[1]], fill=RED, width=round(2.2 * SCALE), joint="curve")
+    draw.line(
+        [*outline, outline[0], outline[1]], fill=STEEL, width=round(2.2 * SCALE), joint="curve"
+    )
     check = [(11 * SCALE, 16 * SCALE), (14.6 * SCALE, 19.6 * SCALE), (21.5 * SCALE, 12.7 * SCALE)]
     width = round(2.6 * SCALE)
     draw.line(check, fill=WHITE, width=width, joint="curve")
