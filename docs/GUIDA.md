@@ -30,7 +30,7 @@ Non serve saper programmare. Ti servono Windows (provato su Windows 11) e cinque
    `C:\Users\TUO-NOME`. Si crea la cartella `GuardiaMCP`. Estrai sempre prima: i programmi non
    funzionano se li avvii da dentro lo zip.
 2. Dentro trovi due programmi:
-   - **`GuardiaMCP.exe`**: l'app con la finestra, quella che usi tu (icona dello scudo rosso, tipo
+   - **`GuardiaMCP.exe`**: l'app con la finestra, quella che usi tu (icona dello scudo azzurro acciaio, tipo
      *Applicazione*). Accanto c'è un piccolo file `GuardiaMCP.exe.config` con lo stesso nome:
      lascialo lì, non è il programma;
    - **`guardia.exe`**: la riga di comando; la usano anche lo Scudo e le app AI, non cancellarla.
@@ -174,7 +174,7 @@ qualcuno cancella o cambia una riga, Guardia se ne accorge.
 | «Controllo intelligente delle app ha bloccato un'app» | Windows 11 con il Controllo intelligente delle app attivo blocca i programmi non firmati, senza «Esegui comunque» | Installa dal codice sorgente (vedi il README), oppure spegni il Controllo intelligente delle app in *Sicurezza di Windows* → *Controllo delle app e del browser* (Windows lo lascia riaccendere solo reinstallando il sistema, quindi decidi con calma) |
 | L'antivirus cancella o blocca `guardia.exe` | Alcuni antivirus scambiano per minacce i programmi costruiti con PyInstaller | Controlla lo zip come al passo 1; se compare **True**, segnala il falso allarme al produttore dell'antivirus, oppure installa dal codice sorgente |
 | Un errore su `python312.dll` | Il programma è stato avviato da dentro lo zip | Prima estrai lo zip (passo 2) |
-| Il doppio clic non fa niente, o apre un file di testo | Hai aperto `GuardiaMCP.exe.config` | Doppio clic su **`GuardiaMCP.exe`**, quello con l'icona dello scudo rosso e tipo *Applicazione* |
+| Il doppio clic non fa niente, o apre un file di testo | Hai aperto `GuardiaMCP.exe.config` | Doppio clic su **`GuardiaMCP.exe`**, quello con l'icona dello scudo azzurro acciaio e tipo *Applicazione* |
 | `Failed to resolve Python.Runtime.Loader.Initialize` | Solo con la versione **0.2.0**: Windows bloccava le librerie dello zip scaricato | Usa l'ultima versione |
 | Problema **G12-006** «File di configurazione non analizzabile» | Guardia non è riuscita a leggere quel file, quindi i server che contiene non sono stati controllati e l'analisi risulta incompleta. **Trovato** dice la riga e cosa non va | Apri il file e correggilo. Nei percorsi di Windows dentro i file JSON scrivi `\\` (due barre) |
 | Accanto a un server compare **Ricollega a questa Guardia**, oppure il server non parte dopo **Proteggi** | La cartella di Guardia è stata spostata, rinominata o cancellata | Premi **Ricollega a questa Guardia**, poi riavvia l'app AI |
